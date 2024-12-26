@@ -1,12 +1,12 @@
 name: Build and Push Docker Images
 
 on:
-#  push:
-#    branches:
-#      - main  # Déclenche sur les pushes vers "main"
-#  pull_request:
-#    branches:
-#      - main  # Déclenche sur les PRs vers "main"
+  push:
+    branches:
+      - main  # Déclenche sur les pushes vers "main"
+  pull_request:
+    branches:
+      - main  # Déclenche sur les PRs vers "main"
   workflow_dispatch:  # Permet de lancer manuellement le workflow
 
 jobs:
@@ -37,7 +37,7 @@ jobs:
         file: backend/Dockerfile
         push: true
         tags: tiritibambix/itransfer-backend:latest
-        platforms: linux/arm64  #,linux/amd64
+        platforms: linux/arm64 #,linux/amd64
 
     # Étape 5 : Construire et pousser l'image Docker pour le frontend
     - name: Build and push frontend image
@@ -47,4 +47,4 @@ jobs:
         file: frontend/Dockerfile
         push: true
         tags: tiritibambix/itransfer-frontend:latest
-        platforms: linux/arm64  #,linux/amd64
+        platforms: linux/arm64 #,linux/amd64
