@@ -1,13 +1,16 @@
 # Dockerfile - Frontend
-FROM node:16-alpine
+FROM node:16-buster
 
 # Définir le répertoire de travail
 WORKDIR /app
 
 # Copier les fichiers nécessaires
 COPY package*.json ./
+
+# Installer les dépendances
 RUN npm install
 
+# Copier le reste de l'application
 COPY . .
 
 # Build de l'application React
