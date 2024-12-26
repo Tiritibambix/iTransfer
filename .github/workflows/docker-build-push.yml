@@ -1,12 +1,12 @@
 name: Build and Push Docker Images
 
 on:
-  push:
-    branches:
-      - main  # Déclenche sur les pushes vers "main"
-  pull_request:
-    branches:
-      - main  # Déclenche sur les PRs vers "main"
+#  push:
+#    branches:
+#      - main  # Déclenche sur les pushes vers "main"
+#  pull_request:
+#    branches:
+#     - main  # Déclenche sur les PRs vers "main"
   workflow_dispatch:  # Permet de lancer manuellement le workflow
 
 jobs:
