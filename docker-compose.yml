@@ -1,35 +1,33 @@
-version: "3.9"
-
 services:
-  backend:
-    build:
-      context: ./backend
+  itransfer-backend:
+    image: tiritibambix/itransfer-backend:latest
+    container_name: itransfer-backend
     ports:
       - "5000:5000"
     volumes:
       - ./backend/uploads:/app/uploads
-    env_file:
-      - .env
+    environment:
+      SMTP_SERVER: smtp.example.com
+      SMTP_PORT: 587
+      SMTP_EMAIL: your_email@example.com
+      SMTP_PASSWORD: your_password
     depends_on:
-      - db
+      - itransfer-db
 
-  frontend:
-    build:
-      context: ./frontend
+  itransfer-frontend:
+    image: tiritibambix/itransfer-frontend:latest
+    container_name: itransfer-frontend
     ports:
       - "3000:3000"
 
-  db:
+  itransfer-db:
     image: postgres:13
-    container_name: postgres_db
+    container_name: itransfer-db
     environment:
       POSTGRES_USER: your_username
       POSTGRES_PASSWORD: your_password
       POSTGRES_DB: uploads_db
     volumes:
-      - db_data:/var/lib/postgresql/data
+      - ./db_data:/var/lib/postgresql/data
     ports:
       - "5432:5432"
-
-volumes:
-  db_data:
