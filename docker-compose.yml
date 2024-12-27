@@ -2,19 +2,18 @@ version: '3'
 
 services:
   backend:
-    build:
-      context: ./backend
+    image: tiritibambix/itransfer-backend  # Utilisation de l'image pré-construite
     ports:
       - "5000:5000"
     volumes:
-      - ./backend:/app
+      - ./backend/data:/data          # Volume pour stocker les données de l'application
+      - ./backend/uploads:/uploads     # Volume pour les fichiers uploadés
 
   frontend:
-    build:
-      context: ./frontend
+    image: tiritibambix/itransfer-frontend  # Utilisation de l'image pré-construite
     ports:
       - "3000:3000"
-    volumes:
-      - ./frontend:/app
     depends_on:
       - backend
+    volumes:
+      - ./frontend/data:/data           # (Facultatif) Volume pour stocker des données du frontend
