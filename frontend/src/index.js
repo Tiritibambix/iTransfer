@@ -26,7 +26,7 @@ const App = () => {
 
   return (
     <div>
-      <h1>WeTransfer Clone</h1>
+      <h1>iTransfer</h1>  {/* Titre mis à jour ici */}
       <input type="file" onChange={handleFileChange} />
       <button onClick={handleUpload}>Upload</button>
       {message && <p>{message}</p>}
