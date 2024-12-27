@@ -1,33 +1,44 @@
 services:
-  itransfer-backend:
-    image: tiritibambix/itransfer-backend:latest
-    container_name: itransfer-backend
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./backend/uploads:/app/uploads
-    environment:
-      SMTP_SERVER: smtp.example.com
-      SMTP_PORT: 587
-      SMTP_EMAIL: your_email@example.com
-      SMTP_PASSWORD: your_password
-    depends_on:
-      - itransfer-db
-
-  itransfer-frontend:
-    image: tiritibambix/itransfer-frontend:latest
-    container_name: itransfer-frontend
+  frontend:
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "3000:3000"
-
-  itransfer-db:
-    image: postgres:13
-    container_name: itransfer-db
+    depends_on:
+      - backend
     environment:
-      POSTGRES_USER: your_username
-      POSTGRES_PASSWORD: your_password
-      POSTGRES_DB: uploads_db
-    volumes:
-      - ./db_data:/var/lib/postgresql/data
+      - REACT_APP_API_URL=http://backend:5000
+
+  backend:
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
-      - "5432:5432"
+      - "5000:5000"
+    depends_on:
+      - database
+    environment:
+      - DATABASE_URL=mongodb://database:27017/wetransfer_clone
+      - JWT_SECRET=your_secret_key
+      - STORAGE_PATH=/app/uploads
+
+  database:
+    image: mongo:latest
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "27017:27017"
+
+  file-storage:
+    build: 
+      context: ./file-storage
+      dockerfile: Dockerfile
+    volumes:
+      - uploads:/app/uploads
+    ports:
+      - "9000:9000"
+
+volumes:
+  mongodb_data:
+  uploads:
