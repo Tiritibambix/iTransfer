@@ -1,12 +1,6 @@
 name: Build and Push Docker Images
 
 on:
-#  push:
-#    branches:
-#      - main  # Déclenche sur les pushes vers "main"
-#  pull_request:
-#    branches:
-#     - main  # Déclenche sur les PRs vers "main"
   workflow_dispatch:  # Permet de lancer manuellement le workflow
 
 jobs:
@@ -29,7 +23,13 @@ jobs:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
-    # Étape 4 : Construire et pousser l'image Docker pour le backend
+    # Étape 4 : Installer les dépendances du frontend
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm install
+
+    # Étape 5 : Construire et pousser l'image Docker pour le backend
     - name: Build and push backend image
       uses: docker/build-push-action@v3
       with:
@@ -39,7 +39,7 @@ jobs:
         tags: tiritibambix/itransfer-backend:latest
         platforms: linux/amd64 #,linux/arm64
 
-    # Étape 5 : Construire et pousser l'image Docker pour le frontend
+    # Étape 6 : Construire et pousser l'image Docker pour le frontend
     - name: Build and push frontend image
       uses: docker/build-push-action@v3
       with:
