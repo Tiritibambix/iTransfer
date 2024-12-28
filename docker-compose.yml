@@ -1,19 +1,45 @@
-version: '3'
+version: '3.8'
 
 services:
-  backend:
-    image: tiritibambix/itransfer-backend  # Utilisation de l'image pré-construite
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./backend/data:/data          # Volume pour stocker les données de l'application
-      - ./backend/uploads:/uploads     # Volume pour les fichiers uploadés
-
   frontend:
-    image: tiritibambix/itransfer-frontend  # Utilisation de l'image pré-construite
+    build:
+      context: ./frontend
     ports:
       - "3000:3000"
-    depends_on:
-      - backend
     volumes:
-      - ./frontend/data:/data           # (Facultatif) Volume pour stocker des données du frontend
+      - ./frontend:/app
+      - /app/node_modules  # Pour éviter de synchroniser le dossier node_modules
+
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "5000:5000"
+    environment:
+      DATABASE_URL: mysql://mariadb_user:mariadb_pass@db/mariadb_db
+      SECRET_KEY: your_secret_key
+      SMTP_SERVER: smtp.yourmail.com
+      SMTP_PORT: 587
+      SMTP_USER: your_smtp_user
+      SMTP_PASSWORD: your_smtp_password
+    volumes:
+      - ./backend/app:/app  # Pour le développement local, permettre les changements en temps réel
+      - backend_data:/app/data  # Volume persistant pour sauvegarder les données si nécessaire
+    depends_on:
+      - db
+
+  db:
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: mariadb_db
+      MYSQL_USER: mariadb_user
+      MYSQL_PASSWORD: mariadb_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql  # Volume persistant pour stocker les données de la base de données
+
+volumes:
+  db_data:
+  backend_data:
