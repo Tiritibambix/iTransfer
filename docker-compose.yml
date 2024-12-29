@@ -1,0 +1,37 @@
+services:
+  frontend:
+    image: tiritibambix/itransfer-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      - backend
+
+  backend:
+    image: tiritibambix/itransfer-backend
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+    volumes:
+      - ./backend/app:/app  # Pour le développement local, permettre les changements en temps réel
+      - backend_data:/app/data  # Volume persistant pour sauvegarder les données si nécessaire
+    depends_on:
+      - db
+
+  db:
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: mariadb_db
+      MYSQL_USER: mariadb_user
+      MYSQL_PASSWORD: mariadb_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - db_data:/var/lib/mysql
+
+#volumes:
+#  db_data:
+#  backend_data:
