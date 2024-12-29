@@ -1,13 +1,16 @@
-# Dockerfile dans le dossier ./backend
+# Utilisation d'une image Python légère
 FROM python:3.10-slim
 
 WORKDIR /app
 
-# Installer les dépendances
-RUN pip install --no-cache-dir -r /requirements.txt
+# Copier le fichier requirements.txt depuis la racine
+COPY /requirements.txt /app/requirements.txt
 
-# Copier tout le contenu de backend/app
-COPY app /app
+# Installer les dépendances Python
+RUN pip install --no-cache-dir -r /app/requirements.txt
+
+# Copier le contenu entier du dossier backend/app
+COPY ./app /app
 
 EXPOSE 5000
 
