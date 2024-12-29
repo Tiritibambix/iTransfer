@@ -33,7 +33,6 @@ jobs:
         tags: tiritibambix/itransfer-backend:latest
         platforms: linux/amd64
 
-
     # Étape 5 : Construire et pousser l'image Docker pour le frontend
     - name: Build and push frontend image
       uses: docker/build-push-action@v3
