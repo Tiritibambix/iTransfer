@@ -4,16 +4,17 @@ FROM python:3.10-slim
 # Définir le répertoire de travail
 WORKDIR /app
 
-# Copier requirements.txt depuis la racine du dépôt
-COPY /requirements.txt /app/requirements.txt
+# Copier le fichier requirements.txt
+COPY requirements.txt /app/requirements.txt
 
-# Installer les dépendances
-RUN pip install --no-cache-dir -r /app/requirements.txt
+# Installer les dépendances et vérifier leur compatibilité
+RUN pip install --no-cache-dir -r /app/requirements.txt && \
+    pip check
 
 # Copier le reste des fichiers de l'application
 COPY backend/app /app
 
-# Vérifier les fichiers copiés
+# Vérifier les fichiers copiés (facultatif mais utile pour debug)
 RUN ls -la /app
 
 # Exposer le port sur lequel l'application sera accessible
