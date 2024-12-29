@@ -5,13 +5,13 @@ FROM python:3.10-slim
 WORKDIR /app
 
 # Copier requirements.txt depuis la racine du dépôt
-COPY requirements.txt /app/requirements.txt
+COPY backend/requirements.txt /app/requirements.txt
 
 # Installer les dépendances
 RUN pip install --no-cache-dir -r /app/requirements.txt
 
 # Copier le reste des fichiers de l'application
-COPY . .
+COPY backend/app /app
 
 # Vérifier les fichiers copiés
 RUN ls -la /app
