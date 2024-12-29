@@ -3,9 +3,6 @@ FROM python:3.10-slim
 
 WORKDIR /app
 
-# Copier le fichier requirements.txt depuis le bon chemin
-COPY app/requirements.txt /requirements.txt
-
 # Installer les dépendances
 RUN pip install --no-cache-dir -r /requirements.txt
 
