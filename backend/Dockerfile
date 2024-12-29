@@ -1,20 +1,17 @@
-# Utiliser une image de base officielle Python
-FROM python:3.9-slim
+# Dockerfile dans ./backend
+FROM python:3.10-slim
 
-# Définir le répertoire de travail
 WORKDIR /app
 
-# Copier les fichiers nécessaires
-COPY backend/ .
-
-# Vérifier les fichiers copiés
-RUN ls -la
+# Copier requirements.txt depuis la racine du dépôt
+COPY /requirements.txt /app/requirements.txt
 
 # Installer les dépendances
-RUN pip install -r requirements.txt
+RUN pip install --no-cache-dir -r /app/requirements.txt
 
-# Exposer le port sur lequel l'application sera accessible
+# Copier le dossier app depuis backend
+COPY backend/app /app
+
 EXPOSE 5000
 
-# Commande pour démarrer l'application
 CMD ["python", "app.py"]
