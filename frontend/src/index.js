@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import './index.css';
+import './index.css'; // Assurez-vous que ce chemin est correct
 
 const App = () => {
   const [file, setFile] = useState(null);
@@ -14,7 +14,7 @@ const App = () => {
     if (!file) return;
     const formData = new FormData();
     formData.append('file', file);
-    
+
     const response = await fetch('http://localhost:5000/upload', {
       method: 'POST',
       body: formData,
@@ -26,7 +26,7 @@ const App = () => {
 
   return (
     <div>
-      <h1>iTransfer</h1>  {/* Titre mis à jour ici */}
+      <h1>iTransfer</h1>
       <input type="file" onChange={handleFileChange} />
       <button onClick={handleUpload}>Upload</button>
       {message && <p>{message}</p>}
