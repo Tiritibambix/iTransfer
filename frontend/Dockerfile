@@ -7,6 +7,9 @@ WORKDIR /app
 # Copier package.json et package-lock.json
 COPY frontend/package*.json ./
 
+# Vérifier les fichiers copiés
+RUN ls -la
+
 # Installer les dépendances
 RUN npm install
 
@@ -17,6 +20,9 @@ COPY frontend/ .
 RUN ls -la
 RUN ls -la src
 
+# Changer les permissions des fichiers
+RUN chmod -R 755 .
+
 # Construire l'application
 RUN npm run build
 
@@ -24,7 +30,7 @@ RUN npm run build
 RUN npm install -g serve
 
 # Exposer le port sur lequel l'application sera accessible
-EXPOSE 3000
+EXPOSE 5000
 
 # Commande pour démarrer l'application
 CMD ["serve", "-s", "build"]
