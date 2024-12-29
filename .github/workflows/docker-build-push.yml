@@ -1,11 +1,11 @@
 name: Build and Push Docker Images
 
 on:
-  workflow_dispatch:  # Permet de lancer manuellement le workflow
+  workflow_dispatch:
 
 jobs:
   build-and-push:
-    runs-on: ubuntu-22.04  # Utilisation d'une VM Ubuntu récente
+    runs-on: ubuntu-22.04
 
     steps:
     # Étape 1 : Cloner le dépôt
@@ -31,7 +31,7 @@ jobs:
         file: ./backend/Dockerfile
         push: true
         tags: tiritibambix/itransfer-backend:latest
-        platforms: linux/amd64 #,linux/arm64
+        platforms: linux/amd64
 
     # Étape 5 : Construire et pousser l'image Docker pour le frontend
     - name: Build and push frontend image
@@ -41,4 +41,4 @@ jobs:
         file: ./frontend/Dockerfile
         push: true
         tags: tiritibambix/itransfer-frontend:latest
-        platforms: linux/amd64 #,linux/arm64
+        platforms: linux/amd64
