@@ -11,7 +11,7 @@ def test_index_route(client):
     assert response.status_code == 200
     assert response.json == {"message": "Bienvenue sur iTransfer API"}
 
-def test_upload_file_no_file(client):
+def test_upload_no_file(client):
     response = client.post('/upload', data={})
     assert response.status_code == 400
     assert "error" in response.json
