@@ -27,12 +27,12 @@ jobs:
     - name: Build and push backend image
       uses: docker/build-push-action@v3
       with:
-        # Inclure tout le dépôt comme contexte
-        context: . 
+        context: ./backend
         file: ./backend/Dockerfile
         push: true
         tags: tiritibambix/itransfer-backend:latest
         platforms: linux/amd64
+
 
     # Étape 5 : Construire et pousser l'image Docker pour le frontend
     - name: Build and push frontend image
