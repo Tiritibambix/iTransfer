@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import './index.css'; // Assurez-vous que ce chemin est correct
+import './index.css'; // Chemin relatif correct
 
 const App = () => {
   const [file, setFile] = useState(null);
