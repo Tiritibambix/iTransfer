@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt && \
     pip check
 
 # Copier le code de l'application
-COPY backend/app /app
+COPY ./backend/app /app
 
 # Vérifier les fichiers copiés (optionnel pour debug)
 RUN ls -la /app
