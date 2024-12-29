@@ -1,0 +1,75 @@
+/* index.css */
+
+:root {
+  /** Dark theme primary colors */
+  --clr-primary-a0: #400040;
+  --clr-primary-a10: #551f53;
+  --clr-primary-a20: #693a67;
+  --clr-primary-a30: #7e547b;
+  --clr-primary-a40: #936f90;
+  --clr-primary-a50: #a88aa5;
+
+  /** Dark theme surface colors */
+  --clr-surface-a0: #170017;
+  --clr-surface-a10: #2b1d2c;
+  --clr-surface-a20: #423542;
+  --clr-surface-a30: #5a4e5a;
+  --clr-surface-a40: #746974;
+  --clr-surface-a50: #8e858e;
+
+  /** Dark theme tonal surface colors */
+  --clr-surface-tonal-a0: #1b021b;
+  --clr-surface-tonal-a10: #2f1e30;
+  --clr-surface-tonal-a20: #463646;
+  --clr-surface-tonal-a30: #5e4f5e;
+  --clr-surface-tonal-a40: #766a77;
+  --clr-surface-tonal-a50: #908690;
+}
+
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background-color: var(--clr-surface-a0);
+  color: var(--clr-primary-a50);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+#root {
+  text-align: center;
+}
+
+h1 {
+  color: var(--clr-primary-a40);
+}
+
+input[type="file"] {
+  margin-top: 20px;
+  padding: 10px;
+  background-color: var(--clr-surface-a20);
+  color: var(--clr-primary-a50);
+  border: none;
+  border-radius: 5px;
+}
+
+button {
+  margin-top: 20px;
+  padding: 10px 20px;
+  background-color: var(--clr-primary-a30);
+  color: var(--clr-surface-a0);
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+button:hover {
+  background-color: var(--clr-primary-a40);
+}
+
+p {
+  margin-top: 20px;
+  color: var(--clr-primary-a50);
+}
