@@ -1,21 +1,27 @@
-import React from 'react';
-import { BrowserRouter as Router, Route, Switch } from 'react-router-dom';
-import Admin from './Admin';
-import Upload from './Upload';
+import React, { useState } from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import FileManager from './FileManager';
-import Settings from './Settings';
+import Uploads from './Uploads';
 
-function App() {
-    return (
-        <Router>
-            <Switch>
-                <Route path="/admin" component={Admin} />
-                <Route path="/upload" component={Upload} />
-                <Route path="/files" component={FileManager} />
-                <Route path="/settings" component={Settings} />
-            </Switch>
-        </Router>
-    );
-}
+const App = () => {
+  const [error, setError] = useState(null);
+
+  const handleError = (message) => {
+    setError(message);
+    setTimeout(() => setError(null), 3000); // Efface l'erreur après 3 secondes
+  };
+
+  return (
+    <Router>
+      <div>
+        {error && <div className="error-banner">{error}</div>}
+        <Routes>
+          <Route path="/" element={<FileManager onError={handleError} />} />
+          <Route path="/uploads" element={<Uploads onError={handleError} />} />
+        </Routes>
+      </div>
+    </Router>
+  );
+};
 
 export default App;
