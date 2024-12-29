@@ -7,11 +7,21 @@ WORKDIR /app
 # Copier package.json et package-lock.json
 COPY frontend/package*.json ./
 
+# Vérifier les fichiers copiés
+RUN ls -la
+
 # Installer les dépendances
 RUN npm install
 
 # Copier le reste des fichiers de l'application
 COPY frontend/ .
+
+# Vérifier les fichiers copiés
+RUN ls -la
+RUN ls -la src
+
+# Changer les permissions des fichiers
+RUN chmod -R 755 .
 
 # Construire l'application
 RUN npm run build
