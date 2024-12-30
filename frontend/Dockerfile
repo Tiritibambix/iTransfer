@@ -1,36 +1,44 @@
-# Utiliser une image de base officielle Node.js
-FROM node:14
+# Étape 1 : Construction de l'application
+FROM node:14 AS builder
 
 # Définir le répertoire de travail
 WORKDIR /app
 
-# Copier package.json et package-lock.json
+# Copier les fichiers de configuration pour npm
 COPY frontend/package*.json ./
-
-# Vérifier les fichiers copiés
-RUN ls -la
 
 # Installer les dépendances
 RUN npm install
 
-# Copier le reste des fichiers de l'application
+# Copier tout le code source du frontend
 COPY frontend/ .
-
-# Vérifier les fichiers copiés
-RUN ls -la
-RUN ls -la src
-
-# Changer les permissions des fichiers
-RUN chmod -R 755 .
 
 # Construire l'application
 RUN npm run build
 
-# Installer serve pour servir l'application
-RUN npm install -g serve
+# Vérifier les fichiers générés
+RUN ls -la build
 
-# Exposer le port sur lequel l'application sera accessible
-EXPOSE 3000
+# Étape 2 : Servir avec Nginx
+FROM nginx:alpine
 
-# Commande pour démarrer l'application
-CMD ["serve", "-s", "build"]
+# Copier les fichiers construits depuis l'étape de build
+COPY --from=builder /app/build /usr/share/nginx/html
+
+# Configuration personnalisée pour Nginx (fallback vers index.html pour les routes React)
+RUN echo 'server { \
+    listen 80; \
+    server_name localhost; \
+    root /usr/share/nginx/html; \
+    index index.html; \
+    location / { \
+        try_files $uri /index.html; \
+    } \
+    error_page 404 /index.html; \
+}' > /etc/nginx/conf.d/default.conf
+
+# Exposer le port utilisé par Nginx
+EXPOSE 80
+
+# Commande pour démarrer Nginx
+CMD ["nginx", "-g", "daemon off;"]
