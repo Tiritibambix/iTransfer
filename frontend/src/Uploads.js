@@ -24,7 +24,7 @@ function Upload() {
 
         try {
             const response = await fetch('http://backend:5000/upload', {
-                method: 'POST',
+                method: 'POST',  // Assurez-vous que la méthode est POST
                 body: formData,
             });
 
