@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import ProgressBar from './ProgressBar';
 
 function Upload() {
     const [file, setFile] = useState(null);
     const [email, setEmail] = useState("");
+    const [progress, setProgress] = useState(0);
+    const navigate = useNavigate();
 
     const handleFileChange = (e) => {
         setFile(e.target.files[0]);
@@ -16,9 +19,19 @@ function Upload() {
 
         const response = await fetch('/upload', {
             method: 'POST',
-            body: formData
+            body: formData,
+            onUploadProgress: (progressEvent) => {
+                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+                setProgress(percentCompleted);
+            }
         });
-        // Logic to handle response
+
+        const data = await response.json();
+        if (response.ok) {
+            navigate('/progress', { state: { progress } });
+        } else {
+            console.error(data.error);
+        }
     };
 
     return (
@@ -27,7 +40,7 @@ function Upload() {
             <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
             <input type="file" onChange={handleFileChange} />
             <button onClick={handleUpload}>Upload</button>
-            <ProgressBar />
+            <ProgressBar progress={progress} />
         </div>
     );
 }

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import FileManager from './FileManager';
 import Uploads from './Uploads';
+import Progress from './Progress';
 
 const App = () => {
   const [error, setError] = useState(null);
@@ -18,6 +19,7 @@ const App = () => {
         <Routes>
           <Route path="/" element={<FileManager onError={handleError} />} />
           <Route path="/uploads" element={<Uploads onError={handleError} />} />
+          <Route path="/progress" element={<Progress />} />
         </Routes>
       </div>
     </Router>

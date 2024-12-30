@@ -18,8 +18,8 @@ services:
     environment:
       - FLASK_ENV=production
     volumes:
-      - ./backend/app:/app  # Pour le développement local, permettre les changements en temps réel
       - backend_data:/app/data  # Volume persistant pour sauvegarder les données si nécessaire
+      - uploads:/uploads
     depends_on:
       - db
 
@@ -38,3 +38,4 @@ services:
 #volumes:
 #  db_data:
 #  backend_data:
+#  uploads
