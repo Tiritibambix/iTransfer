@@ -23,7 +23,7 @@ function Upload() {
 
     try {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', 'http://localhost:4500/upload', true);
+      xhr.open('POST', 'http://192.168.1.104:4500/upload', true);
 
       // Gestion de la progression
       xhr.upload.onprogress = (event) => {
