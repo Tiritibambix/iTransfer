@@ -16,10 +16,9 @@ if not os.path.exists(UPLOAD_FOLDER):
 def index():
     return jsonify({"message": "Bienvenue sur iTransfer API"})
 
-@app.route('/upload', methods=['POST'])  # Assurez-vous que la méthode est POST
+@app.route('/upload', methods=['POST'])
 def upload_file():
     try:
-        logging.info("Request received")
         file = request.files['file']
         # Valider la présence d'un fichier
         if not file:
