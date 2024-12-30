@@ -7,6 +7,9 @@ WORKDIR /app
 # Copier les fichiers de configuration pour npm
 COPY frontend/package*.json ./
 
+# Vérifier que les fichiers sont copiés correctement
+RUN ls -la
+
 # Installer les dépendances
 RUN npm install
 
@@ -25,10 +28,9 @@ FROM nginx:alpine
 # Copier les fichiers construits depuis l'étape de build
 COPY --from=builder /app/build /usr/share/nginx/html
 
-# Configuration personnalisée pour Nginx (fallback vers index.html pour les routes React)
+# Configuration Nginx pour SPA
 RUN echo 'server { \
     listen 80; \
-    server_name localhost; \
     root /usr/share/nginx/html; \
     index index.html; \
     location / { \
