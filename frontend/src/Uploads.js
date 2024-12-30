@@ -23,7 +23,7 @@ function Upload() {
         formData.append('email', email);
 
         try {
-            const response = await fetch('http://localhost:5000/upload', {
+            const response = await fetch('http://backend:5000/upload', {
                 method: 'POST',
                 body: formData,
             });
