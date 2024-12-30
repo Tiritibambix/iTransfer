@@ -1,13 +1,19 @@
 import React from 'react';
 
-function ProgressBar() {
-    // Logique pour afficher la barre de progression
-
-    return (
-        <div>
-            {/* Code pour la barre de progression */}
-        </div>
-    );
-}
+const ProgressBar = ({ progress }) => {
+  return (
+    <div style={{ width: '100%', backgroundColor: '#f3f3f3', borderRadius: '5px' }}>
+      <div
+        style={{
+          width: `${progress}%`,
+          height: '10px',
+          backgroundColor: '#4caf50',
+          borderRadius: '5px',
+          transition: 'width 0.3s ease-in-out',
+        }}
+      ></div>
+    </div>
+  );
+};
 
 export default ProgressBar;
