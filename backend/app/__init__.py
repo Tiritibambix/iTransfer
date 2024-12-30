@@ -4,7 +4,7 @@ from .config import Config
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-CORS(app)  # Ajouter cette ligne pour activer CORS
+CORS(app, resources={r"/*": {"origins": "*"}})  # Autoriser toutes les origines pour toutes les routes
 app.config.from_object(Config)
 db = SQLAlchemy(app)
 
