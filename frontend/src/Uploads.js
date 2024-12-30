@@ -13,24 +13,29 @@ function Upload() {
     };
 
     const handleUpload = async () => {
+        if (!file) {
+            console.error("No file selected");
+            return;
+        }
+
         const formData = new FormData();
         formData.append('file', file);
         formData.append('email', email);
 
-        const response = await fetch('/upload', {
-            method: 'POST',
-            body: formData,
-            onUploadProgress: (progressEvent) => {
-                const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-                setProgress(percentCompleted);
-            }
-        });
+        try {
+            const response = await fetch('http://localhost:5000/upload', {
+                method: 'POST',
+                body: formData,
+            });
 
-        const data = await response.json();
-        if (response.ok) {
-            navigate('/progress', { state: { progress } });
-        } else {
-            console.error(data.error);
+            const data = await response.json();
+            if (response.ok) {
+                navigate('/progress', { state: { progress } });
+            } else {
+                console.error(data.error);
+            }
+        } catch (error) {
+            console.error("Error during upload:", error);
         }
     };
 

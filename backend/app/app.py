@@ -19,6 +19,7 @@ def index():
 @app.route('/upload', methods=['POST'])
 def upload_file():
     try:
+        logging.info("Request received")
         file = request.files['file']
         # Valider la présence d'un fichier
         if not file:
