@@ -30,7 +30,7 @@ jobs:
     - name: Build and Push Backend
       uses: docker/build-push-action@v3
       with:
-        context: ./backend
+        context: .
         file: ./backend/Dockerfile
         push: true
         tags: tiritibambix/itransfer-backend:latest
@@ -39,7 +39,7 @@ jobs:
     - name: Build and Push Frontend
       uses: docker/build-push-action@v3
       with:
-        context: ./frontend
+        context: .
         file: ./frontend/Dockerfile
         push: true
         tags: tiritibambix/itransfer-frontend:latest
