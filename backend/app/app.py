@@ -1,8 +1,10 @@
 from flask import Flask, jsonify, request, send_from_directory
+from flask_cors import CORS
 import os
 import logging
 
 app = Flask(__name__)
+CORS(app)  # Permet les requêtes cross-origin sur toutes les routes
 
 # Configurer les logs
 logging.basicConfig(level=logging.INFO)
@@ -33,15 +35,6 @@ def upload_file():
     except Exception as e:
         logging.error(f"Erreur lors de l'upload : {e}")
         return jsonify({"error": str(e)}), 400
-
-@app.route('/uploads/<filename>')
-def get_uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-
-@app.route('/list-uploads', methods=['GET'])
-def list_uploads():
-    files = os.listdir(app.config['UPLOAD_FOLDER'])
-    return jsonify({"files": files})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
