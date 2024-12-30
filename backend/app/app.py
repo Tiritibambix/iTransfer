@@ -4,7 +4,7 @@ import os
 import logging
 
 app = Flask(__name__)
-CORS(app)  # Permet les requêtes cross-origin sur toutes les routes
+CORS(app, supports_credentials=True)  # Active CORS pour toutes les origines et routes
 
 # Configurer les logs
 logging.basicConfig(level=logging.INFO)
@@ -20,8 +20,15 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 def index():
     return jsonify({"message": "Bienvenue sur iTransfer API"})
 
-@app.route('/upload', methods=['POST'])
+@app.route('/upload', methods=['POST', 'OPTIONS'])  # Autorise OPTIONS pour CORS
 def upload_file():
+    if request.method == 'OPTIONS':  # Réponse CORS pré-demande
+        response = jsonify({'message': 'CORS preflight success'})
+        response.headers.add("Access-Control-Allow-Origin", "*")
+        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response
+
     try:
         file = request.files['file']
         if not file:

@@ -5,6 +5,7 @@ function Upload() {
   const [file, setFile] = useState(null);
   const [email, setEmail] = useState('');
   const [progress, setProgress] = useState(0);
+  const [message, setMessage] = useState('');
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -12,7 +13,7 @@ function Upload() {
 
   const handleUpload = () => {
     if (!file || !email) {
-      alert('Veuillez fournir un fichier et une adresse email.');
+      setMessage('Veuillez fournir un fichier et une adresse email.');
       return;
     }
 
@@ -23,7 +24,7 @@ function Upload() {
     const xhr = new XMLHttpRequest();
     xhr.open('POST', 'http://localhost:5000/upload', true);
 
-    // Suivi de la progression
+    // Gestion de la progression
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
         const percentComplete = Math.round((event.loaded / event.total) * 100);
@@ -31,31 +32,56 @@ function Upload() {
       }
     };
 
+    // Gestion de la réponse
     xhr.onload = () => {
       if (xhr.status === 201) {
-        alert('Fichier uploadé avec succès!');
+        setMessage('Fichier uploadé avec succès !');
         setProgress(0);
       } else {
-        alert('Erreur lors de l\'upload');
+        setMessage('Erreur lors de l\'upload.');
       }
     };
 
-    xhr.onerror = () => alert('Une erreur réseau s\'est produite.');
+    // Gestion des erreurs réseau
+    xhr.onerror = () => {
+      setMessage('Erreur réseau lors de l\'upload.');
+    };
+
     xhr.send(formData);
   };
 
   return (
-    <div>
+    <div style={{ textAlign: 'center', padding: '20px' }}>
       <h1>Upload File</h1>
       <input
         type="email"
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         placeholder="Votre email"
+        style={{ display: 'block', margin: '10px auto', padding: '10px', width: '300px' }}
       />
-      <input type="file" onChange={handleFileChange} />
-      <button onClick={handleUpload}>Upload</button>
+      <input
+        type="file"
+        onChange={handleFileChange}
+        style={{ display: 'block', margin: '10px auto', padding: '10px' }}
+      />
+      <button
+        onClick={handleUpload}
+        style={{
+          display: 'block',
+          margin: '10px auto',
+          padding: '10px 20px',
+          backgroundColor: '#4caf50',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '5px',
+          cursor: 'pointer',
+        }}
+      >
+        Upload
+      </button>
       {progress > 0 && <ProgressBar progress={progress} />}
+      {message && <p>{message}</p>}
     </div>
   );
 }
