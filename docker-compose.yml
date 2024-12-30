@@ -7,6 +7,7 @@ services:
       - "3500:80"
     environment:
       - NODE_ENV=production
+      - REACT_APP_BACKEND_URL=http://backend:5000 # URL dynamique du backend
     volumes:
       - ./frontend:/app
       - /app/node_modules
@@ -19,6 +20,9 @@ services:
       - "4500:5000"
     environment:
       - FLASK_ENV=production
+      - FRONTEND_URL=http://frontend:80 # URL dynamique du frontend
+      - DATABASE_URL=mysql://mariadb_user:mariadb_pass@db/mariadb_db
+      - SECRET_KEY=super_secret_key
     volumes:
       - ./backend_data:/app/data
       - ./uploads:/app/uploads

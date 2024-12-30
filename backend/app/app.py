@@ -5,8 +5,11 @@ import logging
 
 app = Flask(__name__)
 
-# Activer CORS pour toutes les origines
-CORS(app, resources={r"/*": {"origins": "http://localhost:3500"}})
+# Charger les variables d'environnement injectées par Docker Compose
+FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3500')
+
+# Configurer CORS pour autoriser le frontend
+CORS(app, resources={r"/*": {"origins": FRONTEND_URL}})
 
 # Configurer les logs
 logging.basicConfig(level=logging.INFO)
@@ -26,7 +29,7 @@ def index():
 def upload_file():
     if request.method == 'OPTIONS':  # Pré-demande CORS
         response = jsonify({'message': 'CORS preflight success'})
-        response.headers.add("Access-Control-Allow-Origin", "http://localhost:3500")
+        response.headers.add("Access-Control-Allow-Origin", FRONTEND_URL)
         response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
         return response
@@ -36,7 +39,6 @@ def upload_file():
         if not file:
             raise ValueError("Aucun fichier envoyé")
 
-        # Sauvegarder le fichier
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
         file.save(file_path)
         logging.info(f"Fichier {file.filename} sauvegardé avec succès à {file_path}")

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import ProgressBar from './ProgressBar';
 
+const backendUrl = process.env.REACT_APP_BACKEND_URL;
+
 function Upload() {
   const [file, setFile] = useState(null);
   const [email, setEmail] = useState('');
@@ -23,9 +25,8 @@ function Upload() {
 
     try {
       const xhr = new XMLHttpRequest();
-      xhr.open('POST', 'http://localhost:4500/upload', true);
+      xhr.open('POST', `${backendUrl}/upload`, true);
 
-      // Gestion de la progression
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {
           const percentComplete = Math.round((event.loaded / event.total) * 100);
@@ -33,7 +34,6 @@ function Upload() {
         }
       };
 
-      // Gestion de la réponse
       xhr.onload = () => {
         if (xhr.status === 201) {
           setMessage('Fichier uploadé avec succès !');
@@ -43,7 +43,6 @@ function Upload() {
         }
       };
 
-      // Gestion des erreurs réseau
       xhr.onerror = () => {
         setMessage('Erreur réseau lors de l\'upload.');
       };
