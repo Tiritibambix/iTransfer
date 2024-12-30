@@ -11,7 +11,7 @@ function Upload() {
     setFile(e.target.files[0]);
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (!file || !email) {
       setMessage('Veuillez fournir un fichier et une adresse email.');
       return;
@@ -21,33 +21,38 @@ function Upload() {
     formData.append('file', file);
     formData.append('email', email);
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', 'http://localhost:5000/upload', true);
+    try {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', 'http://localhost:4500/upload', true);
 
-    // Gestion de la progression
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const percentComplete = Math.round((event.loaded / event.total) * 100);
-        setProgress(percentComplete);
-      }
-    };
+      // Gestion de la progression
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentComplete = Math.round((event.loaded / event.total) * 100);
+          setProgress(percentComplete);
+        }
+      };
 
-    // Gestion de la réponse
-    xhr.onload = () => {
-      if (xhr.status === 201) {
-        setMessage('Fichier uploadé avec succès !');
-        setProgress(0);
-      } else {
-        setMessage('Erreur lors de l\'upload.');
-      }
-    };
+      // Gestion de la réponse
+      xhr.onload = () => {
+        if (xhr.status === 201) {
+          setMessage('Fichier uploadé avec succès !');
+          setProgress(0);
+        } else {
+          setMessage('Erreur lors de l\'upload.');
+        }
+      };
 
-    // Gestion des erreurs réseau
-    xhr.onerror = () => {
-      setMessage('Erreur réseau lors de l\'upload.');
-    };
+      // Gestion des erreurs réseau
+      xhr.onerror = () => {
+        setMessage('Erreur réseau lors de l\'upload.');
+      };
 
-    xhr.send(formData);
+      xhr.send(formData);
+    } catch (error) {
+      console.error('Erreur réseau ou backend :', error);
+      setMessage('Erreur inconnue. Vérifiez la console pour plus d\'informations.');
+    }
   };
 
   return (
