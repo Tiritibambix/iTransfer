@@ -1,27 +1,23 @@
 import React, { useState } from 'react';
 import ProgressBar from './ProgressBar';
 
-const backendUrl = process.env.REACT_APP_BACKEND_URL;
-
-function Upload() {
+const Upload = ({ backendUrl }) => {
   const [file, setFile] = useState(null);
-  const [email, setEmail] = useState('');
-  const [progress, setProgress] = useState(0);
   const [message, setMessage] = useState('');
+  const [progress, setProgress] = useState(0);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
   };
 
   const handleUpload = async () => {
-    if (!file || !email) {
-      setMessage('Veuillez fournir un fichier et une adresse email.');
+    if (!file) {
+      setMessage('Veuillez sélectionner un fichier.');
       return;
     }
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('email', email);
 
     try {
       const xhr = new XMLHttpRequest();
@@ -49,45 +45,20 @@ function Upload() {
 
       xhr.send(formData);
     } catch (error) {
-      console.error('Erreur réseau ou backend :', error);
-      setMessage('Erreur inconnue. Vérifiez la console pour plus d\'informations.');
+      setMessage('Erreur réseau ou backend.');
+      console.error(error);
     }
   };
 
   return (
-    <div style={{ textAlign: 'center', padding: '20px' }}>
-      <h1>Upload File</h1>
-      <input
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        placeholder="Votre email"
-        style={{ display: 'block', margin: '10px auto', padding: '10px', width: '300px' }}
-      />
-      <input
-        type="file"
-        onChange={handleFileChange}
-        style={{ display: 'block', margin: '10px auto', padding: '10px' }}
-      />
-      <button
-        onClick={handleUpload}
-        style={{
-          display: 'block',
-          margin: '10px auto',
-          padding: '10px 20px',
-          backgroundColor: '#4caf50',
-          color: '#fff',
-          border: 'none',
-          borderRadius: '5px',
-          cursor: 'pointer',
-        }}
-      >
-        Upload
-      </button>
+    <div>
+      <h1>iTransfer</h1>
+      <input type="file" onChange={handleFileChange} />
+      <button onClick={handleUpload}>Upload</button>
       {progress > 0 && <ProgressBar progress={progress} />}
       {message && <p>{message}</p>}
     </div>
   );
-}
+};
 
 export default Upload;

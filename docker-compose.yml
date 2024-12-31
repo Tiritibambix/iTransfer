@@ -1,15 +1,13 @@
-version: '3.8'
-
 services:
   frontend:
     image: tiritibambix/itransfer-frontend
     ports:
       - "3500:80"
     environment:
-      - NODE_ENV=production
-      - REACT_APP_BACKEND_URL=http://backend:5000 # URL dynamique du backend
+      # L'utilisateur peut définir ici l'URL du backend
+      - REACT_APP_BACKEND_URL=http://machineIP:5000
     volumes:
-      - ./frontend:/app
+      - ./iTransfer/frontend:/app
       - /app/node_modules
     depends_on:
       - backend
@@ -19,13 +17,13 @@ services:
     ports:
       - "4500:5000"
     environment:
-      - FLASK_ENV=production
-      - FRONTEND_URL=http://frontend:80 # URL dynamique du frontend
+      # L'utilisateur peut définir ici l'URL du frontend
+      - FRONTEND_URL=http://machineIP:3500
       - DATABASE_URL=mysql://mariadb_user:mariadb_pass@db/mariadb_db
       - SECRET_KEY=super_secret_key
     volumes:
-      - ./backend_data:/app/data
-      - ./uploads:/app/uploads
+      - ./iTransfer/backend_data:/app/data
+      - ./iTransfer/uploads:/app/uploads
     depends_on:
       - db
 
@@ -39,7 +37,7 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ./db_data:/var/lib/mysql
+      - ./iTransfer/db_data:/var/lib/mysql
 
 volumes:
   db_data:
