@@ -1,12 +1,9 @@
 import React, { useState } from 'react';
 import ReactDOM from 'react-dom';
-import './index.css';
+import './index.css'; // Chemin relatif correct
 
-const backendUrl = process.env.REACT_APP_BACKEND_URL;
-
-if (!backendUrl) {
-  throw new Error('REACT_APP_BACKEND_URL doit être défini dans les variables d\'environnement.');
-}
+// URL dynamique du backend via variables d'environnement ou fallback
+const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
 
 const App = () => {
   const [file, setFile] = useState(null);
