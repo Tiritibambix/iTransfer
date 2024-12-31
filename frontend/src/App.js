@@ -1,26 +1,47 @@
 import React, { useState } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import FileManager from './FileManager';
-import Uploads from './Uploads';
 
-const App = () => {
-  const [error, setError] = useState(null);
+const App = ({ backendUrl }) => {
+  const [file, setFile] = useState(null);
+  const [message, setMessage] = useState('');
 
-  const handleError = (message) => {
-    setError(message);
-    setTimeout(() => setError(null), 3000); // Efface l'erreur après 3 secondes
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
+
+  const handleUpload = async () => {
+    if (!file) {
+      setMessage('Veuillez sélectionner un fichier.');
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await fetch(`${backendUrl}/upload`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'upload');
+      }
+
+      const data = await response.json();
+      setMessage(data.message || 'Fichier uploadé avec succès.');
+    } catch (error) {
+      setMessage('Erreur lors de l\'upload. Vérifiez le backend.');
+      console.error(error);
+    }
   };
 
   return (
-    <Router>
-      <div>
-        {error && <div className="error-banner">{error}</div>}
-        <Routes>
-          <Route path="/" element={<FileManager onError={handleError} />} />
-          <Route path="/uploads" element={<Uploads onError={handleError} />} />
-        </Routes>
-      </div>
-    </Router>
+    <div>
+      <h1>iTransfer</h1>
+      <input type="file" onChange={handleFileChange} />
+      <button onClick={handleUpload}>Upload</button>
+      {message && <p>{message}</p>}
+    </div>
   );
 };
 

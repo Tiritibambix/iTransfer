@@ -1,9 +1,19 @@
-import React, { useState } from 'react';
+import React from 'react';
 import ReactDOM from 'react-dom';
-import './index.css'; // Chemin relatif correct
+import App from './App';
+import './index.css';
 
-// URL dynamique du backend via variables d'environnement ou fallback
+// Récupérer l'URL du backend depuis les variables d'environnement
 const backendUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:5000';
+
+console.log('Backend URL configurée :', backendUrl);
+
+ReactDOM.render(
+  <React.StrictMode>
+    <App backendUrl={backendUrl} />
+  </React.StrictMode>,
+  document.getElementById('root')
+);
 
 const App = () => {
   const [file, setFile] = useState(null);
