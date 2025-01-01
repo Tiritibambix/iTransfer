@@ -1,19 +1,25 @@
-import React from 'react';
+import React, { useState } from 'react';
 
-const ProgressBar = ({ progress }) => {
+function Uploads({ onFileUpload }) {
+  const [file, setFile] = useState(null);
+
+  const handleFileChange = (e) => {
+    setFile(e.target.files[0]);
+  };
+
+  const handleUploadClick = () => {
+    if (file) {
+      onFileUpload(file);  // Appelle la fonction d'upload avec le fichier sélectionné
+    }
+  };
+
   return (
-    <div style={{ width: '80%', margin: '20px auto', backgroundColor: '#f3f3f3', borderRadius: '5px' }}>
-      <div
-        style={{
-          width: `${progress}%`,
-          height: '10px',
-          backgroundColor: '#4caf50',
-          borderRadius: '5px',
-          transition: 'width 0.3s ease-in-out',
-        }}
-      ></div>
+    <div className="upload">
+      <h2>Upload de fichier</h2>
+      <input type="file" onChange={handleFileChange} />
+      <button onClick={handleUploadClick}>Upload</button>
     </div>
   );
-};
+}
 
-export default ProgressBar;
+export default Uploads;

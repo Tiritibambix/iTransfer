@@ -1,82 +1,108 @@
-from flask import Flask, jsonify, request, redirect, url_for, render_template, session
-from flask_cors import CORS
-import os
+import React, { useState, useEffect } from 'react';
+import { BrowserRouter as Router, Route, Redirect, Switch } from 'react-router-dom';
+import './index.css';
+import Admin from './Admin'; // Admin page (login)
+import Uploads from './Uploads'; // Page pour uploader les fichiers
+import ProgressBar from './ProgressBar'; // Si tu veux garder la barre de progression
 
-app = Flask(__name__)
+function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);  // Gérer l'authentification
+  const [progress, setProgress] = useState(0);  // Gérer la progression de l'upload
 
-# Secret key pour la gestion des sessions
-app.secret_key = os.urandom(24)
+  // Si l'utilisateur est authentifié
+  useEffect(() => {
+    const isAuthenticated = localStorage.getItem('isAuthenticated');
+    if (isAuthenticated === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
 
-# Identifiants administrateur (utiliser des variables d'environnement pour les valeurs sensibles)
-ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
-ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'adminpassword')
+  // Fonction de login
+  const handleLogin = (username, password) => {
+    fetch('http://localhost:5000/login', {
+      method: 'POST',
+      body: new URLSearchParams({ username, password }),
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+    })
+      .then((response) => {
+        if (response.ok) {
+          localStorage.setItem('isAuthenticated', 'true');  // Stocke dans localStorage
+          setIsAuthenticated(true);  // Mettre à jour l'état
+        } else {
+          alert('Nom d\'utilisateur ou mot de passe incorrect');
+        }
+      });
+  };
 
-# CORS initialisé sans frontend_url, car il est dynamique
-CORS(app, supports_credentials=True)
+  // Fonction de déconnexion
+  const handleLogout = () => {
+    localStorage.removeItem('isAuthenticated');
+    setIsAuthenticated(false);
+  };
 
-# Route pour la page d'index, redirige vers la page de login si l'utilisateur n'est pas connecté
-@app.route('/')
-def index():
-    # Si l'utilisateur est déjà connecté, il est redirigé vers la page d'upload
-    if 'authenticated' in session and session['authenticated']:
-        return redirect(url_for('upload'))
-    # Sinon, redirige vers la page de login
-    return redirect(url_for('login')) 
+  // Fonction pour gérer l'upload de fichiers
+  const handleFileUpload = (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
 
-# Route pour le login
-@app.route('/login', methods=['GET', 'POST'])
-def login():
-    if request.method == 'POST':
-        username = request.form['username']
-        password = request.form['password']
-        
-        # Vérifie les identifiants
-        if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            session['authenticated'] = True  # Stocke l'authentification dans la session
-            return redirect(url_for('upload'))  # Redirige vers la page d'upload
-        else:
-            return jsonify({"error": "Nom d'utilisateur ou mot de passe incorrect"}), 401
-    
-    return render_template('login.html')  # Affiche le formulaire de login
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', 'http://localhost:5000/upload', true);
 
-# Page d'upload - nécessite une authentification
-@app.route('/upload', methods=['GET', 'POST'])
-def upload():
-    # Vérifie si l'utilisateur est authentifié
-    if 'authenticated' not in session or not session['authenticated']:
-        return redirect(url_for('login'))  # Si non authentifié, redirige vers la page de login
-    
-    # Retourne la page d'upload
-    return render_template('upload.html')
+    // Gérer la progression de l'upload
+    xhr.upload.onprogress = function (event) {
+      if (event.lengthComputable) {
+        const percent = (event.loaded / event.total) * 100;
+        setProgress(percent);
+      }
+    };
 
-# Route de déconnexion
-@app.route('/logout')
-def logout():
-    session.pop('authenticated', None)  # Efface la session d'authentification
-    return redirect(url_for('login'))  # Redirige vers la page de login
+    // Gérer la réponse de l'upload
+    xhr.onload = function () {
+      if (xhr.status === 200) {
+        alert('Upload réussi');
+      } else {
+        alert('Erreur d\'upload');
+      }
+      setProgress(0);  // Réinitialiser la progression après l'upload
+    };
 
-# Route de traitement des fichiers uploadés
-@app.route('/upload', methods=['POST'])
-def upload_file():
-    # Récupérer dynamiquement l'URL du frontend
-    frontend_url = request.headers.get('Origin')
-    if not frontend_url:
-        frontend_url = 'http://localhost:3500'
+    xhr.send(formData);
+  };
 
-    # Configurer CORS pour chaque requête
-    CORS(app, resources={r"/upload": {"origins": frontend_url}}, supports_credentials=True)
+  return (
+    <Router>
+      <div className="App">
+        <Switch>
+          {/* Route pour le login */}
+          <Route
+            path="/login"
+            render={() => (isAuthenticated ? <Redirect to="/upload" /> : <Admin onLogin={handleLogin} />)}
+          />
+          
+          {/* Route pour la page d'upload (protéger par l'authentification) */}
+          <Route
+            path="/upload"
+            render={() =>
+              isAuthenticated ? (
+                <div>
+                  <Uploads onFileUpload={handleFileUpload} />
+                  <ProgressBar progress={progress} />
+                  <button onClick={handleLogout}>Se déconnecter</button>
+                </div>
+              ) : (
+                <Redirect to="/login" />
+              )
+            }
+          />
+          
+          {/* Redirection vers la page de login par défaut */}
+          <Redirect from="/" to="/login" />
+        </Switch>
+      </div>
+    </Router>
+  );
+}
 
-    if request.method == 'POST':
-        file = request.files.get('file')
-        if not file:
-            return jsonify({"error": "Aucun fichier envoyé"}), 400
-
-        upload_path = '/app/uploads/' + file.filename
-        file.save(upload_path)
-        
-        return jsonify({"message": f"Fichier {file.filename} reçu avec succès"}), 201
-
-    return jsonify({"error": "Méthode non autorisée"}), 405
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)  # Lance l'application sur toutes les interfaces réseau
+export default App;

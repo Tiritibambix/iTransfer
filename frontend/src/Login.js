@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 
-function Admin({ onLogin }) {
+function Login({ onLogin }) {
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    onLogin(username, password); // Appelle la fonction de login avec les identifiants
+    onLogin(username, password);
   };
 
   return (
@@ -31,4 +31,4 @@ function Admin({ onLogin }) {
   );
 }
 
-export default Admin;
+export default Login;

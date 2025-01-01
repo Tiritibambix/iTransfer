@@ -1,23 +1,36 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ProgressBar from './ProgressBar';
 
-const Upload = ({ backendUrl }) => {
+const backendUrl = process.env.REACT_APP_BACKEND_URL;
+
+function Upload() {
   const [file, setFile] = useState(null);
-  const [message, setMessage] = useState('');
+  const [email, setEmail] = useState('');
   const [progress, setProgress] = useState(0);
+  const [message, setMessage] = useState('');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+  // Vérifier si l'utilisateur est authentifié
+  useEffect(() => {
+    const isAuthenticated = localStorage.getItem('isAuthenticated');
+    if (isAuthenticated === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
   };
 
   const handleUpload = async () => {
-    if (!file) {
-      setMessage('Veuillez sélectionner un fichier.');
+    if (!file || !email) {
+      setMessage('Veuillez fournir un fichier et une adresse email.');
       return;
     }
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('email', email);
 
     try {
       const xhr = new XMLHttpRequest();
@@ -45,20 +58,50 @@ const Upload = ({ backendUrl }) => {
 
       xhr.send(formData);
     } catch (error) {
-      setMessage('Erreur réseau ou backend.');
-      console.error(error);
+      console.error('Erreur réseau ou backend :', error);
+      setMessage('Erreur inconnue. Vérifiez la console pour plus d\'informations.');
     }
   };
 
+  // Si l'utilisateur n'est pas authentifié, rediriger vers la page de login
+  if (!isAuthenticated) {
+    return <Redirect to="/login" />;
+  }
+
   return (
-    <div>
-      <h1>iTransfer</h1>
-      <input type="file" onChange={handleFileChange} />
-      <button onClick={handleUpload}>Upload</button>
+    <div style={{ textAlign: 'center', padding: '20px' }}>
+      <h1>Upload File</h1>
+      <input
+        type="email"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        placeholder="Votre email"
+        style={{ display: 'block', margin: '10px auto', padding: '10px', width: '300px' }}
+      />
+      <input
+        type="file"
+        onChange={handleFileChange}
+        style={{ display: 'block', margin: '10px auto', padding: '10px' }}
+      />
+      <button
+        onClick={handleUpload}
+        style={{
+          display: 'block',
+          margin: '10px auto',
+          padding: '10px 20px',
+          backgroundColor: '#4caf50',
+          color: '#fff',
+          border: 'none',
+          borderRadius: '5px',
+          cursor: 'pointer',
+        }}
+      >
+        Upload
+      </button>
       {progress > 0 && <ProgressBar progress={progress} />}
       {message && <p>{message}</p>}
     </div>
   );
-};
+}
 
 export default Upload;
