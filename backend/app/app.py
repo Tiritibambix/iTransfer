@@ -14,44 +14,51 @@ ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'adminpassword')
 # CORS initialisé sans frontend_url, car il est dynamique
 CORS(app, supports_credentials=True)
 
+# Route pour la page d'index, redirige vers la page de login si l'utilisateur n'est pas connecté
 @app.route('/')
 def index():
     # Si l'utilisateur est déjà connecté, il est redirigé vers la page d'upload
     if 'authenticated' in session and session['authenticated']:
         return redirect(url_for('upload'))
-    return redirect(url_for('login'))  # Redirige toujours vers la page de login si non authentifié
+    # Sinon, redirige vers la page de login
+    return redirect(url_for('login')) 
 
+# Route pour le login
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         
+        # Vérifie les identifiants
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            session['authenticated'] = True  # Met l'utilisateur en session
+            session['authenticated'] = True  # Stocke l'authentification dans la session
             return redirect(url_for('upload'))  # Redirige vers la page d'upload
         else:
             return jsonify({"error": "Nom d'utilisateur ou mot de passe incorrect"}), 401
     
-    return render_template('login.html')  # Page d'authentification
+    return render_template('login.html')  # Affiche le formulaire de login
 
+# Page d'upload - nécessite une authentification
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
     # Vérifie si l'utilisateur est authentifié
     if 'authenticated' not in session or not session['authenticated']:
         return redirect(url_for('login'))  # Si non authentifié, redirige vers la page de login
     
-    return render_template('upload.html')  # Page d'upload après connexion réussie
+    # Retourne la page d'upload
+    return render_template('upload.html')
 
+# Route de déconnexion
 @app.route('/logout')
 def logout():
-    # Déconnexion de l'utilisateur
-    session.pop('authenticated', None)
+    session.pop('authenticated', None)  # Efface la session d'authentification
     return redirect(url_for('login'))  # Redirige vers la page de login
 
+# Route de traitement des fichiers uploadés
 @app.route('/upload', methods=['POST'])
 def upload_file():
-    # Récupérer dynamiquement l'URL du frontend à chaque requête
+    # Récupérer dynamiquement l'URL du frontend
     frontend_url = request.headers.get('Origin')
     if not frontend_url:
         frontend_url = 'http://localhost:3500'
@@ -68,7 +75,8 @@ def upload_file():
         file.save(upload_path)
         
         return jsonify({"message": f"Fichier {file.filename} reçu avec succès"}), 201
+
     return jsonify({"error": "Méthode non autorisée"}), 405
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000)  # Lance l'application sur toutes les interfaces réseau
