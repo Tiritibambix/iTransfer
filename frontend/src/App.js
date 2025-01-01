@@ -1,6 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 function App({ backendUrl }) {
+  const [progress, setProgress] = useState(0); // État pour la progression
+
   const handleFileUpload = async (event) => {
     const file = event.target.files[0];
     if (!file) {
@@ -15,6 +17,9 @@ function App({ backendUrl }) {
       const response = await fetch(`${backendUrl}/upload`, {
         method: 'POST',
         body: formData,
+        headers: {
+          // Ne pas spécifier le Content-Type ici, fetch le gère automatiquement pour FormData
+        },
       });
 
       if (!response.ok) {
@@ -41,6 +46,15 @@ function App({ backendUrl }) {
           cursor: 'pointer',
         }}
       />
+      {/* Affichage de la barre de progression */}
+      <div style={{ marginTop: '20px' }}>
+        {progress > 0 && (
+          <div>
+            <progress value={progress} max="100" />
+            <span>{progress}%</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
