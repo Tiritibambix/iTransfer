@@ -62,10 +62,11 @@ function App({ backendUrl }) {
             fontSize: '16px',
             marginTop: '20px',
             cursor: 'pointer',
-            backgroundColor: '#4CAF50',
+            backgroundColor: '#007bff', // Couleur du thème
             color: 'white',
             border: 'none',
             borderRadius: '4px',
+            textAlign: 'center',
           }}
         >
           Upload

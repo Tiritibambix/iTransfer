@@ -55,18 +55,23 @@ input[type="file"] {
 }
 
 button {
-  margin-top: 20px;
   padding: 10px 20px;
-  background-color: var(--clr-primary-a30);
-  color: var(--clr-surface-a0);
+  font-size: 16px;
+  background-color: #007bff;  /* Bleu par défaut */
+  color: white;
   border: none;
-  border-radius: 5px;
+  border-radius: 4px;
   cursor: pointer;
-  transition: background-color 0.3s;
+  text-align: center;
+  margin-top: 20px;
 }
 
 button:hover {
-  background-color: var(--clr-primary-a40);
+  background-color: #0056b3;  /* Couleur lors du survol */
+}
+
+button:focus {
+  outline: none;
 }
 
 p {
