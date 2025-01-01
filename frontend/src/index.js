@@ -6,8 +6,8 @@ import './index.css';
 // Détecter l'URL du backend dynamiquement
 const backendUrl =
   window.location.hostname === 'localhost'
-    ? 'http://localhost:5000'  // Remplace par le port backend de Docker
-    : `http://${window.location.hostname}:5000`;  // Pour d'autres machines
+    ? 'http://localhost:5500'  // Remplace par le port backend de Docker
+    : `http://${window.location.hostname}:5500`;  // Pour d'autres machines
 
 console.log('Backend URL configurée :', backendUrl);
 
