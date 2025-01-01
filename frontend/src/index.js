@@ -6,8 +6,8 @@ import './index.css';
 // Détecter l'URL du backend dynamiquement
 const backendUrl =
   window.location.hostname === 'localhost'
-    ? 'http://localhost:5000'
-    : `http://${window.location.hostname}:5000`;
+    ? 'http://localhost:4500'
+    : `http://${window.location.hostname}:4500`;
 
 console.log('Backend URL configurée :', backendUrl);
 
