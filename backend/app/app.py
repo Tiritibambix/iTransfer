@@ -1,8 +1,11 @@
-from flask import Flask, jsonify, request, redirect, url_for, render_template
+from flask import Flask, jsonify, request, redirect, url_for, render_template, session
 from flask_cors import CORS
 import os
 
 app = Flask(__name__)
+
+# Secret key pour la gestion des sessions
+app.secret_key = os.urandom(24)
 
 # Identifiants administrateur (utiliser des variables d'environnement pour les valeurs sensibles)
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
@@ -13,7 +16,10 @@ CORS(app, supports_credentials=True)
 
 @app.route('/')
 def index():
-    return redirect(url_for('login'))  # Redirige toujours vers la page de login
+    # Si l'utilisateur est déjà connecté, il est redirigé vers la page d'upload
+    if 'authenticated' in session and session['authenticated']:
+        return redirect(url_for('upload'))
+    return redirect(url_for('login'))  # Redirige toujours vers la page de login si non authentifié
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -22,14 +28,26 @@ def login():
         password = request.form['password']
         
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+            session['authenticated'] = True  # Met l'utilisateur en session
             return redirect(url_for('upload'))  # Redirige vers la page d'upload
         else:
             return jsonify({"error": "Nom d'utilisateur ou mot de passe incorrect"}), 401
+    
     return render_template('login.html')  # Page d'authentification
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
+    # Vérifie si l'utilisateur est authentifié
+    if 'authenticated' not in session or not session['authenticated']:
+        return redirect(url_for('login'))  # Si non authentifié, redirige vers la page de login
+    
     return render_template('upload.html')  # Page d'upload après connexion réussie
+
+@app.route('/logout')
+def logout():
+    # Déconnexion de l'utilisateur
+    session.pop('authenticated', None)
+    return redirect(url_for('login'))  # Redirige vers la page de login
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
