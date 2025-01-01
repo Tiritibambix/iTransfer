@@ -1,18 +1,14 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import os
-import logging
 
 app = Flask(__name__)
 
-# Charger l'URL du frontend depuis les variables d'environnement
-FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3500')
+# Dynamiser l'URL du frontend à partir de l'environnement ou utiliser localhost si absent
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3500')
 
-# Configurer les logs
-logging.basicConfig(level=logging.INFO)
-
-# Activer CORS pour autoriser uniquement l'origine définie
-CORS(app, resources={r"/*": {"origins": FRONTEND_URL}})
+# Configurer CORS pour autoriser les requêtes provenant du frontend
+CORS(app, resources={r"/upload": {"origins": FRONTEND_URL}})
 
 @app.route('/')
 def index():
@@ -20,7 +16,7 @@ def index():
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
-    if request.method == 'OPTIONS':  # Pré-demande CORS
+    if request.method == 'OPTIONS':  # Gérer la pré-demande CORS
         response = jsonify({'message': 'CORS preflight success'})
         response.headers.add("Access-Control-Allow-Origin", FRONTEND_URL)
         response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -32,14 +28,14 @@ def upload_file():
         if not file:
             raise ValueError("Aucun fichier envoyé")
 
-        # Sauvegarder le fichier
-        upload_path = os.path.join('/app/uploads', file.filename)
+        # Sauvegarde du fichier
+        upload_path = '/app/uploads/' + file.filename
         file.save(upload_path)
 
         return jsonify({"message": f"Fichier {file.filename} reçu avec succès"}), 201
     except Exception as e:
-        logging.error(f"Erreur lors de l'upload : {e}")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    # Flask écoute sur toutes les interfaces réseau disponibles (0.0.0.0)
     app.run(host='0.0.0.0', port=5000)
