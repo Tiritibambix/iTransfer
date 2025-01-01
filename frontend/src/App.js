@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 
 function App({ backendUrl }) {
   const [progress, setProgress] = useState(0);  // État pour la progression
+  const xhrRef = useRef(null);  // Référence pour stocker l'objet XMLHttpRequest
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -15,6 +16,9 @@ function App({ backendUrl }) {
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${backendUrl}/upload`, true);
+
+    // Sauvegarde de la requête pour pouvoir l'annuler
+    xhrRef.current = xhr;
 
     // Mise à jour de la barre de progression
     xhr.upload.onprogress = (event) => {
@@ -44,6 +48,15 @@ function App({ backendUrl }) {
     xhr.send(formData);
   };
 
+  // Fonction pour annuler l'upload
+  const cancelUpload = () => {
+    if (xhrRef.current) {
+      xhrRef.current.abort();  // Annule l'envoi
+      console.log('Upload annulé');
+      setProgress(0);  // Réinitialise la progression
+    }
+  };
+
   return (
     <div>
       <h1>Upload de fichier</h1>
@@ -58,6 +71,13 @@ function App({ backendUrl }) {
             backgroundColor: 'green'
           }} />
         </div>
+      )}
+
+      {/* Bouton "Annuler l'envoi" */}
+      {progress > 0 && (
+        <button onClick={cancelUpload} style={{ marginTop: '10px', backgroundColor: 'red', color: 'white' }}>
+          Annuler l'envoi
+        </button>
       )}
     </div>
   );
