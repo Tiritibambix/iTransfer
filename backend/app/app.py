@@ -4,11 +4,15 @@ import os
 
 app = Flask(__name__)
 
-# Dynamiser l'URL du frontend à partir de l'environnement ou utiliser localhost si absent
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3500')
+# Récupérer l'URL du frontend dynamiquement
+frontend_url = request.headers.get('Origin')
 
-# Configurer CORS pour autoriser les requêtes provenant du frontend
-CORS(app, resources={r"/upload": {"origins": FRONTEND_URL}}, supports_credentials=True)
+# Si l'URL du frontend n'est pas définie, on utilise localhost:3500 par défaut
+if not frontend_url:
+    frontend_url = 'http://localhost:3500'
+
+# Configurer CORS pour permettre toutes les requêtes provenant de l'URL dynamique
+CORS(app, resources={r"/upload": {"origins": frontend_url}}, supports_credentials=True)
 
 @app.route('/')
 def index():
@@ -18,7 +22,7 @@ def index():
 def upload_file():
     if request.method == 'OPTIONS':  # Gérer la pré-demande CORS
         response = jsonify({'message': 'CORS preflight success'})
-        response.headers.add("Access-Control-Allow-Origin", FRONTEND_URL)
+        response.headers.add("Access-Control-Allow-Origin", frontend_url)
         response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
         return response
@@ -33,13 +37,12 @@ def upload_file():
         file.save(upload_path)
 
         response = jsonify({"message": f"Fichier {file.filename} reçu avec succès"})
-        response.headers.add("Access-Control-Allow-Origin", FRONTEND_URL)  # Ajouter le header CORS
+        response.headers.add("Access-Control-Allow-Origin", frontend_url)  # Ajouter le header CORS
         return response, 201
     except Exception as e:
         response = jsonify({"error": str(e)})
-        response.headers.add("Access-Control-Allow-Origin", FRONTEND_URL)  # Ajouter le header CORS
+        response.headers.add("Access-Control-Allow-Origin", frontend_url)  # Ajouter le header CORS
         return response, 500
 
 if __name__ == '__main__':
-    # Flask écoute sur toutes les interfaces réseau disponibles (0.0.0.0)
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=5000)  # Ecouter sur toutes les interfaces réseau
