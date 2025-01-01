@@ -1,16 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 
-const App = ({ backendUrl }) => {
-  const [file, setFile] = useState(null);
-  const [message, setMessage] = useState('');
-
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
-  };
-
-  const handleUpload = async () => {
+function App({ backendUrl }) {
+  const handleFileUpload = async (event) => {
+    const file = event.target.files[0];
     if (!file) {
-      setMessage('Veuillez sélectionner un fichier.');
+      console.error('Aucun fichier sélectionné');
       return;
     }
 
@@ -21,28 +15,28 @@ const App = ({ backendUrl }) => {
       const response = await fetch(`${backendUrl}/upload`, {
         method: 'POST',
         body: formData,
+        headers: {
+          // Ne pas spécifier le Content-Type ici, fetch le gère automatiquement pour FormData
+        },
       });
 
       if (!response.ok) {
-        throw new Error('Erreur lors de l\'upload');
+        throw new Error(`Erreur: ${response.statusText}`);
       }
 
       const data = await response.json();
-      setMessage(data.message || 'Fichier uploadé avec succès.');
+      console.log('Réponse du backend:', data);
     } catch (error) {
-      setMessage('Erreur lors de l\'upload. Vérifiez le backend.');
-      console.error(error);
+      console.error('Erreur lors de l\'envoi du fichier:', error);
     }
   };
 
   return (
     <div>
-      <h1>iTransfer</h1>
-      <input type="file" onChange={handleFileChange} />
-      <button onClick={handleUpload}>Upload</button>
-      {message && <p>{message}</p>}
+      <h1>Upload de fichier</h1>
+      <input type="file" onChange={handleFileUpload} />
     </div>
   );
-};
+}
 
 export default App;
