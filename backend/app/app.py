@@ -8,7 +8,7 @@ app = Flask(__name__)
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3500')
 
 # Configurer CORS pour autoriser les requêtes provenant du frontend
-CORS(app, resources={r"/upload": {"origins": FRONTEND_URL}})
+CORS(app, resources={r"/upload": {"origins": FRONTEND_URL}}, supports_credentials=True)
 
 @app.route('/')
 def index():
@@ -32,9 +32,13 @@ def upload_file():
         upload_path = '/app/uploads/' + file.filename
         file.save(upload_path)
 
-        return jsonify({"message": f"Fichier {file.filename} reçu avec succès"}), 201
+        response = jsonify({"message": f"Fichier {file.filename} reçu avec succès"})
+        response.headers.add("Access-Control-Allow-Origin", FRONTEND_URL)  # Ajouter le header CORS
+        return response, 201
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        response = jsonify({"error": str(e)})
+        response.headers.add("Access-Control-Allow-Origin", FRONTEND_URL)  # Ajouter le header CORS
+        return response, 500
 
 if __name__ == '__main__':
     # Flask écoute sur toutes les interfaces réseau disponibles (0.0.0.0)

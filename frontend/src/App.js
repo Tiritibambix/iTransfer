@@ -2,12 +2,21 @@ import React, { useState } from 'react';
 
 function App() {
   const [uploading, setUploading] = useState(false);
+  const [file, setFile] = useState(null); // Suivi du fichier sélectionné
 
-  // Récupérer dynamiquement l'URL du backend à partir de l'environnement
+  // Récupérer dynamiquement l'URL du backend
   const backendUrl = window.location.origin.replace('3500', '5500');  // Dynamique : on change le port 3500 -> 5500
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
+  const handleFileChange = (event) => {
+    const selectedFile = event.target.files[0];
+    if (selectedFile) {
+      setFile(selectedFile);
+    } else {
+      setFile(null); // Aucun fichier sélectionné
+    }
+  };
+
+  const handleFileUpload = async () => {
     if (!file) {
       console.error('Aucun fichier sélectionné');
       return;
@@ -16,7 +25,7 @@ function App() {
     const formData = new FormData();
     formData.append('file', file);
 
-    setUploading(true);  // Démarrer l'upload
+    setUploading(true);
 
     try {
       const response = await fetch(`${backendUrl}/upload`, {
@@ -24,7 +33,7 @@ function App() {
         body: formData,
       });
 
-      setUploading(false);  // Fin de l'upload
+      setUploading(false);
 
       if (!response.ok) {
         throw new Error(`Erreur: ${response.statusText}`);
@@ -41,9 +50,11 @@ function App() {
   return (
     <div>
       <h1>Upload de fichier</h1>
-      <input type="file" onChange={handleFileUpload} />
+      <input type="file" onChange={handleFileChange} />
+      {file && !uploading && (
+        <button onClick={handleFileUpload}>Upload</button>
+      )}
       {uploading && <button disabled>Upload en cours...</button>}
-      {!uploading && <button onClick={handleFileUpload}>Upload</button>}
     </div>
   );
 }
