@@ -29,9 +29,18 @@ function App({ backendUrl }) {
   };
 
   return (
-    <div>
+    <div style={{ padding: '20px', textAlign: 'center' }}>
       <h1>Upload de fichier</h1>
-      <input type="file" onChange={handleFileUpload} />
+      <input
+        type="file"
+        onChange={handleFileUpload}
+        style={{
+          padding: '10px',
+          fontSize: '16px',
+          marginTop: '20px',
+          cursor: 'pointer',
+        }}
+      />
     </div>
   );
 }
