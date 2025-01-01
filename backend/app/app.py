@@ -4,18 +4,12 @@ import os
 
 app = Flask(__name__)
 
-# Récupérer dynamiquement l'URL du frontend
-frontend_url = request.headers.get('Origin')
-
-if not frontend_url:
-    frontend_url = 'http://localhost:3500'
-
-# Configurer CORS pour le backend
-CORS(app, resources={r"/upload": {"origins": frontend_url}}, supports_credentials=True)
-
 # Identifiants administrateur (utiliser des variables d'environnement pour les valeurs sensibles)
 ADMIN_USERNAME = os.getenv('ADMIN_USERNAME', 'admin')
 ADMIN_PASSWORD = os.getenv('ADMIN_PASSWORD', 'adminpassword')
+
+# CORS initialisé sans frontend_url, car il est dynamique
+CORS(app, supports_credentials=True)
 
 @app.route('/')
 def index():
@@ -39,6 +33,14 @@ def upload():
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
+    # Récupérer dynamiquement l'URL du frontend à chaque requête
+    frontend_url = request.headers.get('Origin')
+    if not frontend_url:
+        frontend_url = 'http://localhost:3500'
+
+    # Configurer CORS pour chaque requête
+    CORS(app, resources={r"/upload": {"origins": frontend_url}}, supports_credentials=True)
+
     if request.method == 'POST':
         file = request.files.get('file')
         if not file:
