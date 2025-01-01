@@ -3,24 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Connexion</title>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <title>Login - iTransfer</title>
 </head>
 <body>
-    <div class="container">
-        <h2 class="mt-5">Se connecter</h2>
-        <form action="/login" method="POST" class="mt-4">
-            <div class="form-group">
-                <label for="username">Nom d'utilisateur :</label>
-                <input type="text" class="form-control" id="username" name="username" required>
-            </div>
-            <div class="form-group">
-                <label for="password">Mot de passe :</label>
-                <input type="password" class="form-control" id="password" name="password" required>
-            </div>
-            <button type="submit" class="btn btn-primary">Se connecter</button>
-        </form>
-        <div id="error-message" class="mt-3 text-danger"></div>
-    </div>
+    <h1>Se connecter</h1>
+    <form method="POST" action="{{ url_for('login') }}">
+        <label for="username">Nom d'utilisateur :</label>
+        <input type="text" id="username" name="username" required><br><br>
+        <label for="password">Mot de passe :</label>
+        <input type="password" id="password" name="password" required><br><br>
+        <button type="submit">Se connecter</button>
+    </form>
 </body>
 </html>

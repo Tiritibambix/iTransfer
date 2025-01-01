@@ -13,7 +13,7 @@ CORS(app, supports_credentials=True)
 
 @app.route('/')
 def index():
-    return redirect(url_for('login'))
+    return redirect(url_for('login'))  # Redirige toujours vers la page de login
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -22,14 +22,14 @@ def login():
         password = request.form['password']
         
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-            return redirect(url_for('upload'))
+            return redirect(url_for('upload'))  # Redirige vers la page d'upload
         else:
             return jsonify({"error": "Nom d'utilisateur ou mot de passe incorrect"}), 401
-    return render_template('login.html')
+    return render_template('login.html')  # Page d'authentification
 
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
-    return render_template('upload.html')  # Affiche la page d'upload après une connexion réussie
+    return render_template('upload.html')  # Page d'upload après connexion réussie
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
