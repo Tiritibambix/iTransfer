@@ -15,9 +15,6 @@ function App({ backendUrl }) {
       const response = await fetch(`${backendUrl}/upload`, {
         method: 'POST',
         body: formData,
-        headers: {
-          // Ne pas spécifier le Content-Type ici, fetch le gère automatiquement pour FormData
-        },
       });
 
       if (!response.ok) {

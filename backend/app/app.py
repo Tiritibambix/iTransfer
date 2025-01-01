@@ -12,7 +12,7 @@ FRONTEND_URL = os.environ.get('FRONTEND_URL', 'http://localhost:3500')
 logging.basicConfig(level=logging.INFO)
 
 # Activer CORS pour autoriser uniquement l'origine définie
-CORS(app, resources={r"/*": {"origins": FRONTEND_URL}}, supports_credentials=True)
+CORS(app, resources={r"/*": {"origins": FRONTEND_URL}})
 
 @app.route('/')
 def index():
@@ -24,7 +24,7 @@ def upload_file():
         response = jsonify({'message': 'CORS preflight success'})
         response.headers.add("Access-Control-Allow-Origin", FRONTEND_URL)
         response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type, Authorization")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
         return response
 
     try:
