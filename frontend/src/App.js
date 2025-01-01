@@ -1,10 +1,16 @@
 import React, { useState } from 'react';
 
 function App({ backendUrl }) {
+  const [file, setFile] = useState(null);  // État pour gérer le fichier sélectionné
   const [progress, setProgress] = useState(0); // État pour la progression
 
-  const handleFileUpload = async (event) => {
-    const file = event.target.files[0];
+  // Gérer la sélection de fichier
+  const handleFileChange = (event) => {
+    setFile(event.target.files[0]);  // Sauvegarder le fichier sélectionné
+  };
+
+  // Gérer l'upload du fichier
+  const handleFileUpload = async () => {
     if (!file) {
       console.error('Aucun fichier sélectionné');
       return;
@@ -38,7 +44,7 @@ function App({ backendUrl }) {
       <h1>Upload de fichier</h1>
       <input
         type="file"
-        onChange={handleFileUpload}
+        onChange={handleFileChange}
         style={{
           padding: '10px',
           fontSize: '16px',
@@ -46,6 +52,26 @@ function App({ backendUrl }) {
           cursor: 'pointer',
         }}
       />
+      
+      {/* Affichage du bouton "Upload" si un fichier a été sélectionné */}
+      {file && (
+        <button
+          onClick={handleFileUpload}
+          style={{
+            padding: '10px 20px',
+            fontSize: '16px',
+            marginTop: '20px',
+            cursor: 'pointer',
+            backgroundColor: '#4CAF50',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+          }}
+        >
+          Upload
+        </button>
+      )}
+
       {/* Affichage de la barre de progression */}
       <div style={{ marginTop: '20px' }}>
         {progress > 0 && (
