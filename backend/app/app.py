@@ -1,18 +1,10 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-import os
 
 app = Flask(__name__)
 
-# Récupérer l'URL du frontend dynamiquement
-frontend_url = request.headers.get('Origin')
-
-# Si l'URL du frontend n'est pas définie, on utilise localhost:3500 par défaut
-if not frontend_url:
-    frontend_url = 'http://localhost:3500'
-
-# Configurer CORS pour permettre toutes les requêtes provenant de l'URL dynamique
-CORS(app, resources={r"/upload": {"origins": frontend_url}}, supports_credentials=True)
+# Configurer CORS sans spécifier d'origine statique ici
+CORS(app, supports_credentials=True)
 
 @app.route('/')
 def index():
@@ -20,6 +12,9 @@ def index():
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
+    # Récupérer l'URL du frontend dynamiquement pour chaque requête
+    frontend_url = request.headers.get('Origin', 'http://localhost:3500')  # Si pas d'Origin, fallback à localhost:3500
+
     if request.method == 'OPTIONS':  # Gérer la pré-demande CORS
         response = jsonify({'message': 'CORS preflight success'})
         response.headers.add("Access-Control-Allow-Origin", frontend_url)
