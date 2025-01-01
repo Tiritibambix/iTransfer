@@ -1,22 +1,10 @@
 import React, { useState } from 'react';
 
-function App() {
-  const [uploading, setUploading] = useState(false);
-  const [file, setFile] = useState(null); // Suivi du fichier sélectionné
+function App({ backendUrl }) {
+  const [progress, setProgress] = useState(0);  // État pour la progression
 
-  // Récupérer dynamiquement l'URL du backend
-  const backendUrl = window.location.origin.replace('3500', '5500');  // Dynamique : on change le port 3500 -> 5500
-
-  const handleFileChange = (event) => {
-    const selectedFile = event.target.files[0];
-    if (selectedFile) {
-      setFile(selectedFile);
-    } else {
-      setFile(null); // Aucun fichier sélectionné
-    }
-  };
-
-  const handleFileUpload = async () => {
+  const handleFileUpload = (event) => {
+    const file = event.target.files[0];
     if (!file) {
       console.error('Aucun fichier sélectionné');
       return;
@@ -25,36 +13,52 @@ function App() {
     const formData = new FormData();
     formData.append('file', file);
 
-    setUploading(true);
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${backendUrl}/upload`, true);
 
-    try {
-      const response = await fetch(`${backendUrl}/upload`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      setUploading(false);
-
-      if (!response.ok) {
-        throw new Error(`Erreur: ${response.statusText}`);
+    // Mise à jour de la barre de progression
+    xhr.upload.onprogress = (event) => {
+      if (event.lengthComputable) {
+        const percent = Math.round((event.loaded / event.total) * 100);
+        setProgress(percent);
       }
+    };
 
-      const data = await response.json();
-      console.log('Réponse du backend:', data);
-    } catch (error) {
-      setUploading(false);
-      console.error('Erreur lors de l\'envoi du fichier:', error);
-    }
+    // Gérer la réponse du serveur
+    xhr.onload = () => {
+      if (xhr.status === 201) {
+        console.log('Fichier téléchargé avec succès:', xhr.responseText);
+      } else {
+        console.error('Erreur lors de l\'upload:', xhr.status, xhr.statusText);
+      }
+      setProgress(0);  // Réinitialiser la progression après l'upload
+    };
+
+    // Gérer les erreurs
+    xhr.onerror = () => {
+      console.error('Erreur lors de l\'upload du fichier');
+      setProgress(0);  // Réinitialiser la progression en cas d'erreur
+    };
+
+    // Envoyer la requête avec les données
+    xhr.send(formData);
   };
 
   return (
     <div>
       <h1>Upload de fichier</h1>
-      <input type="file" onChange={handleFileChange} />
-      {file && !uploading && (
-        <button onClick={handleFileUpload}>Upload</button>
+      <input type="file" onChange={handleFileUpload} />
+      
+      {/* Affichage de la barre de progression */}
+      {progress > 0 && (
+        <div style={{ width: '100%', backgroundColor: '#ccc', height: '10px' }}>
+          <div style={{
+            width: `${progress}%`,
+            height: '100%',
+            backgroundColor: 'green'
+          }} />
+        </div>
       )}
-      {uploading && <button disabled>Upload en cours...</button>}
     </div>
   );
 }
