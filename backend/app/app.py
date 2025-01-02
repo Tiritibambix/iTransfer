@@ -3,7 +3,7 @@ from flask_cors import CORS
 
 app = Flask(__name__)
 
-# Configurer CORS sans spécifier d'origine statique ici
+# Configurer CORS pour permettre toutes les origines
 CORS(app, supports_credentials=True)
 
 @app.route('/')
