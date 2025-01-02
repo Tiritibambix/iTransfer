@@ -12,11 +12,15 @@ BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:5000')
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 
-@app.route('/upload', methods=['POST'])
+@app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
-    """
-    Endpoint pour recevoir un fichier et un email, les enregistrer et envoyer une notification.
-    """
+    if request.method == 'OPTIONS':  # Gérer la pré-demande CORS
+        response = jsonify({'message': 'CORS preflight success'})
+        response.headers.add("Access-Control-Allow-Origin", '*')
+        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response
+
     try:
         file = request.files.get('file')
         email = request.form.get('email')
@@ -44,12 +48,15 @@ def upload_file():
         app.logger.error(f"Erreur lors de l'upload : {e}")
         return jsonify({'error': str(e)}), 500
 
-
-@app.route('/login', methods=['POST'])
+@app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
-    """
-    Vérifie les identifiants fournis par le client.
-    """
+    if request.method == 'OPTIONS':  # Gérer la pré-demande CORS
+        response = jsonify({'message': 'CORS preflight success'})
+        response.headers.add("Access-Control-Allow-Origin", '*')
+        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response
+
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
@@ -60,11 +67,7 @@ def login():
     else:
         return jsonify({"error": "Identifiants invalides"}), 401
 
-
 def notify_user(file_id, email):
-    """
-    Exemple de fonction pour envoyer une notification.
-    """
     try:
         with smtplib.SMTP('localhost') as smtp:
             smtp.sendmail(
