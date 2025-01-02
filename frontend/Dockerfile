@@ -7,7 +7,7 @@ WORKDIR /app
 # Copier les fichiers de configuration pour npm
 COPY frontend/package*.json ./
 
-# Installer les dépendances (incluant react-router-dom)
+# Installer les dépendances (incluant @babel/plugin-proposal-private-property-in-object)
 RUN npm install
 
 # Copier tout le code source du frontend
