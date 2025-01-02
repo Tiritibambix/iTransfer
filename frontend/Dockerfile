@@ -9,6 +9,7 @@ COPY frontend/package*.json ./
 
 # Installer les dépendances (incluant @babel/plugin-proposal-private-property-in-object)
 RUN npm install
+RUN npm install react-router-dom@latest
 
 # Copier tout le code source du frontend
 COPY frontend/ .
