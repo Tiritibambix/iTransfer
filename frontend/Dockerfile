@@ -7,10 +7,7 @@ WORKDIR /app
 # Copier les fichiers de configuration pour npm
 COPY frontend/package*.json ./
 
-# Vérifier que les fichiers sont copiés correctement
-RUN ls -la
-
-# Installer les dépendances
+# Installer les dépendances (incluant react-router-dom)
 RUN npm install
 
 # Copier tout le code source du frontend
@@ -18,9 +15,6 @@ COPY frontend/ .
 
 # Construire l'application
 RUN npm run build
-
-# Vérifier les fichiers générés
-RUN ls -la build
 
 # Étape 2 : Servir avec Nginx
 FROM nginx:alpine
