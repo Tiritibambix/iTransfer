@@ -2,12 +2,9 @@ services:
   frontend:
     image: tiritibambix/itransfer-frontend
     ports:
-      - "3500:80"
-    environment:
-      # L'utilisateur peut définir ici l'URL du backend
-      - REACT_APP_BACKEND_URL=http://machineIP:5000
+      - "3500:80"  # Le frontend sera disponible sur le port 3500
     volumes:
-      - ./iTransfer/frontend:/app
+      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/frontend:/app
       - /app/node_modules
     depends_on:
       - backend
@@ -15,15 +12,14 @@ services:
   backend:
     image: tiritibambix/itransfer-backend
     ports:
-      - "4500:5000"
+      - "5500:5000"  # Le backend sera accessible sur le port 5500
     environment:
-      # L'utilisateur peut définir ici l'URL du frontend
-      - FRONTEND_URL=http://machineIP:3500
-      - DATABASE_URL=mysql://mariadb_user:mariadb_pass@db/mariadb_db
-      - SECRET_KEY=super_secret_key
+      - FRONTEND_URL=http://localhost:3500  # Le frontend sera sur ce port (géré dynamiquement)
+      - ADMIN_USERNAME=adminuser  # Nom d'utilisateur pour l'authentification
+      - ADMIN_PASSWORD=adminuserpassword  # Mot de passe pour l'authentification
     volumes:
-      - ./iTransfer/backend_data:/app/data
-      - ./iTransfer/uploads:/app/uploads
+      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/backend_data:/app/data
+      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/uploads:/app/uploads
     depends_on:
       - db
 
@@ -37,7 +33,7 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ./iTransfer/db_data:/var/lib/mysql
+      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/db_data:/var/lib/mysql
 
 volumes:
   db_data:
