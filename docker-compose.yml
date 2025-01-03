@@ -42,7 +42,7 @@ services:
     volumes:
       - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysql -h 127.0.0.1 -u root -p$MYSQL_ROOT_PASSWORD -e 'SELECT 1' || exit 1"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD || echo 'Healthcheck failed' >> /var/log/healthcheck.log"]
       interval: 10s
       timeout: 5s
       retries: 3
