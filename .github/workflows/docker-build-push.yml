@@ -28,7 +28,7 @@ jobs:
 
     # Étape 5 : Construire et pousser l'image Docker pour le backend
     - name: Build and Push Backend
-      uses: docker/build-push-action@v3
+      uses: docker/build-push-action@v6
       with:
         context: .
         file: ./backend/Dockerfile
@@ -37,7 +37,7 @@ jobs:
 
     # Étape 6 : Construire et pousser l'image Docker pour le frontend
     - name: Build and Push Frontend
-      uses: docker/build-push-action@v3
+      uses: docker/build-push-action@v6
       with:
         context: .
         file: ./frontend/Dockerfile
