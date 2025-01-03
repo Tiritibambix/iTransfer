@@ -2,6 +2,7 @@ from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from .config import Config
+import os
 
 app = Flask(__name__)
 app.config.from_object(Config)
@@ -31,14 +32,20 @@ def upload_file():
         if not file:
             raise ValueError("Aucun fichier envoyé")
 
+        # Vérifier si le dossier uploads existe, sinon le créer
+        upload_dir = '/app/uploads'
+        if not os.path.exists(upload_dir):
+            os.makedirs(upload_dir)
+
         # Sauvegarde du fichier
-        upload_path = '/app/uploads/' + file.filename
+        upload_path = os.path.join(upload_dir, file.filename)
         file.save(upload_path)
 
         response = jsonify({"message": f"Fichier {file.filename} reçu avec succès"})
         response.headers.add("Access-Control-Allow-Origin", frontend_url)  # Ajouter le header CORS
         return response, 201
     except Exception as e:
+        app.logger.error(f"Erreur lors de l'upload : {e}")
         response = jsonify({"error": str(e)})
         response.headers.add("Access-Control-Allow-Origin", frontend_url)  # Ajouter le header CORS
         return response, 500
@@ -71,3 +78,6 @@ def login():
         response = jsonify({"error": "Identifiants invalides."})
         response.headers.add("Access-Control-Allow-Origin", frontend_url)
         return response, 401
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)  # Ecouter sur toutes les interfaces réseau

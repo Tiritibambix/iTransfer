@@ -3,6 +3,7 @@
 # iTransfer_1minAI
 ```
 ├── .github
+|     ├── dependabot.yml
 |     ├── workflows
 |     |     ├── docker-build-push.yml
 ├── LICENSE
@@ -16,9 +17,9 @@
 |     |     ├── models.py
 |     |     ├── routes.py
 |     |     ├── utils.py
+|     ├── run.py
 |     ├── tests
 |     |     ├── test_routes.py
-├── docker-compose-build.yml
 ├── docker-compose.yml
 ├── frontend
 |     ├── Dockerfile
@@ -29,6 +30,9 @@
 |     |     ├── Admin.js
 |     |     ├── App.js
 |     |     ├── FileManager.js
+|     |     ├── Login.js
+|     |     ├── PrivateRoute.js
+|     |     ├── Progress.js
 |     |     ├── ProgressBar.js
 |     |     ├── Settings.js
 |     |     ├── Uploads.js
