@@ -8,3 +8,5 @@ class Config:
     SMTP_PORT = os.environ.get('SMTP_PORT')
     SMTP_USER = os.environ.get('SMTP_USER')
     SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
+    ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME') or 'adminuser'
+    ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD') or 'adminuserpassword'

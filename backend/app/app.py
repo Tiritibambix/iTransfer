@@ -71,6 +71,3 @@ def login():
         response = jsonify({"error": "Identifiants invalides."})
         response.headers.add("Access-Control-Allow-Origin", frontend_url)
         return response, 401
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)  # Ecouter sur toutes les interfaces réseau

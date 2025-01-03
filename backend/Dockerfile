@@ -25,10 +25,11 @@ RUN pip install --no-cache-dir -r /app/requirements.txt && \
     pip-check
 
 # Copier le code de l'application
-COPY /backend/app /app
+COPY /backend/app /app/app
+COPY /backend/run.py /app/run.py
 
 # Exposer le port de l'application
 EXPOSE 5000
 
 # Commande pour démarrer l'application
-CMD ["python", "app.py"]
+CMD ["python", "run.py"]
