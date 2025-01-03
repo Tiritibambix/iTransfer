@@ -17,7 +17,7 @@ jobs:
 
     # Étape 2 : Configurer Docker Buildx
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
+      uses: docker/setup-buildx-action@v3
 
     # Étape 3 : Connexion à Docker Hub
     - name: Log in to Docker Hub
