@@ -2,26 +2,32 @@ services:
   frontend:
     image: tiritibambix/itransfer-frontend
     ports:
-      - "3500:80"  # Le frontend sera disponible sur le port 3500
+      - "3500:80"
     volumes:
       - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/frontend:/app
       - /app/node_modules
     depends_on:
       - backend
+    networks:
+      - itransfer-network
 
   backend:
     image: tiritibambix/itransfer-backend
     ports:
-      - "5500:5000"  # Le backend sera accessible sur le port 5500
+      - "5500:5000"
     environment:
-      - FRONTEND_URL=http://localhost:3500  # Le frontend sera sur ce port (géré dynamiquement)
-      - ADMIN_USERNAME=adminuser  # Nom d'utilisateur pour l'authentification
-      - ADMIN_PASSWORD=adminuserpassword  # Mot de passe pour l'authentification
+      - FRONTEND_URL=http://localhost:3500
+      - ADMIN_USERNAME=adminuser
+      - ADMIN_PASSWORD=adminuserpassword
+      - DATABASE_URL=mysql://mariadb_user:mariadb_pass@db/mariadb_db
     volumes:
       - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/backend_data:/app/data
       - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/uploads:/app/uploads
     depends_on:
-      - db
+      - db  # notmalement pas de tiret, et :
+#        condition: service_healthy
+    networks:
+      - itransfer-network
 
   db:
     image: mariadb
@@ -34,8 +40,17 @@ services:
       - "3306:3306"
     volumes:
       - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=root_password || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - itransfer-network
 
 volumes:
   db_data:
-  backend_data:
-  uploads:
+
+networks:
+  itransfer-network:
+    driver: bridge
