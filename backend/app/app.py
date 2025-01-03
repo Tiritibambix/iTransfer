@@ -18,21 +18,22 @@ def index():
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
     # Récupérer l'URL du frontend dynamiquement pour chaque requête
-    frontend_url = request.headers.get('Origin', 'http://localhost:3500')  # Si pas d'Origin, fallback à localhost:3500
+    frontend_url = request.headers.get('Origin', 'http://localhost:3500')
 
-    if request.method == 'OPTIONS':  # Gérer la pré-demande CORS
+    if request.method == 'OPTIONS':  # Pré-demande CORS
         response = jsonify({'message': 'CORS preflight success'})
         response.headers.add("Access-Control-Allow-Origin", frontend_url)
         response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-        return response
+        return response, 200
 
     try:
+        # Vérifier si un fichier a été envoyé
         file = request.files.get('file')
         if not file:
             raise ValueError("Aucun fichier envoyé")
 
-        # Vérifier si le dossier uploads existe, sinon le créer
+        # Chemin de sauvegarde
         upload_dir = '/app/uploads'
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
@@ -42,13 +43,14 @@ def upload_file():
         file.save(upload_path)
 
         response = jsonify({"message": f"Fichier {file.filename} reçu avec succès"})
-        response.headers.add("Access-Control-Allow-Origin", frontend_url)  # Ajouter le header CORS
+        response.headers.add("Access-Control-Allow-Origin", frontend_url)
         return response, 201
+
     except Exception as e:
         app.logger.error(f"Erreur lors de l'upload : {e}")
         response = jsonify({"error": str(e)})
-        response.headers.add("Access-Control-Allow-Origin", frontend_url)  # Ajouter le header CORS
-        return response, 500
+        response.headers.add("Access-Control-Allow-Origin", frontend_url)
+        return response, 400
 
 @app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
@@ -80,4 +82,4 @@ def login():
         return response, 401
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)  # Ecouter sur toutes les interfaces réseau
+    app.run(host='0.0.0.0', port=5000)
