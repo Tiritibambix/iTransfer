@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   frontend:
     image: tiritibambix/itransfer-frontend
@@ -24,8 +26,7 @@ services:
       - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/backend_data:/app/data
       - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/uploads:/app/uploads
     depends_on:
-      - db  # notmalement pas de tiret, et :
-#        condition: service_healthy
+      - db
     networks:
       - itransfer-network
 
@@ -41,10 +42,11 @@ services:
     volumes:
       - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/db_data:/var/lib/mysql
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=root_password || exit 1"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 30s
     networks:
       - itransfer-network
 
