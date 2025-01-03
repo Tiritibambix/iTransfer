@@ -1,4 +1,4 @@
-name: Build, Test and Push Docker Images
+name: Build and Push Docker Images
 
 on:
   workflow_dispatch:
@@ -25,6 +25,15 @@ jobs:
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
+
+    # Étape 4 : Vérifier les dépendances avec pip-check
+    - name: Check dependencies with pip-check
+      run: |
+        docker run --rm -v $(pwd):/app -w /app python:3.10-slim sh -c " \
+        python -m venv venv && \
+        . venv/bin/activate && \
+        pip install pip-check && \
+        pip-check"
 
     # Étape 5 : Construire et pousser l'image Docker pour le backend
     - name: Build and Push Backend
