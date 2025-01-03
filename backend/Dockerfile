@@ -1,13 +1,18 @@
 # Utiliser une image de base officielle Python
 FROM python:3.10-slim
 
+# Installer les bibliothèques nécessaires pour mysqlclient
+RUN apt-get update && apt-get install -y \
+    default-libmysqlclient-dev gcc \
+    && apt-get clean
+
 # Définir le répertoire de travail
 WORKDIR /app
 
 # Copier le fichier requirements.txt
 COPY requirements.txt /app/requirements.txt
 
-# Installer les dépendances et vérifier leur compatibilité
+# Installer les dépendances Python
 RUN pip install --no-cache-dir -r /app/requirements.txt && \
     pip check
 

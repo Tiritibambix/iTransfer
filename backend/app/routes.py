@@ -51,7 +51,7 @@ def upload_file():
 @app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
     """
-    Vérifie les identifiants fournis par le client.
+    Vérifie les identifiants fournis par le client et gère les requêtes CORS.
     """
     frontend_url = request.headers.get('Origin', 'http://localhost:3500')  # Dynamique
 
@@ -62,7 +62,7 @@ def login():
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
         return response, 200
 
-    # Gestion POST
+    # Gestion de la méthode POST
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
@@ -76,7 +76,6 @@ def login():
         response = jsonify({"error": "Identifiants invalides."})
         response.headers.add("Access-Control-Allow-Origin", frontend_url)
         return response, 401
-
 
 def notify_user(file_id, email):
     try:
