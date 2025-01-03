@@ -50,22 +50,33 @@ def upload_file():
 
 @app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
-    if request.method == 'OPTIONS':  # Gérer la pré-demande CORS
-        response = jsonify({'message': 'CORS preflight success'})
-        response.headers.add("Access-Control-Allow-Origin", '*')
-        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-        return response
+    """
+    Vérifie les identifiants fournis par le client.
+    """
+    frontend_url = request.headers.get('Origin', 'http://localhost:3500')  # Dynamique
 
+    if request.method == 'OPTIONS':  # Pré-requête CORS
+        response = jsonify({'message': 'CORS preflight success'})
+        response.headers.add("Access-Control-Allow-Origin", frontend_url)
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response, 200
+
+    # Gestion POST
     data = request.get_json()
     username = data.get('username')
     password = data.get('password')
 
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
         token = "fake_jwt_token_for_demo_purposes"
-        return jsonify({"message": "Login réussi", "token": token}), 200
+        response = jsonify({"message": "Login réussi", "token": token})
+        response.headers.add("Access-Control-Allow-Origin", frontend_url)
+        return response, 200
     else:
-        return jsonify({"error": "Identifiants invalides"}), 401
+        response = jsonify({"error": "Identifiants invalides."})
+        response.headers.add("Access-Control-Allow-Origin", frontend_url)
+        return response, 401
+
 
 def notify_user(file_id, email):
     try:
