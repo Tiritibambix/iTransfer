@@ -1,7 +1,11 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
+from .config import Config
 
 app = Flask(__name__)
+app.config.from_object(Config)
+db = SQLAlchemy(app)
 
 # Configurer CORS pour permettre toutes les origines
 CORS(app, supports_credentials=True)
@@ -38,6 +42,35 @@ def upload_file():
         response = jsonify({"error": str(e)})
         response.headers.add("Access-Control-Allow-Origin", frontend_url)  # Ajouter le header CORS
         return response, 500
+
+@app.route('/login', methods=['POST', 'OPTIONS'])
+def login():
+    """
+    Vérifie les identifiants fournis par le client et gère les requêtes CORS.
+    """
+    frontend_url = request.headers.get('Origin', 'http://localhost:3500')  # Dynamique
+
+    if request.method == 'OPTIONS':  # Pré-requête CORS
+        response = jsonify({'message': 'CORS preflight success'})
+        response.headers.add("Access-Control-Allow-Origin", frontend_url)
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response, 200
+
+    # Gestion de la méthode POST
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    if username == Config.ADMIN_USERNAME and password == Config.ADMIN_PASSWORD:
+        token = "fake_jwt_token_for_demo_purposes"
+        response = jsonify({"message": "Login réussi", "token": token})
+        response.headers.add("Access-Control-Allow-Origin", frontend_url)
+        return response, 200
+    else:
+        response = jsonify({"error": "Identifiants invalides."})
+        response.headers.add("Access-Control-Allow-Origin", frontend_url)
+        return response, 401
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)  # Ecouter sur toutes les interfaces réseau
