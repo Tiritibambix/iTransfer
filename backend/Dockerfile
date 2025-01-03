@@ -1,10 +1,15 @@
 # Utiliser une image Python légère
 FROM python:3.10-slim
 
-# Installer les bibliothèques nécessaires pour mysqlclient
+# Installer les bibliothèques nécessaires pour mysqlclient et autres dépendances
 RUN apt-get update && apt-get install -y \
-    default-libmysqlclient-dev gcc && \
-    apt-get clean
+    build-essential \
+    default-libmysqlclient-dev \
+    libssl-dev \
+    libffi-dev \
+    pkg-config \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Installer pip-check
 RUN pip install --upgrade pip pip-check
