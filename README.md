@@ -10,6 +10,7 @@
 ├── README.md
 ├── backend
 |     ├── Dockerfile
+|     ├── entrypoint.sh
 |     ├── app
 |     |     ├── __init__.py
 |     |     ├── app.py
