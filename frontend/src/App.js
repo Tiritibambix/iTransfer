@@ -1,9 +1,29 @@
 import React, { useState, useRef } from 'react';
 import SMTPSettings from './SMTPSettings';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 
 function App({ backendUrl }) {
   console.log('backendUrl:', backendUrl); // Debug: Vérification de l'URL backend
 
+  return (
+    <div>
+      <Router>
+        <Routes>
+          <Route path="/smtp-settings" element={<SMTPSettings backendUrl={backendUrl} />} />
+          <Route path="/" element={
+            <div>
+              <button className="btn" style={{ float: 'right' }} onClick={() => window.location.href = '/smtp-settings'}>Paramètres</button>
+              <h1>iTransfer</h1>
+              <FileUpload backendUrl={backendUrl} />
+            </div>
+          } />
+        </Routes>
+      </Router>
+    </div>
+  );
+}
+
+const FileUpload = ({ backendUrl }) => {
   const [progress, setProgress] = useState(0); // État pour la progression
   const [recipientEmail, setRecipientEmail] = useState(''); // État pour l'email du destinataire
   const xhrRef = useRef(null); // Référence pour stocker l'objet XMLHttpRequest
@@ -75,9 +95,6 @@ function App({ backendUrl }) {
 
   return (
     <div>
-      <SMTPSettings backendUrl={backendUrl} />
-      <button className="btn" style={{ float: 'right' }} onClick={() => window.location.href = '/smtp-settings'}>Paramètres</button>
-      <h1>iTransfer</h1>
       <input type="email" className="btn" value={recipientEmail} onChange={handleRecipientEmailChange} placeholder="Email du destinataire" />
       <input type="file" className="btn" />
       <button className="btn" onClick={handleUpload}>Upload</button>
@@ -106,6 +123,6 @@ function App({ backendUrl }) {
       )}
     </div>
   );
-}
+};
 
 export default App;
