@@ -67,8 +67,15 @@ def upload_file():
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
         return response, 500
 
-@app.route('/api/save-smtp-settings', methods=['POST'])
+@app.route('/api/save-smtp-settings', methods=['POST', 'OPTIONS'])
 def save_smtp_settings():
+    if request.method == 'OPTIONS':  # Gérer la pré-demande CORS
+        response = jsonify({'message': 'CORS preflight success'})
+        response.headers.add("Access-Control-Allow-Origin", '*')
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response
+
     data = request.json
     smtp_config = {
         "smtp_server": data.get("smtpServer"),
@@ -78,14 +85,29 @@ def save_smtp_settings():
         "smtp_sender_email": data.get("smtpSenderEmail"),
     }
 
-    # Chemin vers le fichier de configuration dans le volume
-    config_file_path = '/app/data/smtp_config.json'
+    try:
+        # Chemin vers le fichier de configuration dans le volume
+        config_file_path = '/app/data/smtp_config.json'
+        
+        # Créer le répertoire s'il n'existe pas
+        os.makedirs(os.path.dirname(config_file_path), exist_ok=True)
 
-    # Sauvegarder la configuration dans un fichier JSON
-    with open(config_file_path, 'w') as config_file:
-        json.dump(smtp_config, config_file)
+        # Sauvegarder la configuration dans un fichier JSON
+        with open(config_file_path, 'w') as config_file:
+            json.dump(smtp_config, config_file)
 
-    return jsonify({"message": "Configuration SMTP enregistrée avec succès!"}), 200
+        response = jsonify({"message": "Configuration SMTP enregistrée avec succès!"})
+        response.headers.add("Access-Control-Allow-Origin", '*')
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response, 200
+    except Exception as e:
+        app.logger.error(f"Erreur lors de la sauvegarde des paramètres SMTP : {e}")
+        response = jsonify({"error": str(e)})
+        response.headers.add("Access-Control-Allow-Origin", '*')
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response, 500
 
 @app.route('/login', methods=['POST', 'OPTIONS'])
 def login():

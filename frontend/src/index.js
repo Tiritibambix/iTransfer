@@ -25,7 +25,7 @@ ReactDOM.render(
             </PrivateRoute>
           }
         />
-        <Route path="/smtp-settings" element={<SMTPSettings />} />
+        <Route path="/smtp-settings" element={<SMTPSettings backendUrl={backendUrl} />} />
       </Routes>
     </Router>
   </React.StrictMode>,
