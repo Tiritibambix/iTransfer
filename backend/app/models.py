@@ -1,6 +1,6 @@
 from flask import Flask
 from . import db
-from routes import router
+from .routes import router
 
 app = Flask(__name__)
 
