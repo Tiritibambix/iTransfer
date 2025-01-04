@@ -31,6 +31,14 @@ def upload_file():
         file_id = str(uuid.uuid4())
         encrypted_data = hashlib.sha256(file.read()).hexdigest()
 
+        # Ajout de la logique pour sauvegarder le fichier
+        upload_dir = '/app/uploads'
+        if not os.path.exists(upload_dir):
+            os.makedirs(upload_dir)
+
+        upload_path = os.path.join(upload_dir, file.filename)
+        file.save(upload_path)
+
         new_file = FileUpload(
             id=file_id,
             filename=file.filename,
