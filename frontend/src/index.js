@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import App from './App';
 import Login from './Login';
 import PrivateRoute from './PrivateRoute';
+import SMTPSettings from './SMTPSettings';
 import './index.css';
 
 const backendUrl =
@@ -24,6 +25,7 @@ ReactDOM.render(
             </PrivateRoute>
           }
         />
+        <Route path="/smtp-settings" element={<SMTPSettings />} />
       </Routes>
     </Router>
   </React.StrictMode>,
