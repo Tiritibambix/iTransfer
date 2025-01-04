@@ -1,8 +1,7 @@
-from flask import Flask
-from . import db
-from .routes import router
+from app import app, db
+from app.routes import router
 
-app = Flask(__name__)
+app = app
 
 class FileUpload(db.Model):
     id = db.Column(db.String(36), primary_key=True)
