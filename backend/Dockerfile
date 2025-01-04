@@ -27,6 +27,7 @@ RUN pip install --no-cache-dir -r /app/requirements.txt && \
 # Créer le dossier uploads et lui donner les permissions nécessaires
 RUN mkdir -p /app/uploads && chmod -R 777 /app/uploads
 
+
 # Copier le code de l'application
 COPY /backend/app /app/app
 COPY /backend/run.py /app/run.py
