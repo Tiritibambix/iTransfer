@@ -2,6 +2,7 @@ import os
 import uuid
 import hashlib
 import smtplib
+import json
 from flask import request, jsonify
 from . import app, db
 from .models import FileUpload
@@ -65,6 +66,26 @@ def upload_file():
         response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
         return response, 500
+
+@app.route('/api/save-smtp-settings', methods=['POST'])
+def save_smtp_settings():
+    data = request.json
+    smtp_config = {
+        "smtp_server": data.get("smtpServer"),
+        "smtp_port": data.get("smtpPort"),
+        "smtp_user": data.get("smtpUser"),
+        "smtp_password": data.get("smtpPassword"),
+        "smtp_sender_email": data.get("smtpSenderEmail"),
+    }
+
+    # Chemin vers le fichier de configuration dans le volume
+    config_file_path = '/app/data/smtp_config.json'
+
+    # Sauvegarder la configuration dans un fichier JSON
+    with open(config_file_path, 'w') as config_file:
+        json.dump(smtp_config, config_file)
+
+    return jsonify({"message": "Configuration SMTP enregistrée avec succès!"}), 200
 
 @app.route('/login', methods=['POST', 'OPTIONS'])
 def login():

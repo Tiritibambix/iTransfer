@@ -7,9 +7,32 @@ const SMTPSettings = () => {
   const [smtpPassword, setSmtpPassword] = useState('');
   const [smtpSenderEmail, setSmtpSenderEmail] = useState('');
 
-  const handleSave = () => {
-    // Logique pour enregistrer les paramètres SMTP
-    console.log({ smtpServer, smtpPort, smtpUser, smtpPassword, smtpSenderEmail });
+  const handleSave = async () => {
+    const smtpSettings = {
+      smtpServer,
+      smtpPort,
+      smtpUser,
+      smtpPassword,
+      smtpSenderEmail,
+    };
+
+    try {
+      const response = await fetch(`${backendUrl}/api/save-smtp-settings`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(smtpSettings),
+      });
+
+      if (response.ok) {
+        console.log('Configuration SMTP enregistrée avec succès');
+      } else {
+        console.error('Erreur lors de l\'enregistrement de la configuration SMTP');
+      }
+    } catch (error) {
+      console.error('Erreur réseau lors de l\'enregistrement de la configuration SMTP', error);
+    }
   };
 
   return (
