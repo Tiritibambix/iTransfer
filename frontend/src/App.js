@@ -74,7 +74,7 @@ function App({ backendUrl }) {
 
   return (
     <div>
-      <button className="btn" style={{ float: 'right' }} onClick={() => window.location.href = '/smtp-settings'}>Paramètres</button>
+      <button className="btn" style={{ float: 'right' }} onClick={() => window.location.href = '/SMTPSettings'}>Paramètres</button>
       <h1>iTransfer</h1>
       <input type="email" className="btn" value={recipientEmail} onChange={handleRecipientEmailChange} placeholder="Email du destinataire" />
       <input type="file" className="btn" />
