@@ -36,8 +36,7 @@ const SMTPSettings = () => {
         <input type="email" className="btn" value={smtpSenderEmail} onChange={(e) => setSmtpSenderEmail(e.target.value)} />
       </div>
       <button onClick={handleSave}>Enregistrer</button>
-      <button className="btn" onClick={() => window.location.href = '/upload'}>Retour à l'upload</button>
-      <button className="btn" onClick={() => window.location.href = '/upload'}>Retour à l'upload</button>
+      <button className="btn" onClick={() => window.location.href = '/'}>Retour à l'accueil</button>
     </div>
   );
 };
