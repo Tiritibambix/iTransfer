@@ -5,19 +5,25 @@ const Upload = ({ backendUrl }) => {
   const [file, setFile] = useState(null);
   const [message, setMessage] = useState('');
   const [progress, setProgress] = useState(0);
+  const [recipientEmail, setRecipientEmail] = useState('');
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
   };
 
+  const handleRecipientEmailChange = (e) => {
+    setRecipientEmail(e.target.value);
+  };
+
   const handleUpload = async () => {
-    if (!file) {
-      setMessage('Veuillez sélectionner un fichier.');
+    if (!file || !recipientEmail) {
+      setMessage('Veuillez sélectionner un fichier et entrer un email destinataire.');
       return;
     }
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('email', recipientEmail);
 
     try {
       const xhr = new XMLHttpRequest();
@@ -54,6 +60,7 @@ const Upload = ({ backendUrl }) => {
     <div>
       <h1>iTransfer</h1>
       <input type="file" onChange={handleFileChange} />
+      <input type="email" value={recipientEmail} onChange={handleRecipientEmailChange} placeholder="Email du destinataire" />
       <button onClick={handleUpload}>Upload</button>
       {progress > 0 && <ProgressBar progress={progress} />}
       {message && <p>{message}</p>}
