@@ -29,8 +29,8 @@ RUN mkdir -p /app/uploads && chmod -R 777 /app/uploads
 
 
 # Copier le code de l'application
-COPY /backend/app /app/app
-COPY /backend/run.py /app/run.py
+COPY app /app/app
+COPY run.py /app/run.py
 
 # Copier le script d'entrée
 COPY entrypoint.sh /entrypoint.sh
