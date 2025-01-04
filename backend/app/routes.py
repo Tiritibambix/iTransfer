@@ -3,7 +3,7 @@ import uuid
 import hashlib
 import smtplib
 import json
-from flask import request, jsonify
+from flask import request, jsonify, send_file
 from . import app, db
 from .models import FileUpload
 
@@ -12,6 +12,51 @@ BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:5000')
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+
+def send_email(to_email, file_id, filename):
+    try:
+        # Charger la configuration SMTP
+        config_file_path = '/app/data/smtp_config.json'
+        with open(config_file_path, 'r') as config_file:
+            smtp_config = json.load(config_file)
+
+        # Créer le lien de téléchargement
+        download_link = f"{BACKEND_URL}/download/{file_id}"
+
+        # Configurer le message
+        message = f"""
+        Bonjour,
+
+        Un fichier a été partagé avec vous via iTransfer.
+        
+        Fichier : {filename}
+        Lien de téléchargement : {download_link}
+        
+        Ce lien expirera dans 7 jours.
+        
+        Cordialement,
+        L'équipe iTransfer
+        """
+
+        # Configurer le serveur SMTP
+        server = smtplib.SMTP(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
+        server.starttls()
+        server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
+
+        # Envoyer l'email
+        server.sendmail(
+            smtp_config['smtp_sender_email'],
+            to_email,
+            f"From: {smtp_config['smtp_sender_email']}\r\n"
+            f"To: {to_email}\r\n"
+            f"Subject: iTransfer - Nouveau fichier partagé\r\n"
+            f"\r\n{message}"
+        )
+        server.quit()
+        return True
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'envoi de l'email : {e}")
+        return False
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
@@ -24,9 +69,13 @@ def upload_file():
 
     try:
         file = request.files.get('file')
+        recipient_email = request.form.get('email')  # Récupérer l'email du formulaire
 
         if not file:
             return jsonify({'error': 'Fichier requis'}), 400
+
+        if not recipient_email:
+            return jsonify({'error': 'Email du destinataire requis'}), 400
 
         file_id = str(uuid.uuid4())
         file_content = file.read()
@@ -43,17 +92,26 @@ def upload_file():
         with open(upload_path, 'wb') as f:
             f.write(file_content)
 
+        # Créer l'entrée dans la base de données
         new_file = FileUpload(
             id=file_id,
             filename=file.filename,
-            encrypted_data=encrypted_data,
+            email=recipient_email,
+            encrypted_data=encrypted_data
         )
         db.session.add(new_file)
         db.session.commit()
 
-        # notify_user(file_id, email)  # Supprimer la notification
+        # Envoyer l'email
+        email_sent = send_email(recipient_email, file_id, file.filename)
 
-        response = jsonify({'file_id': file_id, 'message': 'Fichier reçu avec succès'})
+        response_data = {
+            'file_id': file_id,
+            'message': 'Fichier reçu avec succès',
+            'email_sent': email_sent
+        }
+
+        response = jsonify(response_data)
         response.headers.add("Access-Control-Allow-Origin", '*')
         response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
@@ -137,6 +195,29 @@ def login():
         response = jsonify({"error": "Identifiants invalides."})
         response.headers.add("Access-Control-Allow-Origin", frontend_url)
         return response, 401
+
+@app.route('/download/<file_id>', methods=['GET'])
+def download_file(file_id):
+    try:
+        # Récupérer le fichier depuis la base de données
+        file_upload = FileUpload.query.get_or_404(file_id)
+        
+        # Vérifier si le fichier existe dans le système de fichiers
+        file_path = os.path.join('/app/uploads', file_upload.filename)
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Fichier non trouvé'}), 404
+
+        # Envoyer le fichier
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=file_upload.filename,
+            mimetype='application/octet-stream'
+        )
+
+    except Exception as e:
+        app.logger.error(f"Erreur lors du téléchargement : {e}")
+        return jsonify({'error': str(e)}), 500
 
 def notify_user(file_id, email):
     try:

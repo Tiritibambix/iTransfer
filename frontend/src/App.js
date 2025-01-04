@@ -16,8 +16,10 @@ function App({ backendUrl }) {
 
     const formData = new FormData();
     formData.append('file', file);
+    formData.append('email', recipientEmail);
 
     console.log('Fichier à envoyer :', file);
+    console.log('Email du destinataire :', recipientEmail);
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${backendUrl}/upload`, true);
@@ -31,15 +33,23 @@ function App({ backendUrl }) {
 
     xhr.onload = () => {
       if (xhr.status === 201) {
+        const response = JSON.parse(xhr.responseText);
         console.log('Upload réussi');
+        if (response.email_sent) {
+          alert('Le fichier a été uploadé et un email a été envoyé au destinataire.');
+        } else {
+          alert('Le fichier a été uploadé mais l\'envoi de l\'email a échoué.');
+        }
       } else {
         console.error('Erreur lors de l\'upload :', xhr.status, xhr.statusText);
+        alert('Erreur lors de l\'upload. Veuillez vérifier que l\'email est valide et réessayer.');
       }
       setProgress(0);
     };
 
     xhr.onerror = () => {
       console.error('Erreur réseau lors de l\'upload');
+      alert('Erreur réseau lors de l\'upload. Veuillez vérifier votre connexion et réessayer.');
       setProgress(0);
     };
 
