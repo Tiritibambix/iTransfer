@@ -56,7 +56,11 @@ def upload_file():
 
     except Exception as e:
         app.logger.error(f"Erreur lors de l'upload : {e}")
-        return jsonify({'error': str(e)}), 500
+        response = jsonify({'error': str(e)})
+        response.headers.add("Access-Control-Allow-Origin", '*')
+        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response, 500
 
 @app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
