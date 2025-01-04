@@ -16,7 +16,7 @@ const SMTPSettings = () => {
       <h1>Configuration SMTP</h1>
       <div>
         <label>Serveur SMTP:</label>
-        <input type="text" value={smtpServer} onChange={(e) => setSmtpServer(e.target.value)} />
+        <input type="text" className="btn" value={smtpServer} onChange={(e) => setSmtpServer(e.target.value)} />
       </div>
       <div>
         <label>Port SMTP:</label>
@@ -31,7 +31,8 @@ const SMTPSettings = () => {
         <input type="password" value={smtpPassword} onChange={(e) => setSmtpPassword(e.target.value)} />
       </div>
       <button onClick={handleSave}>Enregistrer</button>
-      <button onClick={() => window.location.href = '/upload'}>Retour à l'upload</button>
+      <button className="btn" onClick={() => window.location.href = '/upload'}>Retour à l'upload</button>
+      <button className="btn" onClick={() => window.location.href = '/upload'}>Retour à l'upload</button>
     </div>
   );
 };

@@ -59,9 +59,10 @@ const Upload = ({ backendUrl }) => {
   return (
     <div>
       <h1>iTransfer</h1>
-      <input type="file" onChange={handleFileChange} />
+      <input type="file" className="btn" onChange={handleFileChange} />
       <input type="email" value={recipientEmail} onChange={handleRecipientEmailChange} placeholder="Email du destinataire" />
-      <button onClick={handleUpload}>Upload</button>
+      <button className="btn" onClick={handleUpload}>Upload</button>
+      <button className="btn" onClick={() => window.location.href = '/smtp-settings'}>Configuration SMTP</button>
       {progress > 0 && <ProgressBar progress={progress} />}
       {message && <p>{message}</p>}
     </div>
