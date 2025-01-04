@@ -4,8 +4,9 @@ import hashlib
 import smtplib
 from flask import request, jsonify
 
-from . import app, db
-from .models import FileUpload
+app = __import__("app")
+db = __import__("db")
+from models import FileUpload
 
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
 BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:5000')
