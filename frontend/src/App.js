@@ -4,6 +4,7 @@ function App({ backendUrl }) {
   console.log('backendUrl:', backendUrl); // Debug: Vérification de l'URL backend
 
   const [progress, setProgress] = useState(0); // État pour la progression
+  const [recipientEmail, setRecipientEmail] = useState(''); // État pour l'email du destinataire
   const xhrRef = useRef(null); // Référence pour stocker l'objet XMLHttpRequest
 
   const handleFileUpload = (event) => {
@@ -59,10 +60,17 @@ function App({ backendUrl }) {
     }
   };
 
+  // Fonction pour mettre à jour l'email du destinataire
+  const handleRecipientEmailChange = (event) => {
+    setRecipientEmail(event.target.value);
+  };
+
   return (
     <div>
       <h1>Application iTransfer</h1>
       <input type="file" onChange={handleFileUpload} />
+      <input type="email" className="btn" value={recipientEmail} onChange={handleRecipientEmailChange} placeholder="Email du destinataire" />
+      <button className="btn" onClick={() => window.location.href = '/smtp-settings'}>Configuration SMTP</button>
 
       {/* Affichage de la barre de progression */}
       {progress > 0 && (
