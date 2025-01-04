@@ -7,6 +7,7 @@ const Upload = ({ backendUrl }) => {
   const [progress, setProgress] = useState(0);
   const [recipientEmail, setRecipientEmail] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
+  const [recipientEmail2, setRecipientEmail2] = useState('');
 
   const handleFileChange = (e) => {
     setFile(e.target.files[0]);
@@ -18,6 +19,10 @@ const Upload = ({ backendUrl }) => {
 
   const handleSenderEmailChange = (e) => {
     setSenderEmail(e.target.value);
+  };
+
+  const handleRecipientEmail2Change = (e) => {
+    setRecipientEmail2(e.target.value);
   };
 
   const handleUpload = async () => {
@@ -68,7 +73,9 @@ const Upload = ({ backendUrl }) => {
       <input type="file" className="btn" onChange={handleFileChange} />
       <input type="email" className="btn" value={senderEmail} onChange={handleSenderEmailChange} placeholder="Email de l'expéditeur" />
       <input type="email" className="btn" value={recipientEmail} onChange={handleRecipientEmailChange} placeholder="Email du destinataire" />
+      <input type="email" className="btn" value={recipientEmail2} onChange={handleRecipientEmail2Change} placeholder="Email du destinataire 2" />
       <button className="btn" onClick={handleUpload}>Upload</button>
+      <button className="btn" onClick={() => window.location.href = '/smtp-settings'}>Configuration SMTP</button>
       <button className="btn" onClick={() => window.location.href = '/smtp-settings'}>Configuration SMTP</button>
       {progress > 0 && <ProgressBar progress={progress} />}
       {message && <p>{message}</p>}
