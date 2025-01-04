@@ -7,7 +7,7 @@ on:
       - main
 
 jobs:
-  build-test-push:
+  build-push:
     runs-on: ubuntu-22.04
 
     steps:
