@@ -65,12 +65,20 @@ function App({ backendUrl }) {
     setRecipientEmail(event.target.value);
   };
 
+  const handleUpload = () => {
+    const fileInput = document.querySelector('input[type="file"]');
+    if (fileInput.files.length > 0) {
+      handleFileUpload({ target: fileInput });
+    }
+  };
+
   return (
     <div>
-      <h1>Application iTransfer</h1>
-      <input type="file" onChange={handleFileUpload} />
+      <button className="btn" style={{ float: 'right' }} onClick={() => window.location.href = '/smtp-settings'}>Paramètres</button>
+      <h1>iTransfer</h1>
       <input type="email" className="btn" value={recipientEmail} onChange={handleRecipientEmailChange} placeholder="Email du destinataire" />
-      <button className="btn" onClick={() => window.location.href = '/smtp-settings'}>Configuration SMTP</button>
+      <input type="file" className="btn" />
+      <button className="btn" onClick={handleUpload}>Upload</button>
 
       {/* Affichage de la barre de progression */}
       {progress > 0 && (
