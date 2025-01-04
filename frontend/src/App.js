@@ -1,32 +1,11 @@
 import React, { useState, useRef } from 'react';
-import SMTPSettings from './SMTPSettings';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 
 function App({ backendUrl }) {
-  console.log('backendUrl:', backendUrl); // Debug: Vérification de l'URL backend
-
-  return (
-    <div>
-      <Router>
-        <Routes>
-          <Route path="/smtp-settings" element={<SMTPSettings backendUrl={backendUrl} />} />
-          <Route path="/" element={
-            <div>
-              <button className="btn" style={{ float: 'right' }} onClick={() => window.location.href = '/smtp-settings'}>Paramètres</button>
-              <h1>iTransfer</h1>
-              <FileUpload backendUrl={backendUrl} />
-            </div>
-          } />
-        </Routes>
-      </Router>
-    </div>
-  );
-}
-
-const FileUpload = ({ backendUrl }) => {
-  const [progress, setProgress] = useState(0); // État pour la progression
-  const [recipientEmail, setRecipientEmail] = useState(''); // État pour l'email du destinataire
-  const xhrRef = useRef(null); // Référence pour stocker l'objet XMLHttpRequest
+  const navigate = useNavigate();
+  const [progress, setProgress] = useState(0);
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const xhrRef = useRef(null);
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];
@@ -38,12 +17,11 @@ const FileUpload = ({ backendUrl }) => {
     const formData = new FormData();
     formData.append('file', file);
 
-    console.log('Fichier à envoyer :', file); // Debug: Log du fichier sélectionné
+    console.log('Fichier à envoyer :', file);
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${backendUrl}/upload`, true);
 
-    // Mise à jour de la barre de progression
     xhr.upload.onprogress = (event) => {
       if (event.lengthComputable) {
         const percent = Math.round((event.loaded / event.total) * 100);
@@ -51,37 +29,32 @@ const FileUpload = ({ backendUrl }) => {
       }
     };
 
-    // Gérer la réponse du serveur
     xhr.onload = () => {
-      console.log('Réponse backend :', xhr.responseText); // Debug: Log de la réponse
       if (xhr.status === 201) {
         console.log('Upload réussi');
       } else {
         console.error('Erreur lors de l\'upload :', xhr.status, xhr.statusText);
       }
-      setProgress(0); // Réinitialiser la progression après l'upload
+      setProgress(0);
     };
 
-    // Gérer les erreurs
     xhr.onerror = () => {
       console.error('Erreur réseau lors de l\'upload');
       setProgress(0);
     };
 
-    xhr.setRequestHeader('Accept', 'application/json'); // Assurez la compatibilité CORS
-    xhr.send(formData); // Envoyer la requête avec le fichier
+    xhr.setRequestHeader('Accept', 'application/json');
+    xhr.send(formData);
   };
 
-  // Fonction pour annuler l'upload
   const cancelUpload = () => {
     if (xhrRef.current) {
-      xhrRef.current.abort(); // Annule l'envoi
+      xhrRef.current.abort();
       console.log('Upload annulé');
-      setProgress(0); // Réinitialise la progression
+      setProgress(0);
     }
   };
 
-  // Fonction pour mettre à jour l'email du destinataire
   const handleRecipientEmailChange = (event) => {
     setRecipientEmail(event.target.value);
   };
@@ -95,11 +68,12 @@ const FileUpload = ({ backendUrl }) => {
 
   return (
     <div>
+      <button className="btn" style={{ float: 'right' }} onClick={() => navigate('/smtp-settings')}>Paramètres</button>
+      <h1>iTransfer</h1>
       <input type="email" className="btn" value={recipientEmail} onChange={handleRecipientEmailChange} placeholder="Email du destinataire" />
       <input type="file" className="btn" />
       <button className="btn" onClick={handleUpload}>Upload</button>
 
-      {/* Affichage de la barre de progression */}
       {progress > 0 && (
         <div style={{ width: '100%', backgroundColor: '#ccc', height: '10px' }}>
           <div
@@ -112,17 +86,11 @@ const FileUpload = ({ backendUrl }) => {
         </div>
       )}
 
-      {/* Bouton "Annuler l'envoi" */}
       {progress > 0 && (
-        <button
-          onClick={cancelUpload}
-          style={{ marginTop: '10px', backgroundColor: 'red', color: 'white' }}
-        >
-          Annuler l'envoi
-        </button>
+        <button onClick={cancelUpload}>Annuler l'envoi</button>
       )}
     </div>
   );
-};
+}
 
 export default App;
