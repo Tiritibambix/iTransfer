@@ -1,5 +1,5 @@
-from app import app, db
-from app.routes import router
+from backend.app import app, db
+from backend.app.routes import router
 
 app = app
 
