@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import SMTPSettings from './SMTPSettings';
 
 function App({ backendUrl }) {
   console.log('backendUrl:', backendUrl); // Debug: Vérification de l'URL backend
@@ -74,6 +75,7 @@ function App({ backendUrl }) {
 
   return (
     <div>
+      <SMTPSettings backendUrl={backendUrl} />
       <button className="btn" style={{ float: 'right' }} onClick={() => window.location.href = '/smtp-settings'}>Paramètres</button>
       <h1>iTransfer</h1>
       <input type="email" className="btn" value={recipientEmail} onChange={handleRecipientEmailChange} placeholder="Email du destinataire" />

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-const SMTPSettings = () => {
+const SMTPSettings = ({ backendUrl }) => {
   const [smtpServer, setSmtpServer] = useState('');
   const [smtpPort, setSmtpPort] = useState('');
   const [smtpUser, setSmtpUser] = useState('');
