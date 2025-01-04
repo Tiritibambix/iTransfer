@@ -8,26 +8,36 @@ app = Flask(__name__)
 app.config.from_object(Config)
 db = SQLAlchemy(app)
 
-# Configuration de CORS
+# Activer CORS
 CORS(app, supports_credentials=True)
+
+@app.after_request
+def add_cors_headers(response):
+    """
+    Ajouter les headers CORS à toutes les réponses.
+    """
+    frontend_url = request.headers.get('Origin', 'http://localhost:3500')  # Par défaut : localhost
+    response.headers.add('Access-Control-Allow-Origin', frontend_url)
+    response.headers.add('Access-Control-Allow-Credentials', 'true')
+    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
+    return response
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
-    frontend_url = request.headers.get('Origin', 'http://localhost:3500')
-
-    if request.method == 'OPTIONS':  # Pré-demande CORS
-        response = jsonify({'message': 'CORS preflight success'})
-        response.headers.add("Access-Control-Allow-Origin", frontend_url)
-        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-        response.headers.add("Access-Control-Allow-Credentials", "true")
-        return response, 200
-
     try:
+        if request.method == 'OPTIONS':  # Pré-demande CORS
+            return jsonify({'message': 'CORS preflight success'}), 200
+
+        # Récupérer le fichier de la requête
         file = request.files.get('file')
         if not file:
-            raise ValueError("Aucun fichier envoyé")
+            raise ValueError("Aucun fichier envoyé.")
 
+        # Log du fichier reçu pour debug
+        app.logger.info(f"Nom du fichier reçu : {file.filename}")
+
+        # Sauvegarder le fichier dans le dossier uploads
         upload_dir = '/app/uploads'
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
@@ -35,17 +45,11 @@ def upload_file():
         upload_path = os.path.join(upload_dir, file.filename)
         file.save(upload_path)
 
-        response = jsonify({"message": f"Fichier {file.filename} reçu avec succès"})
-        response.headers.add("Access-Control-Allow-Origin", frontend_url)
-        response.headers.add("Access-Control-Allow-Credentials", "true")
-        return response, 201
+        return jsonify({"message": f"Fichier {file.filename} reçu avec succès"}), 201
 
     except Exception as e:
         app.logger.error(f"Erreur lors de l'upload : {e}")
-        response = jsonify({"error": str(e)})
-        response.headers.add("Access-Control-Allow-Origin", frontend_url)
-        response.headers.add("Access-Control-Allow-Credentials", "true")
-        return response, 400
+        return jsonify({"error": str(e)}), 400
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)

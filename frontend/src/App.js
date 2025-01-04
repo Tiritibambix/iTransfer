@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 
 function App({ backendUrl }) {
-  console.log('backendUrl:', backendUrl); // Ajoutez ce log
+  console.log('backendUrl:', backendUrl); // Debug: Vérification de l'URL backend
 
   const [progress, setProgress] = useState(0); // État pour la progression
   const xhrRef = useRef(null); // Référence pour stocker l'objet XMLHttpRequest
@@ -16,13 +16,10 @@ function App({ backendUrl }) {
     const formData = new FormData();
     formData.append('file', file);
 
-    console.log('Fichier à envoyer :', file); // Log ajouté pour le debug
+    console.log('Fichier à envoyer :', file); // Debug: Log du fichier sélectionné
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${backendUrl}/upload`, true);
-
-    // Sauvegarde de la requête pour pouvoir l'annuler
-    xhrRef.current = xhr;
 
     // Mise à jour de la barre de progression
     xhr.upload.onprogress = (event) => {
@@ -34,7 +31,7 @@ function App({ backendUrl }) {
 
     // Gérer la réponse du serveur
     xhr.onload = () => {
-      console.log('Réponse backend :', xhr.responseText); // Log ajouté pour le debug
+      console.log('Réponse backend :', xhr.responseText); // Debug: Log de la réponse
       if (xhr.status === 201) {
         console.log('Upload réussi');
       } else {
@@ -46,12 +43,11 @@ function App({ backendUrl }) {
     // Gérer les erreurs
     xhr.onerror = () => {
       console.error('Erreur réseau lors de l\'upload');
-      setProgress(0); // Réinitialiser la progression en cas d'erreur
+      setProgress(0);
     };
 
-    // Envoyer la requête avec les données
     xhr.setRequestHeader('Accept', 'application/json'); // Assurez la compatibilité CORS
-    xhr.send(formData);
+    xhr.send(formData); // Envoyer la requête avec le fichier
   };
 
   // Fonction pour annuler l'upload
