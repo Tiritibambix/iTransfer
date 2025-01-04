@@ -23,10 +23,9 @@ def upload_file():
 
     try:
         file = request.files.get('file')
-        email = request.form.get('email')
 
-        if not file or not email:
-            return jsonify({'error': 'Fichier et email sont requis'}), 400
+        if not file:
+            return jsonify({'error': 'Fichier requis'}), 400
 
         file_id = str(uuid.uuid4())
         encrypted_data = hashlib.sha256(file.read()).hexdigest()
@@ -42,13 +41,12 @@ def upload_file():
         new_file = FileUpload(
             id=file_id,
             filename=file.filename,
-            email=email,
             encrypted_data=encrypted_data,
         )
         db.session.add(new_file)
         db.session.commit()
 
-        notify_user(file_id, email)
+        # notify_user(file_id, email)  # Supprimer la notification
 
         return jsonify({'file_id': file_id, 'message': 'Fichier reçu avec succès'}), 201
 
