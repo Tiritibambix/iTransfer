@@ -28,7 +28,8 @@ def upload_file():
             return jsonify({'error': 'Fichier requis'}), 400
 
         file_id = str(uuid.uuid4())
-        encrypted_data = hashlib.sha256(file.read()).hexdigest()
+        file_content = file.read()
+        encrypted_data = hashlib.sha256(file_content).hexdigest()
 
         # Ajout de la logique pour sauvegarder le fichier
         upload_dir = '/app/uploads'
@@ -36,7 +37,10 @@ def upload_file():
             os.makedirs(upload_dir)
 
         upload_path = os.path.join(upload_dir, file.filename)
-        file.save(upload_path)
+        
+        # Sauvegarder le fichier
+        with open(upload_path, 'wb') as f:
+            f.write(file_content)
 
         new_file = FileUpload(
             id=file_id,
