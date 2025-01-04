@@ -5,10 +5,11 @@ const SMTPSettings = () => {
   const [smtpPort, setSmtpPort] = useState('');
   const [smtpUser, setSmtpUser] = useState('');
   const [smtpPassword, setSmtpPassword] = useState('');
+  const [smtpSenderEmail, setSmtpSenderEmail] = useState('');
 
   const handleSave = () => {
     // Logique pour enregistrer les paramètres SMTP
-    console.log({ smtpServer, smtpPort, smtpUser, smtpPassword });
+    console.log({ smtpServer, smtpPort, smtpUser, smtpPassword, smtpSenderEmail });
   };
 
   return (
@@ -20,7 +21,7 @@ const SMTPSettings = () => {
       </div>
       <div>
         <label>Port SMTP:</label>
-        <input type="text" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} />
+        <input type="text" className="btn" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} />
       </div>
       <div>
         <label>Utilisateur SMTP:</label>
@@ -29,6 +30,10 @@ const SMTPSettings = () => {
       <div>
         <label>Mot de passe SMTP:</label>
         <input type="password" value={smtpPassword} onChange={(e) => setSmtpPassword(e.target.value)} />
+      </div>
+      <div>
+        <label>Email de l'expéditeur:</label>
+        <input type="email" className="btn" value={smtpSenderEmail} onChange={(e) => setSmtpSenderEmail(e.target.value)} />
       </div>
       <button onClick={handleSave}>Enregistrer</button>
       <button className="btn" onClick={() => window.location.href = '/upload'}>Retour à l'upload</button>
