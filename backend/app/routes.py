@@ -48,7 +48,11 @@ def upload_file():
 
         # notify_user(file_id, email)  # Supprimer la notification
 
-        return jsonify({'file_id': file_id, 'message': 'Fichier reçu avec succès'}), 201
+        response = jsonify({'file_id': file_id, 'message': 'Fichier reçu avec succès'})
+        response.headers.add("Access-Control-Allow-Origin", '*')
+        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response, 201
 
     except Exception as e:
         app.logger.error(f"Erreur lors de l'upload : {e}")

@@ -16,8 +16,7 @@ def add_cors_headers(response):
     """
     Ajouter les headers CORS à toutes les réponses.
     """
-    frontend_url = request.headers.get('Origin', 'http://localhost:3500')  # Par défaut : localhost
-    response.headers.add('Access-Control-Allow-Origin', frontend_url)
+    response.headers.add('Access-Control-Allow-Origin', '*')
     response.headers.add('Access-Control-Allow-Credentials', 'true')
     response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization')
