@@ -32,8 +32,13 @@ RUN mkdir -p /app/uploads && chmod -R 777 /app/uploads
 COPY /backend/app /app/app
 COPY /backend/run.py /app/run.py
 
+# Copier le script d'entrée
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
 # Exposer le port de l'application
 EXPOSE 5000
 
 # Commande pour démarrer l'application
+ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python", "run.py"]
