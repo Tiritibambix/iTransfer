@@ -11,6 +11,11 @@ db = SQLAlchemy(app)
 # Activer CORS
 CORS(app, supports_credentials=True)
 
+# Créer les tables au démarrage
+with app.app_context():
+    db.create_all()
+    app.logger.info("Base de données initialisée avec succès")
+
 @app.after_request
 def add_cors_headers(response):
     """
