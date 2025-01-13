@@ -11,30 +11,28 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# Installer pip-check
-RUN pip install --upgrade pip pip-check
+# Installer pip-check et PyYAML
+RUN pip install --upgrade pip pip-check PyYAML
 
 # Définir le répertoire de travail
 WORKDIR /app
 
 # Copier les fichiers de dépendances
-COPY requirements.txt /app/requirements.txt
+COPY /backend/requirements.txt /app/requirements.txt
 
 # Installer les dépendances et vérifier la compatibilité
 RUN pip install --no-cache-dir -r /app/requirements.txt && \
     pip-check
 
-# Créer le dossier uploads et lui donner les permissions nécessaires
-RUN mkdir -p /app/uploads && chmod -R 777 /app/uploads
+# Créer les dossiers nécessaires
+RUN mkdir -p /app/uploads /app/data && chmod -R 777 /app/uploads /app/data
 
+# Copier le docker-compose.yml pour la lecture des ports
+COPY docker-compose.yml /app/docker-compose.yml
 
 # Copier le code de l'application
 COPY /backend/app /app/app
 COPY /backend/wsgi.py /app/wsgi.py
-
-# Copier le script d'entrée
-COPY /backend/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
 
 # Exposer le port de l'application
 EXPOSE 5000
@@ -44,5 +42,4 @@ ENV FLASK_APP=wsgi.py
 ENV PYTHONPATH=/app
 
 # Commande pour démarrer l'application
-ENTRYPOINT ["/entrypoint.sh"]
 CMD ["python", "wsgi.py"]

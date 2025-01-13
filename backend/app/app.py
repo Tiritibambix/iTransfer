@@ -27,8 +27,8 @@ def get_host_ip():
 def get_ports_from_compose():
     """Lit le docker-compose.yml pour obtenir les ports configurés"""
     try:
-        # Remonter d'un niveau par rapport au dossier app
-        compose_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'docker-compose.yml')
+        # Le fichier docker-compose.yml est copié à la racine du conteneur
+        compose_path = '/app/docker-compose.yml'
         
         with open(compose_path, 'r') as f:
             compose_config = yaml.safe_load(f)
