@@ -6,7 +6,7 @@ services:
     ports:
       - "3500:80"
     volumes:
-      - ./iTransfer/frontend:/app
+      - ./frontend:/app
       - /app/node_modules
     depends_on:
       - backend
@@ -41,8 +41,8 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - ./iTransfer/db_data:/var/lib/mysql
-      - ./iTransfer/backend/init/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./db_data:/var/lib/mysql
+      - ./backend/init/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD || echo 'Healthcheck failed' >> /var/log/healthcheck.log"]
       interval: 10s
@@ -51,9 +51,6 @@ services:
       start_period: 30s
     networks:
       - itransfer-network
-
-volumes:
-  db_data:
 
 networks:
   itransfer-network:
