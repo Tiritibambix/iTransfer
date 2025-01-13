@@ -48,20 +48,80 @@ def upload_file():
         file_upload = FileUpload(id=file_id, filename=filename)
         db.session.add(file_upload)
         db.session.commit()
-        
-        # Envoyer l'email de notification
-        email = request.form.get('email')
-        if email:
-            send_email(email, file_id, filename)
 
-        return jsonify({
-            "message": f"Fichier {filename} reçu avec succès",
-            "file_id": file_id
-        }), 201
+        # Envoyer l'email avec le lien de téléchargement
+        email = request.form.get('email')
+        if not email:
+            return jsonify({'message': 'Email manquant', 'file_id': file_id}), 201
+
+        try:
+            send_email(email, file_id, filename)
+            return jsonify({'message': 'Fichier uploadé et email envoyé avec succès', 'file_id': file_id}), 201
+        except Exception as e:
+            current_app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+            # On retourne quand même un succès car le fichier a été uploadé
+            return jsonify({
+                'message': 'Fichier uploadé avec succès, mais erreur lors de l\'envoi de l\'email',
+                'file_id': file_id
+            }), 201
 
     except Exception as e:
-        current_app.logger.error(f"Erreur lors de l'upload : {e}")
-        return jsonify({"error": str(e)}), 400
+        current_app.logger.error(f"Erreur lors de l'upload : {str(e)}")
+        return jsonify({'error': str(e)}), 400
+
+def send_email(to_email, file_id, filename):
+    try:
+        config_file_path = '/app/data/smtp_config.json'
+        current_app.logger.info(f"Tentative de lecture de la configuration SMTP depuis {config_file_path}")
+        
+        with open(config_file_path, 'r') as config_file:
+            smtp_config = json.load(config_file)
+            current_app.logger.info(f"Configuration SMTP chargée : {json.dumps({**smtp_config, 'smtp_password': '***'})}")
+
+        # Créer le lien de téléchargement avec l'URL du backend configurée
+        backend_url = current_app.config.get('BACKEND_URL')
+        if not backend_url:
+            current_app.logger.error("URL du backend non configurée")
+            raise ValueError("URL du backend non configurée")
+            
+        download_link = f"{backend_url}/download/{file_id}"
+        current_app.logger.info(f"Lien de téléchargement généré : {download_link}")
+
+        # Configurer le message
+        msg = MIMEMultipart()
+        msg['From'] = smtp_config['smtp_sender_email']
+        msg['To'] = to_email
+        msg['Subject'] = f"Votre fichier {filename} est disponible"
+
+        body = f"""
+        Bonjour,
+
+        Votre fichier {filename} a été uploadé avec succès.
+        Vous pouvez le télécharger en cliquant sur ce lien :
+        {download_link}
+
+        Ce lien est valable pendant 24 heures.
+
+        Cordialement,
+        L'équipe iTransfer
+        """
+
+        msg.attach(MIMEText(body, 'plain'))
+
+        # Connexion au serveur SMTP
+        with smtplib.SMTP(smtp_config['smtp_server'], smtp_config['smtp_port']) as server:
+            if smtp_config.get('smtp_use_tls', True):
+                server.starttls()
+            
+            server.login(smtp_config['smtp_username'], smtp_config['smtp_password'])
+            server.send_message(msg)
+            
+        current_app.logger.info(f"Email envoyé avec succès à {to_email}")
+        return True
+
+    except Exception as e:
+        current_app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+        raise
 
 @bp.route('/download/<file_id>', methods=['GET'])
 def download_file(file_id):
@@ -97,50 +157,6 @@ def download_file(file_id):
         import traceback
         current_app.logger.error(f"Traceback : {traceback.format_exc()}")
         return jsonify({'error': 'Erreur lors du téléchargement du fichier'}), 500
-
-def send_email(to_email, file_id, filename):
-    try:
-        config_file_path = '/app/data/smtp_config.json'
-        current_app.logger.info(f"Tentative de lecture de la configuration SMTP depuis {config_file_path}")
-        
-        with open(config_file_path, 'r') as config_file:
-            smtp_config = json.load(config_file)
-            current_app.logger.info(f"Configuration SMTP chargée : {json.dumps({**smtp_config, 'smtp_password': '***'})}")
-
-        # Créer le lien de téléchargement avec l'URL du backend configurée
-        download_link = current_app.config['BACKEND_URL'] + f"/download/{file_id}"
-        current_app.logger.info(f"Lien de téléchargement généré : {download_link}")
-
-        # Configurer le message
-        msg = MIMEMultipart()
-        msg['From'] = smtp_config['smtp_sender_email']
-        msg['To'] = to_email
-        msg['Subject'] = f"Votre fichier {filename} est disponible"
-
-        body = f"""
-        Bonjour,
-
-        Votre fichier {filename} a été uploadé avec succès.
-        Vous pouvez le télécharger en cliquant sur ce lien :
-        {download_link}
-
-        Ce lien est valable pendant 24 heures.
-
-        Cordialement,
-        L'équipe iTransfer
-        """
-        msg.attach(MIMEText(body, 'plain'))
-
-        # Se connecter au serveur SMTP
-        current_app.logger.info(f"Tentative de connexion au serveur SMTP : {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
-        with smtplib.SMTP_SSL(smtp_config['smtp_server'].strip(), int(smtp_config['smtp_port'])) as server:
-            server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'].strip())
-            server.send_message(msg)
-            current_app.logger.info(f"Email envoyé avec succès à {to_email}")
-
-    except Exception as e:
-        current_app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
-        raise
 
 @bp.route('/api/test-smtp', methods=['POST', 'OPTIONS'])
 def test_smtp():

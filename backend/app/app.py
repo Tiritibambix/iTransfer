@@ -68,40 +68,40 @@ def create_app():
     # Initialiser SQLAlchemy avec l'application
     db.init_app(app)
     
-    # Obtenir les ports depuis le docker-compose.yml
-    backend_port, frontend_port = get_ports_from_compose()
-    
-    # Définir l'URL du backend avec le port externe lu depuis docker-compose
-    host_ip = get_host_ip()
-    app.config['BACKEND_URL'] = f"http://{host_ip}:{backend_port}"
-    app.config['FRONTEND_URL'] = f"http://{host_ip}:{frontend_port}"
-    
-    print(f"URL du backend configurée : {app.config['BACKEND_URL']}")
-    print(f"URL du frontend configurée : {app.config['FRONTEND_URL']}")
-    
-    # Importer et enregistrer les routes
-    from . import routes
-    app.register_blueprint(routes.bp)
-    routes.init_app(app)  # Initialiser les configurations des routes
-    
-    # Créer les tables au démarrage avec gestion des erreurs
-    max_retries = 5
-    retry_delay = 5  # secondes
-    
-    for attempt in range(max_retries):
-        try:
-            with app.app_context():
+    with app.app_context():
+        # Obtenir les ports depuis le docker-compose.yml
+        backend_port, frontend_port = get_ports_from_compose()
+        
+        # Définir l'URL du backend avec le port externe lu depuis docker-compose
+        host_ip = get_host_ip()
+        app.config['BACKEND_URL'] = f"http://{host_ip}:{backend_port}"
+        app.config['FRONTEND_URL'] = f"http://{host_ip}:{frontend_port}"
+        
+        print(f"URL du backend configurée : {app.config['BACKEND_URL']}")
+        print(f"URL du frontend configurée : {app.config['FRONTEND_URL']}")
+        
+        # Importer et enregistrer les routes
+        from . import routes
+        app.register_blueprint(routes.bp)
+        routes.init_app(app)  # Initialiser les configurations des routes
+        
+        # Créer les tables au démarrage avec gestion des erreurs
+        max_retries = 5
+        retry_delay = 5  # secondes
+        
+        for attempt in range(max_retries):
+            try:
                 db.create_all()
                 app.logger.info("Base de données initialisée avec succès")
                 break
-        except Exception as e:
-            if attempt < max_retries - 1:
-                app.logger.warning(f"Tentative {attempt + 1}/{max_retries} de connexion à la base de données échouée: {e}")
-                import time
-                time.sleep(retry_delay)
-            else:
-                app.logger.error(f"Impossible de se connecter à la base de données après {max_retries} tentatives: {e}")
-                raise
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    app.logger.warning(f"Tentative {attempt + 1}/{max_retries} de connexion à la base de données échouée: {e}")
+                    import time
+                    time.sleep(retry_delay)
+                else:
+                    app.logger.error(f"Impossible de se connecter à la base de données après {max_retries} tentatives: {e}")
+                    raise
     
     # Ajouter les headers CORS à toutes les réponses.
     @app.after_request
