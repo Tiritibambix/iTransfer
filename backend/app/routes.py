@@ -76,7 +76,16 @@ def send_email(to_email, file_id, filename):
         
         with open(config_file_path, 'r') as config_file:
             smtp_config = json.load(config_file)
-            current_app.logger.info(f"Configuration SMTP chargée : {json.dumps({**smtp_config, 'smtp_password': '***'})}")
+            # Log sécurisé de la configuration
+            safe_config = {
+                'smtp_server': smtp_config['smtp_server'],
+                'smtp_port': smtp_config['smtp_port'],
+                'smtp_username': smtp_config['smtp_username'],
+                'smtp_sender_email': smtp_config['smtp_sender_email'],
+                'smtp_use_ssl': smtp_config.get('smtp_use_ssl', False),
+                'smtp_use_tls': smtp_config.get('smtp_use_tls', True)
+            }
+            current_app.logger.info(f"Configuration SMTP chargée : {json.dumps(safe_config)}")
 
         # Créer le lien de téléchargement avec l'URL du backend configurée
         backend_url = current_app.config.get('BACKEND_URL')
@@ -108,19 +117,53 @@ def send_email(to_email, file_id, filename):
 
         msg.attach(MIMEText(body, 'plain'))
 
-        # Connexion au serveur SMTP
-        with smtplib.SMTP(smtp_config['smtp_server'], smtp_config['smtp_port']) as server:
-            if smtp_config.get('smtp_use_tls', True):
+        # Connexion au serveur SMTP avec gestion des différents types de connexion
+        use_ssl = smtp_config.get('smtp_use_ssl', False)
+        use_tls = smtp_config.get('smtp_use_tls', True)
+        
+        current_app.logger.info(f"Tentative de connexion SMTP - SSL: {use_ssl}, TLS: {use_tls}")
+        
+        if use_ssl:
+            server = smtplib.SMTP_SSL(
+                smtp_config['smtp_server'],
+                int(smtp_config['smtp_port']),
+                timeout=30
+            )
+        else:
+            server = smtplib.SMTP(
+                smtp_config['smtp_server'],
+                int(smtp_config['smtp_port']),
+                timeout=30
+            )
+            
+        try:
+            server.set_debuglevel(1)  # Active le mode debug pour plus de détails
+            
+            if use_tls and not use_ssl:
+                current_app.logger.info("Démarrage TLS...")
                 server.starttls()
             
-            server.login(smtp_config['smtp_username'], smtp_config['smtp_password'])
-            server.send_message(msg)
+            current_app.logger.info("Tentative de connexion...")
+            server.login(
+                smtp_config['smtp_username'].strip(),
+                smtp_config['smtp_password'].strip()
+            )
             
-        current_app.logger.info(f"Email envoyé avec succès à {to_email}")
+            current_app.logger.info("Envoi du message...")
+            server.send_message(msg)
+            current_app.logger.info(f"Email envoyé avec succès à {to_email}")
+            
+        finally:
+            current_app.logger.info("Fermeture de la connexion SMTP")
+            server.quit()
+            
         return True
 
     except Exception as e:
         current_app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+        current_app.logger.error(f"Type d'erreur : {type(e).__name__}")
+        import traceback
+        current_app.logger.error(f"Traceback : {traceback.format_exc()}")
         raise
 
 @bp.route('/download/<file_id>', methods=['GET'])
