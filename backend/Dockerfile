@@ -24,14 +24,15 @@ COPY requirements.txt /app/requirements.txt
 RUN pip install --no-cache-dir -r /app/requirements.txt && \
     pip-check
 
+# Créer les dossiers nécessaires
+RUN mkdir -p /app/uploads /app/data && \
+    chmod -R 777 /app/uploads /app/data
+
 # Copier le code de l'application
 COPY backend /app/
-
-# Créer le dossier data et lui donner les permissions nécessaires
-RUN mkdir -p /app/data && chmod -R 777 /app/data
 
 # Exposer le port
 EXPOSE 5000
 
-# Définir la commande de démarrage
-CMD ["python", "-m", "flask", "run", "--host=0.0.0.0"]
+# Commande pour démarrer l'application
+CMD ["python", "run.py"]
