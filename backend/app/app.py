@@ -1,18 +1,15 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
 from .config import Config
+from .database import db, init_db
 import os
-
-# Initialisation de SQLAlchemy sans app
-db = SQLAlchemy()
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     
     # Initialiser les extensions
-    db.init_app(app)
+    init_db(app)
     CORS(app, supports_credentials=True)
     
     # Créer les tables au démarrage

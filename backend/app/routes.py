@@ -4,7 +4,8 @@ import hashlib
 import smtplib
 import json
 from flask import request, jsonify, send_file
-from . import app, db
+from . import app
+from .database import db
 from .models import FileUpload
 
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
