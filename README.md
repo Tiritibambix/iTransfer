@@ -2,11 +2,11 @@
 
 [![Build and Push Docker Images](https://github.com/tiritibambix/iTransfer/actions/workflows/docker-build-push.yml/badge.svg)](https://github.com/tiritibambix/iTransfer_1minAI/actions/workflows/docker-build-push.yml)
 
-A modern file transfer application with web interface, secure backend, and email notifications.
+A file transfer application with web interface, secure backend, and email notifications.
 
 ## Features
 
-- Modern and responsive user interface
+- Responsive user interface
 - File upload with progress bar
 - Automatic email notifications
 - Secure admin interface
