@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 
 const styles = {
   container: {
-    maxWidth: '600px',
+    maxWidth: '800px',
     margin: '0 auto',
     padding: '20px',
     backgroundColor: 'var(--clr-surface-a10)',
@@ -23,11 +23,11 @@ const styles = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '15px'
+    gap: '20px'
   },
   emailInput: {
-    width: '80%',
-    padding: '12px',
+    width: '90%',
+    padding: '15px',
     backgroundColor: 'var(--clr-surface-a20)',
     border: '1px solid var(--clr-surface-a30)',
     borderRadius: '4px',
@@ -38,8 +38,8 @@ const styles = {
     display: 'none'
   },
   fileLabel: {
-    width: '80%',
-    padding: '12px 20px',
+    width: '90%',
+    padding: '15px',
     backgroundColor: 'var(--clr-surface-a20)',
     color: 'var(--clr-primary-a50)',
     borderRadius: '4px',
@@ -53,21 +53,21 @@ const styles = {
     fontSize: '16px'
   },
   progressContainer: {
-    width: '80%',
+    width: '90%',
     margin: '20px auto'
   },
   progressBar: {
     width: '100%',
-    height: '12px',
+    height: '15px',
     backgroundColor: 'var(--clr-surface-a20)',
-    borderRadius: '6px',
+    borderRadius: '8px',
     overflow: 'hidden',
     boxShadow: 'inset 0 1px 3px rgba(0, 0, 0, 0.2)'
   },
   progressFill: {
     height: '100%',
     background: 'linear-gradient(90deg, var(--clr-primary-a30) 0%, var(--clr-primary-a40) 100%)',
-    borderRadius: '6px',
+    borderRadius: '8px',
     transition: 'width 0.3s ease-in-out',
     position: 'relative'
   },
@@ -81,8 +81,8 @@ const styles = {
     textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
   },
   uploadButton: {
-    width: '80%',
-    padding: '12px 20px',
+    width: '90%',
+    padding: '15px',
     backgroundColor: 'var(--clr-primary-a30)',
     color: 'white',
     border: 'none',
@@ -93,8 +93,8 @@ const styles = {
   },
   settingsLink: {
     display: 'inline-block',
-    marginTop: '20px',
-    fontSize: '14px',
+    marginTop: '30px',
+    fontSize: '12px',
     color: 'var(--clr-primary-a40)',
     textDecoration: 'none',
     opacity: 0.7,
