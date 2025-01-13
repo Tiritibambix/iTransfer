@@ -1,239 +1,171 @@
-# iTransfer
-
 [![Build and Push Docker Images](https://github.com/tiritibambix/iTransfer/actions/workflows/docker-build-push.yml/badge.svg)](https://github.com/tiritibambix/iTransfer_1minAI/actions/workflows/docker-build-push.yml)
 
-A file transfer application with web interface, secure backend, and email notifications.
+# iTransfer
 
-## Features
+Une application moderne de transfert de fichiers avec interface web, backend sécurisé et notification par email.
 
-- Responsive user interface
-- Multiple file upload support with drag & drop
-- Automatic ZIP archive creation for multiple files
-- Detailed download page with file/archive contents
-- Email notifications with secure download links
-- Secure admin interface
-- REST API backend
-- File management with MariaDB database
+## Fonctionnalités
 
-## Prerequisites
+- Interface utilisateur moderne et réactive
+- Upload de fichiers avec barre de progression
+- Notifications par email automatiques
+- Interface d'administration sécurisée
+- API REST backend
+- Déploiement facile avec Docker
+- Gestion des fichiers avec base de données MariaDB
+
+## Prérequis
 
 - Docker
 - Docker Compose
-- Access to ports 3500 (frontend), 5500 (backend), and 3306 (MariaDB)
+- Accès aux ports 3500 (frontend), 5500 (backend) et 3306 (MariaDB)
 
-## Quick Start
+## Installation
 
-1. Clone the repository:
+1. Clonez le dépôt :
 ```bash
 git clone https://github.com/tiritibambix/iTransfer.git
 cd iTransfer
 ```
 
-2. Create necessary directories:
+2. Créez le fichier d'initialisation SQL :
 ```bash
-mkdir -p backend/data backend/uploads
+# Créez le fichier init.sql dans le dossier spécifié
+mkdir -p .../iTransfer/backend/
+cat > ...iTransfer/backend/init.sql << EOL
+CREATE TABLE IF NOT EXISTS file_upload (
+    id VARCHAR(36) PRIMARY KEY,
+    filename VARCHAR(256) NOT NULL,
+    email VARCHAR(256) NOT NULL,
+    encrypted_data VARCHAR(256) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+EOL
 ```
 
-3. Start the containers:
+Or simply download [this file](https://github.com/tiritibambix/iTransfer/blob/main/backend/init.sql) here : ...iTransfer/backend/  
+
+3. Démarrez les conteneurs :
 ```bash
 docker-compose up -d
 ```
 
-4. Access the web interface at http://localhost:3500
+## Configuration
 
-## Detailed Installation Guide
+### Variables d'environnement
 
-### 1. System Requirements
+Le projet utilise plusieurs variables d'environnement configurables dans le `docker-compose.yml` :
 
-- Docker Engine 20.10.0 or later
-- Docker Compose 2.0.0 or later
-- At least 1GB of free RAM
-- At least 1GB of free disk space
+#### Backend
+- `FRONTEND_URL`: URL du frontend (par défaut: http://localhost:3500)
+- `ADMIN_USERNAME`: Nom d'utilisateur admin
+- `ADMIN_PASSWORD`: Mot de passe admin
+- `DATABASE_URL`: URL de connexion à la base de données
 
-### 2. Installation Steps
+#### Base de données
+- `MYSQL_ROOT_PASSWORD`: Mot de passe root MariaDB
+- `MYSQL_DATABASE`: Nom de la base de données
+- `MYSQL_USER`: Utilisateur MariaDB
+- `MYSQL_PASSWORD`: Mot de passe utilisateur MariaDB
 
-1. **Clone the Repository**
+### Configuration SMTP
+
+La configuration SMTP peut être effectuée via l'interface d'administration :
+1. Connectez-vous à l'interface admin (http://localhost:3500/admin)
+2. Accédez aux paramètres SMTP
+3. Configurez les détails de votre serveur SMTP
+
+## Structure des volumes
+
+Le projet utilise plusieurs volumes Docker pour la persistance des données :
+
+- `/srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/db_data`: Données MariaDB
+- `/srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/backend/init.sql`: Script d'initialisation SQL
+- `/srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/backend_data`: Données du backend
+- `/srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/uploads`: Fichiers uploadés
+
+## Utilisation
+
+1. Accédez à l'interface web : http://localhost:3500
+2. Pour uploader un fichier :
+   - Glissez-déposez ou sélectionnez un fichier
+   - Entrez l'adresse email du destinataire
+   - Cliquez sur "Envoyer"
+3. Le destinataire recevra un email avec les informations de téléchargement
+
+## Administration
+
+1. Accédez à l'interface admin : http://localhost:3500/admin
+2. Connectez-vous avec les identifiants configurés
+3. Gérez les paramètres SMTP et autres configurations
+
+## Ports utilisés
+
+- Frontend: 3500
+- Backend: 5500
+- MariaDB: 3306
+
+## Sécurité
+
+- Authentification admin sécurisée
+- Chiffrement des données des fichiers
+- Validation des emails
+- Healthcheck de la base de données
+
+## Développement
+
+Pour le développement local sans Docker :
+
+### Backend (Python/Flask)
 ```bash
-git clone https://github.com/tiritibambix/iTransfer.git
-cd iTransfer
+cd backend
+pip install -r requirements.txt
+python run.py
 ```
 
-2. **Create Required Directories**
+### Frontend (React)
 ```bash
-mkdir -p backend/data backend/uploads
-chmod -R 777 backend/data backend/uploads
+cd frontend
+npm install
+npm start
 ```
-
-3. **Configure Environment**
-
-Edit `docker-compose.yml` to set your environment variables:
-```yaml
-# Backend service environment variables
-FRONTEND_URL: "http://localhost:3500"  # Change if using different host/port
-ADMIN_USERNAME: "adminuser"            # Change this
-ADMIN_PASSWORD: "adminuserpassword"    # Change this
-DATABASE_URL: "mysql://mariadb_user:mariadb_pass@db/mariadb_db"
-
-# Database service environment variables
-MYSQL_ROOT_PASSWORD: "rootpassword"    # Change this
-MYSQL_DATABASE: "mariadb_db"
-MYSQL_USER: "mariadb_user"            # Change this
-MYSQL_PASSWORD: "mariadb_pass"         # Change this
 ```
-
-4. **Start the Services**
-```bash
-# Build the images
-docker-compose build
-
-# Start the services
-docker-compose up -d
+├── .github
+|      ├── dependabot.yml
+|      ├── workflows
+|      |      ├── docker-build-push.yml
+├── LICENSE
+├── README.md
+├── backend
+|      ├── Dockerfile
+|      ├── entrypoint.sh
+|      ├── app
+|      |      ├── __init__.py
+|      |      ├── app.py
+|      |      ├── config.py
+|      |      ├── models.py
+|      |      ├── routes.py
+|      |      ├── utils.py
+|      ├── run.py
+|      ├── tests
+|      |      ├── test_routes.py
+├── docker-compose.yml
+├── frontend
+|      ├── Dockerfile
+|      ├── package.json
+|      ├── public
+|      |      ├── index.html
+|      ├── src
+|      |      ├── Admin.js
+|      |      ├── App.js
+|      |      ├── FileManager.js
+|      |      ├── Login.js
+|      |      ├── PrivateRoute.js
+|      |      ├── Progress.js
+|      |      ├── ProgressBar.js
+|      |      ├── Settings.js
+|      |      ├── Uploads.js
+|      |      ├── index.css
+|      |      ├── index.js
+├── requirements.txt
 ```
-
-5. **Verify Installation**
-```bash
-# Check if all containers are running
-docker-compose ps
-
-# Check container logs
-docker-compose logs -f
-```
-
-### 3. SMTP Configuration
-
-1. Access the admin interface at http://localhost:3500/admin
-2. Log in with your configured admin credentials
-3. Go to SMTP Settings and configure:
-   - SMTP Server (e.g., smtp.gmail.com)
-   - SMTP Port (e.g., 465 for SSL)
-   - SMTP Username
-   - SMTP Password
-   - Sender Email Address
-
-### 4. Testing the Installation
-
-1. **Test File Upload**
-   - Go to http://localhost:3500
-   - Upload a file and enter a recipient email
-   - Verify that the file uploads successfully
-   - Check that the recipient receives the email
-
-2. **Test Admin Interface**
-   - Go to http://localhost:3500/admin
-   - Log in with admin credentials
-   - Verify access to all admin features
-
-## Usage Guide
-
-### File Upload
-1. Visit http://localhost:3500
-2. Drag and drop one or multiple files
-   - Single files will be uploaded as is
-   - Multiple files will be automatically zipped
-3. Enter recipient's email address
-4. Click "Send"
-5. Recipient will receive an email with download link
-
-### Download Process
-1. Click the download link in the email
-2. View file/archive details on the download page
-   - For single files: name and size
-   - For archives: list of contained files with sizes
-3. Click "Download" to get the file
-
-### Admin Tasks
-1. Access admin interface at http://localhost:3500/admin
-2. Configure SMTP settings
-3. Monitor file uploads
-4. Manage system settings
-
-## Docker Commands Reference
-
-```bash
-# Start services
-docker-compose up -d
-
-# Stop services
-docker-compose down
-
-# View logs
-docker-compose logs -f
-
-# Rebuild containers
-docker-compose build
-
-# Restart specific service
-docker-compose restart [service_name]
-
-# View service status
-docker-compose ps
-```
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Container fails to start**
-   - Check logs: `docker-compose logs [service_name]`
-   - Verify port availability
-   - Check directory permissions
-
-2. **Email notifications not working**
-   - Verify SMTP settings
-   - Check admin interface logs
-   - Ensure correct email format
-
-3. **Upload fails**
-   - Check backend logs
-   - Verify directory permissions
-   - Check disk space
-
-### Logs Location
-
-- Backend logs: `docker-compose logs backend`
-- Frontend logs: `docker-compose logs frontend`
-- Database logs: `docker-compose logs db`
-
-## Security Considerations
-
-1. **Change Default Credentials**
-   - Admin username/password
-   - Database passwords
-   - SMTP credentials
-
-2. **File Security**
-   - Files are stored in `backend/uploads`
-   - Download links expire after 7 days
-   - Files are encrypted at rest
-
-## Maintenance
-
-### Backup
-
-1. **Database Backup**
-```bash
-docker-compose exec db mysqldump -u root -p mariadb_db > backup.sql
-```
-
-2. **File Backup**
-```bash
-tar -czf uploads_backup.tar.gz backend/uploads
-```
-
-### Updates
-
-1. **Update Application**
-```bash
-git pull
-docker-compose build
-docker-compose up -d
-```
-
-## Support
-
-- GitHub Issues: [Report a bug](https://github.com/tiritibambix/iTransfer/issues)
-- Documentation: [Wiki](https://github.com/tiritibambix/iTransfer/wiki)
-
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
