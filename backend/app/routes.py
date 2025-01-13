@@ -5,14 +5,14 @@ import smtplib
 import json
 from flask import Blueprint, jsonify, request, current_app, send_file
 from werkzeug.utils import secure_filename
-from . import app, db
+from .extensions import db
 from .models import FileUpload
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
 BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:5000')
-app.config['BACKEND_URL'] = BACKEND_URL
+current_app.config['BACKEND_URL'] = BACKEND_URL
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')

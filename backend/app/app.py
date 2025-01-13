@@ -1,13 +1,13 @@
 from flask import Flask
 from flask_cors import CORS
-from flask_sqlalchemy import SQLAlchemy
 from .config import Config
+from .extensions import db
 import os
 import socket
 import yaml
 
 # Initialisation de l'extension SQLAlchemy
-db = SQLAlchemy()
+# db = SQLAlchemy()
 
 def get_host_ip():
     """Détecte l'IP de la machine hôte"""
