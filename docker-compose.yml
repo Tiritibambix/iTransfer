@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   frontend:
     image: tiritibambix/itransfer-frontend
@@ -43,11 +45,11 @@ services:
       - ./iTransfer/db_data:/var/lib/mysql
       - ./iTransfer/backend/init/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-proot_password"]
-      interval: 10s
-      timeout: 20s
-      retries: 10
-      start_period: 60s
+      test: ["CMD", "bash", "-c", 'mariadb -u root -proot_password -e "SELECT 1;" || exit 1']
+      interval: 5s
+      timeout: 10s
+      retries: 20
+      start_period: 30s
     networks:
       - itransfer-network
     restart: unless-stopped
