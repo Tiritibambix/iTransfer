@@ -9,6 +9,7 @@ from .models import FileUpload
 
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
 BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:5000')
+app.config['BACKEND_URL'] = BACKEND_URL
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
@@ -23,8 +24,9 @@ def send_email(to_email, file_id, filename):
             smtp_config = json.load(config_file)
             app.logger.info(f"Configuration SMTP chargée : {json.dumps({**smtp_config, 'smtp_password': '***'})}")
 
-        # Créer le lien de téléchargement
-        download_link = f"{BACKEND_URL}/download/{file_id}"
+        # Créer le lien de téléchargement avec l'URL du backend configurée
+        download_link = f"{app.config['BACKEND_URL']}/download/{file_id}"
+        app.logger.info(f"Lien de téléchargement généré : {download_link}")
 
         # Configurer le message
         message = f"""
@@ -218,25 +220,37 @@ def login():
 @app.route('/download/<file_id>', methods=['GET'])
 def download_file(file_id):
     try:
+        app.logger.info(f"Tentative de téléchargement du fichier {file_id}")
+        
         # Récupérer le fichier depuis la base de données
         file_upload = FileUpload.query.get_or_404(file_id)
+        app.logger.info(f"Fichier trouvé dans la base de données : {file_upload.filename}")
         
         # Vérifier si le fichier existe dans le système de fichiers
         file_path = os.path.join('/app/uploads', file_upload.filename)
+        app.logger.info(f"Chemin du fichier : {file_path}")
+        
         if not os.path.exists(file_path):
-            return jsonify({'error': 'Fichier non trouvé'}), 404
+            app.logger.error(f"Fichier non trouvé sur le disque : {file_path}")
+            return jsonify({'error': 'Fichier non trouvé sur le serveur'}), 404
 
-        # Envoyer le fichier
-        return send_file(
-            file_path,
-            as_attachment=True,
-            download_name=file_upload.filename,
-            mimetype='application/octet-stream'
-        )
+        app.logger.info(f"Fichier trouvé, envoi en cours...")
+        
+        try:
+            return send_file(
+                file_path,
+                as_attachment=True,
+                download_name=file_upload.filename
+            )
+        except Exception as send_error:
+            app.logger.error(f"Erreur lors de l'envoi du fichier : {str(send_error)}")
+            return jsonify({'error': 'Erreur lors de l\'envoi du fichier'}), 500
 
     except Exception as e:
-        app.logger.error(f"Erreur lors du téléchargement : {e}")
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"Erreur lors du téléchargement : {str(e)}")
+        import traceback
+        app.logger.error(f"Traceback : {traceback.format_exc()}")
+        return jsonify({'error': 'Erreur lors du téléchargement du fichier'}), 500
 
 @app.route('/api/test-smtp', methods=['POST', 'OPTIONS'])
 def test_smtp():

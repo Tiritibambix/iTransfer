@@ -22,6 +22,7 @@ services:
       - ADMIN_USERNAME=adminuser
       - ADMIN_PASSWORD=adminuserpassword
       - DATABASE_URL=mysql://mariadb_user:mariadb_pass@db/mariadb_db
+      - BACKEND_URL=http://${HOST_IP:-localhost}:5500
     volumes:
       - ./iTransfer/backend/data:/app/data
       - ./iTransfer/uploads:/app/uploads
