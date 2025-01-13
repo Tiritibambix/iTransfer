@@ -31,14 +31,26 @@ ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 
 def send_email(to_email, file_id, filename):
+    server = None
     try:
         # Charger la configuration SMTP
         config_file_path = '/app/data/smtp_config.json'
         app.logger.info(f"Tentative de lecture de la configuration SMTP depuis {config_file_path}")
         
+        if not os.path.exists(config_file_path):
+            app.logger.error(f"Fichier de configuration SMTP introuvable : {config_file_path}")
+            return False
+        
         with open(config_file_path, 'r') as config_file:
             smtp_config = json.load(config_file)
             app.logger.info(f"Configuration SMTP chargée : {json.dumps({**smtp_config, 'smtp_password': '***'})}")
+
+        # Vérifier les champs requis
+        required_fields = ['smtp_server', 'smtp_port', 'smtp_user', 'smtp_password', 'smtp_sender_email']
+        for field in required_fields:
+            if field not in smtp_config or not smtp_config[field]:
+                app.logger.error(f"Champ SMTP manquant ou vide : {field}")
+                return False
 
         # Créer le lien de téléchargement avec l'URL dynamique
         backend_url = get_backend_url()
@@ -67,7 +79,7 @@ def send_email(to_email, file_id, filename):
 
         # Se connecter
         app.logger.info(f"Tentative de connexion avec l'utilisateur : {smtp_config['smtp_user']}")
-        server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'])
+        server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'].strip())
         app.logger.info("Connexion SMTP réussie")
 
         # Préparer l'email
@@ -87,13 +99,33 @@ Content-Type: text/plain; charset=utf-8
         )
         app.logger.info("Email envoyé avec succès")
         
-        server.quit()
+        if server:
+            server.quit()
         return True
+
+    except FileNotFoundError as e:
+        app.logger.error(f"Erreur de fichier SMTP : {str(e)}")
+        return False
+    except json.JSONDecodeError as e:
+        app.logger.error(f"Erreur de format JSON dans la configuration SMTP : {str(e)}")
+        return False
+    except smtplib.SMTPAuthenticationError as e:
+        app.logger.error(f"Erreur d'authentification SMTP : {str(e)}")
+        return False
+    except smtplib.SMTPException as e:
+        app.logger.error(f"Erreur SMTP : {str(e)}")
+        return False
     except Exception as e:
-        app.logger.error(f"Erreur détaillée lors de l'envoi de l'email : {str(e)}")
+        app.logger.error(f"Erreur inattendue lors de l'envoi de l'email : {str(e)}")
         import traceback
         app.logger.error(f"Traceback : {traceback.format_exc()}")
         return False
+    finally:
+        if server:
+            try:
+                server.quit()
+            except Exception:
+                pass
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
@@ -136,11 +168,25 @@ def upload_file():
             email=recipient_email,
             encrypted_data=encrypted_data
         )
-        db.session.add(new_file)
-        db.session.commit()
+
+        try:
+            db.session.add(new_file)
+            db.session.commit()
+        except Exception as db_error:
+            app.logger.error(f"Erreur base de données : {str(db_error)}")
+            # Supprimer le fichier en cas d'erreur
+            if os.path.exists(upload_path):
+                os.remove(upload_path)
+            raise db_error
 
         # Envoyer l'email
-        email_sent = send_email(recipient_email, file_id, file.filename)
+        try:
+            email_sent = send_email(recipient_email, file_id, file.filename)
+            if not email_sent:
+                app.logger.error("L'envoi de l'email a échoué")
+        except Exception as email_error:
+            app.logger.error(f"Erreur lors de l'envoi de l'email : {str(email_error)}")
+            email_sent = False
 
         response_data = {
             'file_id': file_id,
@@ -155,8 +201,11 @@ def upload_file():
         return response, 201
 
     except Exception as e:
-        app.logger.error(f"Erreur lors de l'upload : {e}")
-        response = jsonify({'error': str(e)})
+        app.logger.error(f"Erreur lors de l'upload : {str(e)}")
+        # Si une erreur survient, on s'assure de nettoyer le fichier s'il existe
+        if 'upload_path' in locals() and os.path.exists(upload_path):
+            os.remove(upload_path)
+        response = jsonify({'error': 'Erreur lors de l\'upload. Veuillez vérifier que l\'email est valide et réessayer.'})
         response.headers.add("Access-Control-Allow-Origin", '*')
         response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
