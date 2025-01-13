@@ -1,13 +1,89 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+
+const styles = {
+  container: {
+    maxWidth: '600px',
+    margin: '0 auto',
+    padding: '20px',
+    backgroundColor: 'var(--clr-surface-a10)',
+    borderRadius: '10px',
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+  },
+  content: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '20px'
+  },
+  formGroup: {
+    width: '100%',
+    marginBottom: '15px'
+  },
+  label: {
+    display: 'block',
+    marginBottom: '5px',
+    color: 'var(--clr-primary-a50)',
+    fontWeight: 'bold'
+  },
+  input: {
+    width: '100%',
+    padding: '8px',
+    backgroundColor: 'var(--clr-surface-a20)',
+    border: '1px solid var(--clr-surface-a30)',
+    borderRadius: '4px',
+    color: 'var(--clr-primary-a50)'
+  },
+  buttonGroup: {
+    display: 'flex',
+    gap: '10px',
+    marginTop: '20px'
+  },
+  button: {
+    padding: '10px 20px',
+    backgroundColor: 'var(--clr-primary-a30)',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    transition: 'background-color 0.3s'
+  },
+  secondaryButton: {
+    backgroundColor: 'var(--clr-surface-a20)',
+    color: 'var(--clr-primary-a50)'
+  },
+  message: {
+    padding: '10px',
+    marginBottom: '20px',
+    borderRadius: '4px',
+    width: '100%'
+  },
+  successMessage: {
+    backgroundColor: 'var(--clr-success-a10)',
+    color: 'var(--clr-success-a50)',
+    border: '1px solid var(--clr-success-a20)'
+  },
+  errorMessage: {
+    backgroundColor: 'var(--clr-error-a10)',
+    color: 'var(--clr-error-a50)',
+    border: '1px solid var(--clr-error-a20)'
+  },
+  infoMessage: {
+    backgroundColor: 'var(--clr-info-a10)',
+    color: 'var(--clr-info-a50)',
+    border: '1px solid var(--clr-info-a20)'
+  }
+};
 
 const SMTPSettings = ({ backendUrl }) => {
+  const navigate = useNavigate();
   const [smtpServer, setSmtpServer] = useState('');
   const [smtpPort, setSmtpPort] = useState('');
   const [smtpUser, setSmtpUser] = useState('');
   const [smtpPassword, setSmtpPassword] = useState('');
   const [smtpSenderEmail, setSmtpSenderEmail] = useState('');
   const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState(''); // 'success' ou 'error'
+  const [messageType, setMessageType] = useState('');
 
   const handleSave = async () => {
     const smtpSettings = {
@@ -67,152 +143,111 @@ const SMTPSettings = ({ backendUrl }) => {
     }
   };
 
+  const getMessageStyle = () => {
+    switch (messageType) {
+      case 'success':
+        return { ...styles.message, ...styles.successMessage };
+      case 'error':
+        return { ...styles.message, ...styles.errorMessage };
+      case 'info':
+        return { ...styles.message, ...styles.infoMessage };
+      default:
+        return styles.message;
+    }
+  };
+
   return (
-    <div className="smtp-settings">
+    <div style={styles.container}>
       <h1>Configuration SMTP</h1>
       
-      {message && (
-        <div className={`message ${messageType}`}>
-          {message}
+      <div style={styles.content}>
+        {message && (
+          <div style={getMessageStyle()}>
+            {message}
+          </div>
+        )}
+
+        <div style={styles.formGroup}>
+          <label style={styles.label}>Serveur SMTP:</label>
+          <input 
+            type="text" 
+            value={smtpServer} 
+            onChange={(e) => setSmtpServer(e.target.value)}
+            placeholder="ex: ssl0.ovh.net"
+            style={styles.input}
+            name="smtpServer"
+            autoComplete="off"
+          />
         </div>
-      )}
+        
+        <div style={styles.formGroup}>
+          <label style={styles.label}>Port SMTP:</label>
+          <input 
+            type="text" 
+            value={smtpPort} 
+            onChange={(e) => setSmtpPort(e.target.value)}
+            placeholder="ex: 465"
+            style={styles.input}
+          />
+        </div>
+        
+        <div style={styles.formGroup}>
+          <label style={styles.label}>Utilisateur SMTP:</label>
+          <input 
+            type="text" 
+            value={smtpUser} 
+            onChange={(e) => setSmtpUser(e.target.value)}
+            placeholder="ex: user@domain.com"
+            style={styles.input}
+            name="smtpUser"
+            autoComplete="username"
+          />
+        </div>
+        
+        <div style={styles.formGroup}>
+          <label style={styles.label}>Mot de passe SMTP:</label>
+          <input 
+            type="password" 
+            value={smtpPassword} 
+            onChange={(e) => setSmtpPassword(e.target.value)}
+            placeholder="Votre mot de passe SMTP"
+            style={styles.input}
+            name="smtpPassword"
+            autoComplete="current-password"
+          />
+        </div>
+        
+        <div style={styles.formGroup}>
+          <label style={styles.label}>Email de l'expéditeur:</label>
+          <input 
+            type="email" 
+            value={smtpSenderEmail} 
+            onChange={(e) => setSmtpSenderEmail(e.target.value)}
+            placeholder="ex: no-reply@domain.com"
+            style={styles.input}
+            name="smtpSenderEmail"
+            autoComplete="email"
+          />
+        </div>
 
-      <div className="form-group">
-        <label>Serveur SMTP:</label>
-        <input 
-          type="text" 
-          value={smtpServer} 
-          onChange={(e) => setSmtpServer(e.target.value)}
-          placeholder="ex: ssl0.ovh.net" 
-        />
+        <div style={styles.buttonGroup}>
+          <button onClick={handleSave} style={styles.button}>
+            Enregistrer
+          </button>
+          <button 
+            onClick={handleTest} 
+            style={{...styles.button, ...styles.secondaryButton}}
+          >
+            Tester la configuration
+          </button>
+          <button 
+            onClick={() => navigate('/')} 
+            style={{...styles.button, ...styles.secondaryButton}}
+          >
+            Retour à l'accueil
+          </button>
+        </div>
       </div>
-      
-      <div className="form-group">
-        <label>Port SMTP:</label>
-        <input 
-          type="text" 
-          value={smtpPort} 
-          onChange={(e) => setSmtpPort(e.target.value)}
-          placeholder="ex: 465" 
-        />
-      </div>
-      
-      <div className="form-group">
-        <label>Utilisateur SMTP:</label>
-        <input 
-          type="text" 
-          value={smtpUser} 
-          onChange={(e) => setSmtpUser(e.target.value)}
-          placeholder="ex: user@domain.com" 
-        />
-      </div>
-      
-      <div className="form-group">
-        <label>Mot de passe SMTP:</label>
-        <input 
-          type="password" 
-          value={smtpPassword} 
-          onChange={(e) => setSmtpPassword(e.target.value)}
-          placeholder="Votre mot de passe SMTP" 
-        />
-      </div>
-      
-      <div className="form-group">
-        <label>Email de l'expéditeur:</label>
-        <input 
-          type="email" 
-          value={smtpSenderEmail} 
-          onChange={(e) => setSmtpSenderEmail(e.target.value)}
-          placeholder="ex: no-reply@domain.com" 
-        />
-      </div>
-
-      <div className="button-group">
-        <button onClick={handleSave} className="primary">Enregistrer</button>
-        <button onClick={handleTest} className="secondary">Tester la configuration</button>
-        <button onClick={() => window.location.href = '/'} className="tertiary">Retour à l'accueil</button>
-      </div>
-
-      <style jsx>{`
-        .smtp-settings {
-          max-width: 600px;
-          margin: 0 auto;
-          padding: 20px;
-        }
-        
-        .form-group {
-          margin-bottom: 15px;
-        }
-        
-        .form-group label {
-          display: block;
-          margin-bottom: 5px;
-          font-weight: bold;
-        }
-        
-        .form-group input {
-          width: 100%;
-          padding: 8px;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-        }
-        
-        .button-group {
-          margin-top: 20px;
-          display: flex;
-          gap: 10px;
-        }
-        
-        .message {
-          padding: 10px;
-          margin-bottom: 20px;
-          border-radius: 4px;
-        }
-        
-        .success {
-          background-color: #d4edda;
-          color: #155724;
-          border: 1px solid #c3e6cb;
-        }
-        
-        .error {
-          background-color: #f8d7da;
-          color: #721c24;
-          border: 1px solid #f5c6cb;
-        }
-        
-        .info {
-          background-color: #cce5ff;
-          color: #004085;
-          border: 1px solid #b8daff;
-        }
-        
-        button {
-          padding: 8px 16px;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-        }
-        
-        button.primary {
-          background-color: #007bff;
-          color: white;
-        }
-        
-        button.secondary {
-          background-color: #6c757d;
-          color: white;
-        }
-        
-        button.tertiary {
-          background-color: #f8f9fa;
-          border: 1px solid #ddd;
-        }
-        
-        button:hover {
-          opacity: 0.9;
-        }
-      `}</style>
     </div>
   );
 };

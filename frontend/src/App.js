@@ -18,14 +18,14 @@ const styles = {
   },
   inputContainer: {
     width: '100%',
-    maxWidth: '400px'
+    maxWidth: '600px'
   },
   emailInput: {
     width: '100%',
-    padding: '12px',
+    padding: '8px',
     backgroundColor: 'var(--clr-surface-a20)',
-    border: 'none',
-    borderRadius: '5px',
+    border: '1px solid var(--clr-surface-a30)',
+    borderRadius: '4px',
     color: 'var(--clr-primary-a50)',
     marginBottom: '10px'
   },
@@ -47,7 +47,7 @@ const styles = {
   },
   progressContainer: {
     width: '100%',
-    maxWidth: '400px',
+    maxWidth: '600px',
     margin: '20px auto'
   },
   progressBar: {
@@ -161,10 +161,12 @@ function App({ backendUrl }) {
         <div style={styles.inputContainer}>
           <input
             type="email"
+            name="recipientEmail"
             placeholder="Email du destinataire"
             value={recipientEmail}
             onChange={(e) => setRecipientEmail(e.target.value)}
             style={styles.emailInput}
+            autoComplete="email"
           />
           
           <input
