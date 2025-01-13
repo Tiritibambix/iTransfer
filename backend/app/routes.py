@@ -10,14 +10,13 @@ from .models import FileUpload
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 
-# Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
-BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:5000')
-current_app.config['BACKEND_URL'] = BACKEND_URL
-
-ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
-ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
-
 bp = Blueprint('main', __name__)
+
+def init_app(app):
+    """Initialiser les configurations spécifiques aux routes"""
+    app.config['ADMIN_USERNAME'] = os.environ.get('ADMIN_USERNAME')
+    app.config['ADMIN_PASSWORD'] = os.environ.get('ADMIN_PASSWORD')
+    app.config['BACKEND_URL'] = os.environ.get('BACKEND_URL', 'http://localhost:5000')
 
 @bp.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
@@ -196,7 +195,7 @@ def login():
     username = data.get('username')
     password = data.get('password')
 
-    if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
+    if username == current_app.config['ADMIN_USERNAME'] and password == current_app.config['ADMIN_PASSWORD']:
         token = "fake_jwt_token_for_demo_purposes"
         response = jsonify({"message": "Login réussi", "token": token})
         response.headers.add("Access-Control-Allow-Origin", frontend_url)

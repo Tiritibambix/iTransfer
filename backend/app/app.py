@@ -82,6 +82,7 @@ def create_app():
     # Importer et enregistrer les routes
     from . import routes
     app.register_blueprint(routes.bp)
+    routes.init_app(app)  # Initialiser les configurations des routes
     
     # Créer les tables au démarrage avec gestion des erreurs
     max_retries = 5
