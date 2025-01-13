@@ -4,16 +4,26 @@ from flask_sqlalchemy import SQLAlchemy
 from .config import Config
 import os
 
-app = Flask(__name__)
-app.config.from_object(Config)
-db = SQLAlchemy(app)
+# Initialisation de SQLAlchemy sans app
+db = SQLAlchemy()
 
-# Activer CORS
-CORS(app, supports_credentials=True)
+def create_app():
+    app = Flask(__name__)
+    app.config.from_object(Config)
+    
+    # Initialiser les extensions
+    db.init_app(app)
+    CORS(app, supports_credentials=True)
+    
+    # Créer les tables au démarrage
+    with app.app_context():
+        db.create_all()
+        app.logger.info("Base de données initialisée avec succès")
+    
+    return app
 
-# Créer les tables au démarrage
-with app.app_context():
-    app.logger.info("Base de données initialisée avec succès")
+# Créer l'application
+app = create_app()
 
 @app.after_request
 def add_cors_headers(response):
@@ -24,7 +34,6 @@ def add_cors_headers(response):
     response.headers.add('Access-Control-Allow-Credentials', 'true')
     response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE, PATCH')
     response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
-
     return response
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
