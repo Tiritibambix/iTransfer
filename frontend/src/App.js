@@ -8,46 +8,52 @@ const styles = {
     padding: '20px',
     backgroundColor: 'var(--clr-surface-a10)',
     borderRadius: '10px',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
+    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    textAlign: 'center'
   },
   content: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    gap: '20px'
+    gap: '20px',
+    width: '100%'
   },
   inputContainer: {
     width: '100%',
-    maxWidth: '600px'
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: '15px'
   },
   emailInput: {
-    width: '100%',
-    padding: '8px',
+    width: '80%',
+    padding: '12px',
     backgroundColor: 'var(--clr-surface-a20)',
     border: '1px solid var(--clr-surface-a30)',
     borderRadius: '4px',
     color: 'var(--clr-primary-a50)',
-    marginBottom: '10px'
+    fontSize: '16px'
   },
   fileInput: {
     display: 'none'
   },
   fileLabel: {
-    display: 'block',
+    width: '80%',
     padding: '12px 20px',
     backgroundColor: 'var(--clr-surface-a20)',
     color: 'var(--clr-primary-a50)',
-    borderRadius: '5px',
+    borderRadius: '4px',
     cursor: 'pointer',
     textAlign: 'center',
     transition: 'background-color 0.3s',
+    border: '1px solid var(--clr-surface-a30)',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap'
+    whiteSpace: 'nowrap',
+    fontSize: '16px'
   },
   progressContainer: {
-    width: '100%',
-    maxWidth: '600px',
+    width: '80%',
     margin: '20px auto'
   },
   progressBar: {
@@ -70,24 +76,25 @@ const styles = {
     right: '8px',
     top: '50%',
     transform: 'translateY(-50%)',
-    fontSize: '10px',
+    fontSize: '12px',
     color: 'white',
     textShadow: '0 1px 2px rgba(0, 0, 0, 0.3)'
   },
   uploadButton: {
-    minWidth: '150px',
-    padding: '10px 20px',
+    width: '80%',
+    padding: '12px 20px',
     backgroundColor: 'var(--clr-primary-a30)',
     color: 'white',
     border: 'none',
-    borderRadius: '5px',
+    borderRadius: '4px',
     cursor: 'pointer',
-    transition: 'background-color 0.3s'
+    transition: 'background-color 0.3s',
+    fontSize: '16px'
   },
   settingsLink: {
     display: 'inline-block',
     marginTop: '20px',
-    fontSize: '12px',
+    fontSize: '14px',
     color: 'var(--clr-primary-a40)',
     textDecoration: 'none',
     opacity: 0.7,
