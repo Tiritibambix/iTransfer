@@ -1,14 +1,12 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from flask_sqlalchemy import SQLAlchemy
 from .config import Config
-from .database import init_db
 import os
 
 app = Flask(__name__)
 app.config.from_object(Config)
-
-# Initialiser la base de données
-init_db(app)
+db = SQLAlchemy(app)
 
 # Activer CORS
 CORS(app, supports_credentials=True)
