@@ -7,11 +7,12 @@ A file transfer application with web interface, secure backend, and email notifi
 ## Features
 
 - Responsive user interface
-- File upload with progress bar
-- Automatic email notifications
+- Multiple file upload support with drag & drop
+- Automatic ZIP archive creation for multiple files
+- Detailed download page with file/archive contents
+- Email notifications with secure download links
 - Secure admin interface
 - REST API backend
-- Easy deployment with Docker
 - File management with MariaDB database
 
 ## Prerequisites
@@ -126,10 +127,19 @@ docker-compose logs -f
 
 ### File Upload
 1. Visit http://localhost:3500
-2. Drag and drop files or click to select
+2. Drag and drop one or multiple files
+   - Single files will be uploaded as is
+   - Multiple files will be automatically zipped
 3. Enter recipient's email address
 4. Click "Send"
 5. Recipient will receive an email with download link
+
+### Download Process
+1. Click the download link in the email
+2. View file/archive details on the download page
+   - For single files: name and size
+   - For archives: list of contained files with sizes
+3. Click "Download" to get the file
 
 ### Admin Tasks
 1. Access admin interface at http://localhost:3500/admin
