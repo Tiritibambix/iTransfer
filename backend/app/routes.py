@@ -8,7 +8,23 @@ from . import app, db
 from .models import FileUpload
 
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
-BACKEND_URL = os.environ.get('BACKEND_URL', 'http://localhost:5000')
+def get_backend_url():
+    """
+    Génère l'URL du backend en se basant sur la requête entrante
+    """
+    if not request:
+        return os.environ.get('BACKEND_URL', 'http://localhost:5000')
+    
+    # Récupérer le protocole (http ou https)
+    protocol = request.scheme
+    
+    # Récupérer l'hôte complet (hostname:port)
+    host = request.headers.get('Host')
+    if not host:
+        # Fallback sur l'environnement ou la valeur par défaut
+        return os.environ.get('BACKEND_URL', 'http://localhost:5000')
+    
+    return f"{protocol}://{host}"
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
@@ -23,8 +39,9 @@ def send_email(to_email, file_id, filename):
             smtp_config = json.load(config_file)
             app.logger.info(f"Configuration SMTP chargée : {json.dumps({**smtp_config, 'smtp_password': '***'})}")
 
-        # Créer le lien de téléchargement
-        download_link = f"{BACKEND_URL}/download/{file_id}"
+        # Créer le lien de téléchargement avec l'URL dynamique
+        backend_url = get_backend_url()
+        download_link = f"{backend_url}/download/{file_id}"
 
         # Configurer le message
         message = f"""

@@ -23,8 +23,8 @@ services:
       - ADMIN_PASSWORD=adminuserpassword
       - DATABASE_URL=mysql://mariadb_user:mariadb_pass@db/mariadb_db
     volumes:
-      - ./iTransfer/backend/data:/app/data
-      - ./iTransfer/uploads:/app/uploads
+      - ./backend/data:/app/data
+      - ./backend/uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
