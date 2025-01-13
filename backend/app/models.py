@@ -1,4 +1,4 @@
-from .database import db
+from . import db
 
 class FileUpload(db.Model):
     __tablename__ = 'file_upload'

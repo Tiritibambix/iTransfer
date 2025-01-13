@@ -1,7 +1,8 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
+from . import app, db
 from .config import Config
-from .database import db, init_db
+from .database import init_db
 import os
 
 def create_app():
