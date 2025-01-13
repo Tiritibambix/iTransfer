@@ -6,7 +6,7 @@ services:
     ports:
       - "3500:80"
     volumes:
-      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/frontend:/app
+      - ./iTransfer/frontend:/app
       - /app/node_modules
     depends_on:
       - backend
@@ -23,10 +23,11 @@ services:
       - ADMIN_PASSWORD=adminuserpassword
       - DATABASE_URL=mysql://mariadb_user:mariadb_pass@db/mariadb_db
     volumes:
-      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/backend_data:/app/data
-      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/uploads:/app/uploads
+      - ./iTransfer/backend/data:/app/data
+      - ./iTransfer/uploads:/app/uploads
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - itransfer-network
 
@@ -40,8 +41,8 @@ services:
     ports:
       - "3306:3306"
     volumes:
-      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/db_data:/var/lib/mysql
-      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./iTransfer/db_data:/var/lib/mysql
+      - ./iTransfer/backend/init/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD || echo 'Healthcheck failed' >> /var/log/healthcheck.log"]
       interval: 10s
