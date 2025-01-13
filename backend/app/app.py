@@ -83,10 +83,24 @@ def create_app():
     from . import routes
     app.register_blueprint(routes.bp)
     
-    # Créer les tables au démarrage
-    with app.app_context():
-        db.create_all()
-        app.logger.info("Base de données initialisée avec succès")
+    # Créer les tables au démarrage avec gestion des erreurs
+    max_retries = 5
+    retry_delay = 5  # secondes
+    
+    for attempt in range(max_retries):
+        try:
+            with app.app_context():
+                db.create_all()
+                app.logger.info("Base de données initialisée avec succès")
+                break
+        except Exception as e:
+            if attempt < max_retries - 1:
+                app.logger.warning(f"Tentative {attempt + 1}/{max_retries} de connexion à la base de données échouée: {e}")
+                import time
+                time.sleep(retry_delay)
+            else:
+                app.logger.error(f"Impossible de se connecter à la base de données après {max_retries} tentatives: {e}")
+                raise
     
     # Ajouter les headers CORS à toutes les réponses.
     @app.after_request
