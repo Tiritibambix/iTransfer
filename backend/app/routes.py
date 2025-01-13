@@ -17,8 +17,11 @@ def send_email(to_email, file_id, filename):
     try:
         # Charger la configuration SMTP
         config_file_path = '/app/data/smtp_config.json'
+        app.logger.info(f"Tentative de lecture de la configuration SMTP depuis {config_file_path}")
+        
         with open(config_file_path, 'r') as config_file:
             smtp_config = json.load(config_file)
+            app.logger.info(f"Configuration SMTP chargée : {json.dumps({**smtp_config, 'smtp_password': '***'})}")
 
         # Créer le lien de téléchargement
         download_link = f"{BACKEND_URL}/download/{file_id}"
@@ -38,24 +41,40 @@ def send_email(to_email, file_id, filename):
         L'équipe iTransfer
         """
 
-        # Configurer le serveur SMTP
-        server = smtplib.SMTP(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
-        server.starttls()
-        server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
+        app.logger.info(f"Tentative de connexion au serveur SMTP : {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
+        
+        # Utiliser SMTP_SSL pour le port 465
+        server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
+        app.logger.info("Connexion SMTP établie")
+
+        # Se connecter
+        app.logger.info(f"Tentative de connexion avec l'utilisateur : {smtp_config['smtp_user']}")
+        server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'])
+        app.logger.info("Connexion SMTP réussie")
+
+        # Préparer l'email
+        email_message = f"""From: {smtp_config['smtp_sender_email']}
+To: {to_email}
+Subject: iTransfer - Nouveau fichier partagé
+Content-Type: text/plain; charset=utf-8
+
+{message}"""
 
         # Envoyer l'email
+        app.logger.info(f"Envoi de l'email à {to_email}")
         server.sendmail(
             smtp_config['smtp_sender_email'],
             to_email,
-            f"From: {smtp_config['smtp_sender_email']}\r\n"
-            f"To: {to_email}\r\n"
-            f"Subject: iTransfer - Nouveau fichier partagé\r\n"
-            f"\r\n{message}"
+            email_message.encode('utf-8')
         )
+        app.logger.info("Email envoyé avec succès")
+        
         server.quit()
         return True
     except Exception as e:
-        app.logger.error(f"Erreur lors de l'envoi de l'email : {e}")
+        app.logger.error(f"Erreur détaillée lors de l'envoi de l'email : {str(e)}")
+        import traceback
+        app.logger.error(f"Traceback : {traceback.format_exc()}")
         return False
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
@@ -218,6 +237,55 @@ def download_file(file_id):
     except Exception as e:
         app.logger.error(f"Erreur lors du téléchargement : {e}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/test-smtp', methods=['POST', 'OPTIONS'])
+def test_smtp():
+    if request.method == 'OPTIONS':
+        response = jsonify({'message': 'CORS preflight success'})
+        response.headers.add("Access-Control-Allow-Origin", '*')
+        response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
+        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
+        return response
+
+    try:
+        # Charger la configuration SMTP
+        config_file_path = '/app/data/smtp_config.json'
+        with open(config_file_path, 'r') as config_file:
+            smtp_config = json.load(config_file)
+
+        # Tenter d'envoyer un email de test
+        server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
+        app.logger.info("Connexion SMTP établie pour le test")
+
+        server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'])
+        app.logger.info("Connexion SMTP réussie pour le test")
+
+        test_message = f"""From: {smtp_config['smtp_sender_email']}
+To: {smtp_config['smtp_sender_email']}
+Subject: Test de configuration SMTP iTransfer
+Content-Type: text/plain; charset=utf-8
+
+Ceci est un email de test pour vérifier la configuration SMTP d'iTransfer.
+Si vous recevez cet email, la configuration est correcte."""
+
+        server.sendmail(
+            smtp_config['smtp_sender_email'],
+            smtp_config['smtp_sender_email'],
+            test_message.encode('utf-8')
+        )
+        
+        server.quit()
+        app.logger.info("Test SMTP réussi")
+
+        response = jsonify({"success": True, "message": "Test SMTP réussi! Un email de test a été envoyé."})
+        response.headers.add("Access-Control-Allow-Origin", '*')
+        return response, 200
+
+    except Exception as e:
+        app.logger.error(f"Erreur lors du test SMTP : {str(e)}")
+        response = jsonify({"success": False, "error": str(e)})
+        response.headers.add("Access-Control-Allow-Origin", '*')
+        return response, 500
 
 def notify_user(file_id, email):
     try:
