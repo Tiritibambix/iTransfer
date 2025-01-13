@@ -24,15 +24,15 @@ Une application moderne de transfert de fichiers avec interface web, backend sé
 
 1. Clonez le dépôt :
 ```bash
-git clone https://github.com/votre-username/iTransfer.git
+git clone https://github.com/tiritibambix/iTransfer.git
 cd iTransfer
 ```
 
 2. Créez le fichier d'initialisation SQL :
 ```bash
 # Créez le fichier init.sql dans le dossier spécifié
-mkdir -p /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/backend/
-cat > /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/backend/init.sql << EOL
+mkdir -p .../iTransfer/backend/
+cat > ...iTransfer/backend/init.sql << EOL
 CREATE TABLE IF NOT EXISTS file_upload (
     id VARCHAR(36) PRIMARY KEY,
     filename VARCHAR(256) NOT NULL,
@@ -42,6 +42,8 @@ CREATE TABLE IF NOT EXISTS file_upload (
 );
 EOL
 ```
+
+Or simply download [this file](https://github.com/tiritibambix/iTransfer/blob/main/backend/init.sql) here : ...iTransfer/backend/  
 
 3. Démarrez les conteneurs :
 ```bash
