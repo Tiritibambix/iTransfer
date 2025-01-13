@@ -30,7 +30,7 @@ RUN mkdir -p /app/uploads && chmod -R 777 /app/uploads
 
 # Copier le code de l'application
 COPY /backend/app /app/app
-COPY /backend/run.py /app/run.py
+COPY /backend/wsgi.py /app/wsgi.py
 
 # Copier le script d'entrée
 COPY /backend/entrypoint.sh /entrypoint.sh
@@ -39,6 +39,10 @@ RUN chmod +x /entrypoint.sh
 # Exposer le port de l'application
 EXPOSE 5000
 
+# Définir les variables d'environnement
+ENV FLASK_APP=wsgi.py
+ENV PYTHONPATH=/app
+
 # Commande pour démarrer l'application
 ENTRYPOINT ["/entrypoint.sh"]
-CMD ["python", "run.py"]
+CMD ["python", "wsgi.py"]
