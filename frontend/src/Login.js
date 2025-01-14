@@ -1,60 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const styles = {
-  container: {
-    maxWidth: '600px',
-    margin: '0 auto',
-    padding: '20px',
-    backgroundColor: 'var(--clr-surface-a10)',
-    borderRadius: '10px',
-    boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
-  },
-  content: {
-    display: 'flex',
-    flexDirection: 'column',
-    alignItems: 'center',
-    gap: '20px'
-  },
-  formGroup: {
-    width: '100%',
-    marginBottom: '15px'
-  },
-  label: {
-    display: 'block',
-    marginBottom: '5px',
-    color: 'var(--clr-primary-a50)',
-    fontWeight: 'bold'
-  },
-  input: {
-    width: '100%',
-    padding: '8px',
-    backgroundColor: 'var(--clr-surface-a20)',
-    border: '1px solid var(--clr-surface-a30)',
-    borderRadius: '4px',
-    color: 'var(--clr-primary-a50)'
-  },
-  button: {
-    width: '100%',
-    padding: '10px 20px',
-    backgroundColor: 'var(--clr-primary-a30)',
-    color: 'white',
-    border: 'none',
-    borderRadius: '5px',
-    cursor: 'pointer',
-    transition: 'background-color 0.3s'
-  },
-  errorMessage: {
-    padding: '10px',
-    marginBottom: '20px',
-    borderRadius: '4px',
-    width: '100%',
-    backgroundColor: 'var(--clr-error-a10)',
-    color: 'var(--clr-error-a50)',
-    border: '1px solid var(--clr-error-a20)'
-  }
-};
-
 const Login = ({ backendUrl }) => {
   const navigate = useNavigate();
   const [username, setUsername] = useState('');
@@ -87,57 +33,42 @@ const Login = ({ backendUrl }) => {
   };
 
   return (
-    <div style={styles.container}>
-      <div style={styles.content}>
-        <h1>Connexion</h1>
-        
-        {error && (
-          <div style={styles.errorMessage}>
-            {error}
-          </div>
-        )}
+    <div className="container">
+      <h1>Connexion</h1>
 
-        <form onSubmit={handleSubmit} style={{ width: '100%' }}>
-          <div style={styles.formGroup}>
-            <label style={styles.label}>
-              Nom d'utilisateur:
-            </label>
-            <input
-              type="text"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              style={styles.input}
-              required
-              name="username"
-              autoComplete="username"
-              placeholder="Votre nom d'utilisateur"
-            />
-          </div>
+      {error && (
+        <div className="message message-error">
+          {error}
+        </div>
+      )}
 
-          <div style={styles.formGroup}>
-            <label style={styles.label}>
-              Mot de passe:
-            </label>
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              style={styles.input}
-              required
-              name="password"
-              autoComplete="current-password"
-              placeholder="Votre mot de passe"
-            />
-          </div>
+      <form onSubmit={handleSubmit}>
+        <div>
+          <label>Nom d'utilisateur:</label>
+          <input
+            type="text"
+            className="input"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+          />
+        </div>
 
-          <button 
-            type="submit" 
-            style={styles.button}
-          >
-            Se connecter
-          </button>
-        </form>
-      </div>
+        <div>
+          <label>Mot de passe:</label>
+          <input
+            type="password"
+            className="input"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+          />
+        </div>
+
+        <button className="button" type="submit">
+          Se connecter
+        </button>
+      </form>
     </div>
   );
 };
