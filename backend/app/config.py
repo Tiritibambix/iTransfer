@@ -1,10 +1,18 @@
 import os
 import secrets
+from sqlalchemy import create_engine
 
 class Config:
-    # Configuration de la base de données
+    # Configuration de la base de données avec retry
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or 'sqlite:///app.db'
     SQLALCHEMY_TRACK_MODIFICATIONS = False
+    SQLALCHEMY_ENGINE_OPTIONS = {
+        'pool_pre_ping': True,  # Vérifie la connexion avant utilisation
+        'pool_recycle': 3600,   # Recycle les connexions après 1 heure
+        'pool_timeout': 30,     # Timeout de 30 secondes pour obtenir une connexion
+        'pool_size': 10,        # Taille du pool de connexions
+        'max_overflow': 20      # Nombre maximum de connexions supplémentaires
+    }
     
     # Génération d'une clé secrète aléatoire si non définie
     SECRET_KEY = os.environ.get('SECRET_KEY') or secrets.token_hex(32)

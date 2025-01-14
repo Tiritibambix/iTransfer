@@ -4,7 +4,27 @@ from . import app, db
 from .config import Config
 from .database import init_db
 import os
+import time
 from werkzeug.utils import secure_filename
+from sqlalchemy import exc
+
+def wait_for_db(max_retries=5, delay=2):
+    """Attend que la base de données soit disponible"""
+    for attempt in range(max_retries):
+        try:
+            # Tente de se connecter à la base de données
+            db.engine.connect()
+            app.logger.info("Connexion à la base de données établie avec succès")
+            return True
+        except exc.OperationalError as e:
+            if attempt < max_retries - 1:
+                app.logger.warning(f"Tentative {attempt + 1}/{max_retries} échouée. Nouvelle tentative dans {delay} secondes...")
+                time.sleep(delay)
+                delay *= 2  # Augmente le délai entre chaque tentative
+            else:
+                app.logger.error("Impossible de se connecter à la base de données après plusieurs tentatives")
+                raise
+    return False
 
 def create_app():
     app = Flask(__name__)
@@ -22,15 +42,16 @@ def create_app():
     # Initialiser la base de données
     init_db(app)
     
-    # Créer les tables au démarrage
+    # Attendre que la base de données soit disponible
     with app.app_context():
+        wait_for_db()
         try:
             db.create_all()
             app.logger.info("Base de données initialisée avec succès")
         except Exception as e:
             app.logger.error(f"Erreur lors de l'initialisation de la base de données: {e}")
             raise
-        
+    
     return app
 
 # Créer l'application
