@@ -44,6 +44,64 @@ CREATE TABLE IF NOT EXISTS file_upload (
 ```bash
 docker-compose up -d
 ```
+Or use [docker-compose.yml](https://github.com/tiritibambix/iTransfer/blob/main/docker-compose.yml)
+```yaml
+services:
+  frontend:
+    image: tiritibambix/itransfer-frontend
+    ports:
+      - "3500:80"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - itransfer-network
+
+  backend:
+    image: tiritibambix/itransfer-backend
+    ports:
+      - "5500:5000"
+    environment:
+      - FRONTEND_URL=http://localhost:3500
+      - ADMIN_USERNAME=adminuser
+      - ADMIN_PASSWORD=adminuserpassword
+      - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - itransfer-network
+
+  db:
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: mariadb_db
+      MYSQL_USER: mariadb_user
+      MYSQL_PASSWORD: mariadb_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./db_data:/var/lib/mysql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD || echo 'Healthcheck failed' >> /var/log/healthcheck.log"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - itransfer-network
+
+networks:
+  itransfer-network:
+    driver: bridge
+```
 
 ## Configuration
 
@@ -71,6 +129,10 @@ The project uses several environment variables configurable in `docker-compose.y
    - Enter the recipient's email address
    - Enter your email address (sender)
    - Click "Send"
+3. Both you and the recipient will receive email notifications:
+   - Recipient gets a download link
+   - You get a confirmation of upload
+   - You'll be notified when the recipient downloads the file
 
 ## Administration
 
@@ -85,29 +147,29 @@ iTransfer/
 ├── LICENSE
 ├── README.md
 ├── backend
-|     ├── Dockerfile
-|     ├── app
-|     |     ├── __init__.py
-|     |     ├── app.py
-|     |     ├── config.py
-|     |     ├── models.py
-|     |     ├── routes.py
-|     ├── entrypoint.sh
-|     ├── init.sql
-|     ├── run.py
+|     ├── Dockerfile
+|     ├── app
+|     |     ├── __init__.py
+|     |     ├── app.py
+|     |     ├── config.py
+|     |     ├── models.py
+|     |     ├── routes.py
+|     ├── entrypoint.sh
+|     ├── init.sql
+|     ├── run.py
 ├── docker-compose.yml
 ├── frontend
-|     ├── Dockerfile
-|     ├── package.json
-|     ├── public
-|     |     ├── index.html
-|     ├── src
-|     |     ├── App.js
-|     |     ├── Login.js
-|     |     ├── PrivateRoute.js
-|     |     ├── SMTPSettings.js
-|     |     ├── index.css
-|     |     ├── index.js
+|     ├── Dockerfile
+|     ├── package.json
+|     ├── public
+|     |     ├── index.html
+|     ├── src
+|     |     ├── App.js
+|     |     ├── Login.js
+|     |     ├── PrivateRoute.js
+|     |     ├── SMTPSettings.js
+|     |     ├── index.css
+|     |     ├── index.js
 ├── requirements.txt
 ```
 
