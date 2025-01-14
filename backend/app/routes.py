@@ -4,6 +4,7 @@ import hashlib
 import smtplib
 import json
 from flask import request, jsonify, send_file
+from werkzeug.utils import secure_filename
 from . import app, db
 from .models import FileUpload
 
@@ -34,6 +35,9 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
     try:
         backend_url = get_backend_url()
         
+        # Log de debug pour la configuration SMTP
+        app.logger.info(f"Configuration SMTP : serveur={smtp_config['smtp_server']}, port={smtp_config['smtp_port']}, user={smtp_config['smtp_user']}")
+        
         # Configurer le message
         email_message = f"""From: {smtp_config['smtp_sender_email']}
 To: {to_email}
@@ -42,9 +46,15 @@ Content-Type: text/plain; charset=utf-8
 
 {message_content}"""
 
+        app.logger.info(f"Tentative de connexion au serveur SMTP {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
+        
         # Utiliser SMTP_SSL pour le port 465
         server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
+        app.logger.info("Connexion SMTP établie")
+        
+        app.logger.info(f"Tentative de login avec l'utilisateur {smtp_config['smtp_user']}")
         server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'].strip())
+        app.logger.info("Login SMTP réussi")
 
         # Envoyer l'email
         app.logger.info(f"Envoi de l'email à {to_email}")
@@ -56,7 +66,7 @@ Content-Type: text/plain; charset=utf-8
         app.logger.info("Email envoyé avec succès")
         return True
     except Exception as e:
-        app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+        app.logger.error(f"Erreur détaillée lors de l'envoi de l'email : {str(e)}")
         return False
     finally:
         if server:
@@ -119,78 +129,106 @@ def send_sender_download_notification(to_email, filename, smtp_config):
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
     if request.method == 'OPTIONS':
-        response = jsonify({'message': 'CORS preflight success'})
-        response.headers.add("Access-Control-Allow-Origin", '*')
-        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-        return response
+        return jsonify({'message': 'CORS preflight success'}), 200
 
     try:
-        file = request.files.get('file')
+        # Vérification des données requises
+        if 'file' not in request.files:
+            return jsonify({'error': 'Aucun fichier envoyé'}), 400
+        
+        file = request.files['file']
         email = request.form.get('email')
         sender_email = request.form.get('sender_email')
 
+        app.logger.info(f"Upload demandé : fichier={file.filename}, email={email}, sender={sender_email}")
+
         if not file or not email or not sender_email:
             return jsonify({'error': 'Fichier ou email manquant'}), 400
+        
+        if not file.filename:
+            return jsonify({'error': 'Nom de fichier invalide'}), 400
 
+        # Génération d'un ID unique et sécurisation du nom de fichier
         file_id = str(uuid.uuid4())
-        file_content = file.read()
-        encrypted_data = hashlib.sha256(file_content).hexdigest()
-
-        # Sauvegarder le fichier
-        upload_dir = '/app/uploads'
-        if not os.path.exists(upload_dir):
-            os.makedirs(upload_dir)
-
-        upload_path = os.path.join(upload_dir, file.filename)
-        with open(upload_path, 'wb') as f:
-            f.write(file_content)
-
-        # Créer l'entrée dans la base de données
-        new_file = FileUpload(
-            id=file_id,
-            filename=file.filename,
-            email=email,
-            sender_email=sender_email,
-            encrypted_data=encrypted_data,
-            downloaded=False
-        )
+        safe_filename = secure_filename(file.filename)
+        
+        # Création du chemin de fichier unique
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_id}_{safe_filename}")
+        
+        try:
+            # Sauvegarde du fichier de manière optimisée
+            app.logger.info(f"Sauvegarde du fichier vers {file_path}")
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            file.save(file_path)
+            
+            # Calcul du hash après la sauvegarde
+            with open(file_path, 'rb') as f:
+                encrypted_data = hashlib.sha256(f.read()).hexdigest()
+            
+            app.logger.info("Fichier sauvegardé avec succès")
+        except Exception as e:
+            app.logger.error(f"Erreur lors de la sauvegarde du fichier: {str(e)}")
+            return jsonify({'error': 'Erreur lors de la sauvegarde du fichier'}), 500
 
         try:
+            # Création de l'entrée dans la base de données
+            app.logger.info("Création de l'entrée dans la base de données")
+            new_file = FileUpload(
+                id=file_id,
+                filename=safe_filename,
+                email=email,
+                sender_email=sender_email,
+                encrypted_data=encrypted_data,
+                downloaded=False
+            )
             db.session.add(new_file)
             db.session.commit()
+            app.logger.info("Entrée créée dans la base de données")
         except Exception as db_error:
-            app.logger.error(f"Erreur base de données : {str(db_error)}")
-            if os.path.exists(upload_path):
-                os.remove(upload_path)
-            raise db_error
+            app.logger.error(f"Erreur base de données: {str(db_error)}")
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return jsonify({'error': 'Erreur lors de l\'enregistrement en base de données'}), 500
 
-        # Charger la configuration SMTP
-        config_file_path = '/app/data/smtp_config.json'
-        if not os.path.exists(config_file_path):
-            return jsonify({'error': 'Configuration SMTP manquante'}), 500
+        # Chargement de la configuration SMTP
+        try:
+            app.logger.info(f"Chargement de la configuration SMTP depuis {app.config['SMTP_CONFIG_PATH']}")
+            with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
+                smtp_config = json.load(config_file)
+            app.logger.info("Configuration SMTP chargée avec succès")
+        except Exception as e:
+            app.logger.error(f"Erreur lors du chargement de la configuration SMTP: {str(e)}")
+            return jsonify({'warning': 'Fichier uploadé mais impossible d\'envoyer les notifications'}), 200
+
+        # Envoi des notifications
+        notification_errors = []
+        
+        app.logger.info(f"Envoi de la notification au destinataire {email}")
+        if not send_recipient_notification(email, file_id, safe_filename, smtp_config):
+            notification_errors.append("destinataire")
             
-        with open(config_file_path, 'r') as config_file:
-            smtp_config = json.load(config_file)
-        
-        # Envoyer les notifications
-        recipient_notified = send_recipient_notification(email, file_id, file.filename, smtp_config)
-        sender_notified = send_sender_upload_confirmation(sender_email, file_id, file.filename, smtp_config)
-        
-        if not recipient_notified or not sender_notified:
-            return jsonify({'warning': 'Fichier uploadé mais problème avec les notifications'}), 200
+        app.logger.info(f"Envoi de la confirmation à l'expéditeur {sender_email}")
+        if not send_sender_upload_confirmation(sender_email, file_id, safe_filename, smtp_config):
+            notification_errors.append("expéditeur")
 
-        return jsonify({
+        response_data = {
             'success': True,
             'file_id': file_id,
             'message': 'Fichier uploadé avec succès'
-        }), 200
+        }
+
+        if notification_errors:
+            error_msg = f"Impossible d'envoyer les notifications aux destinataires suivants: {', '.join(notification_errors)}"
+            app.logger.error(error_msg)
+            response_data['warning'] = error_msg
+
+        return jsonify(response_data), 200
 
     except Exception as e:
-        app.logger.error(f"Erreur lors de l'upload : {str(e)}")
-        if 'upload_path' in locals() and os.path.exists(upload_path):
-            os.remove(upload_path)
-        return jsonify({'error': str(e)}), 500
+        app.logger.error(f"Erreur lors de l'upload: {str(e)}")
+        if 'file_path' in locals() and os.path.exists(file_path):
+            os.remove(file_path)
+        return jsonify({'error': 'Une erreur interne est survenue'}), 500
 
 @app.route('/api/save-smtp-settings', methods=['POST', 'OPTIONS'])
 def save_smtp_settings():
@@ -199,7 +237,7 @@ def save_smtp_settings():
         response.headers.add("Access-Control-Allow-Origin", '*')
         response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-        return response
+        return response, 200
 
     data = request.json
     smtp_config = {
@@ -212,7 +250,7 @@ def save_smtp_settings():
 
     try:
         # Chemin vers le fichier de configuration dans le volume
-        config_file_path = '/app/data/smtp_config.json'
+        config_file_path = app.config['SMTP_CONFIG_PATH']
         
         # Créer le répertoire s'il n'existe pas
         os.makedirs(os.path.dirname(config_file_path), exist_ok=True)
@@ -228,7 +266,9 @@ def save_smtp_settings():
         return response, 200
     except Exception as e:
         app.logger.error(f"Erreur lors de la sauvegarde des paramètres SMTP : {e}")
-        response = jsonify({"error": str(e)})
+
+        response = jsonify({"error": "Une erreur interne est survenue."})
+
         response.headers.add("Access-Control-Allow-Origin", '*')
         response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
@@ -269,7 +309,7 @@ def download_file(file_id):
         file_upload = FileUpload.query.get_or_404(file_id)
         
         # Vérifier si le fichier existe dans le système de fichiers
-        file_path = os.path.join('/app/uploads', file_upload.filename)
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_upload.id}_{file_upload.filename}")
         if not os.path.exists(file_path):
             return jsonify({'error': 'Fichier non trouvé'}), 404
 
@@ -280,13 +320,14 @@ def download_file(file_id):
             db.session.commit()
             
             # Charger la configuration SMTP
-            config_file_path = '/app/data/smtp_config.json'
-            if os.path.exists(config_file_path):
-                with open(config_file_path, 'r') as config_file:
+            try:
+                with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
                     smtp_config = json.load(config_file)
                 # Envoyer la notification à l'expéditeur
                 send_sender_download_notification(file_upload.sender_email, file_upload.filename, smtp_config)
-        
+            except Exception as e:
+                app.logger.error(f"Erreur lors du chargement de la configuration SMTP: {str(e)}")
+
         # Envoyer le fichier
         return send_file(
             file_path,
@@ -297,7 +338,7 @@ def download_file(file_id):
 
     except Exception as e:
         app.logger.error(f"Erreur lors du téléchargement : {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'An internal error has occurred!'}), 500
 
 @app.route('/api/test-smtp', methods=['POST', 'OPTIONS'])
 def test_smtp():
@@ -310,9 +351,12 @@ def test_smtp():
 
     try:
         # Charger la configuration SMTP
-        config_file_path = '/app/data/smtp_config.json'
-        with open(config_file_path, 'r') as config_file:
-            smtp_config = json.load(config_file)
+        try:
+            with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
+                smtp_config = json.load(config_file)
+        except Exception as e:
+            app.logger.error(f"Erreur lors du chargement de la configuration SMTP: {str(e)}")
+            return jsonify({'error': 'Configuration SMTP manquante'}), 500
 
         # Tenter d'envoyer un email de test
         server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
@@ -344,6 +388,6 @@ Si vous recevez cet email, la configuration est correcte."""
 
     except Exception as e:
         app.logger.error(f"Erreur lors du test SMTP : {str(e)}")
-        response = jsonify({"success": False, "error": str(e)})
+        response = jsonify({"success": False, "error": "An internal error has occurred!"})
         response.headers.add("Access-Control-Allow-Origin", '*')
         return response, 500

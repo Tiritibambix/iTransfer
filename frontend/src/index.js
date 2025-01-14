@@ -7,10 +7,7 @@ import PrivateRoute from './PrivateRoute';
 import SMTPSettings from './SMTPSettings';
 import './index.css';
 
-const backendUrl =
-  window.location.hostname === 'localhost'
-    ? 'http://localhost:5500'
-    : `http://${window.location.hostname}:5500`;
+const backendUrl = window.APP_CONFIG?.backendUrl || 'http://localhost:5000';
 
 ReactDOM.render(
   <React.StrictMode>

@@ -4,63 +4,61 @@ from . import app, db
 from .config import Config
 from .database import init_db
 import os
+import time
+from werkzeug.utils import secure_filename
+from sqlalchemy import exc
+
+def wait_for_db(max_retries=5, delay=2):
+    """Attend que la base de données soit disponible"""
+    for attempt in range(max_retries):
+        try:
+            # Tente de se connecter à la base de données
+            db.engine.connect()
+            app.logger.info("Connexion à la base de données établie avec succès")
+            return True
+        except exc.OperationalError as e:
+            if attempt < max_retries - 1:
+                app.logger.warning(f"Tentative {attempt + 1}/{max_retries} échouée. Nouvelle tentative dans {delay} secondes...")
+                time.sleep(delay)
+                delay *= 2  # Augmente le délai entre chaque tentative
+            else:
+                app.logger.error("Impossible de se connecter à la base de données après plusieurs tentatives")
+                raise
+    return False
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     
-    # Initialiser les extensions
-    init_db(app)
-    CORS(app, supports_credentials=True)
+    # Configuration CORS centralisée
+    CORS(app, resources={
+        r"/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"]
+        }
+    })
     
-    # Créer les tables au démarrage
+    # Initialiser la base de données
+    init_db(app)
+    
+    # Attendre que la base de données soit disponible
     with app.app_context():
-        db.create_all()
-        app.logger.info("Base de données initialisée avec succès")
+        wait_for_db()
+        try:
+            db.create_all()
+            app.logger.info("Base de données initialisée avec succès")
+        except Exception as e:
+            app.logger.error(f"Erreur lors de l'initialisation de la base de données: {e}")
+            raise
     
     return app
 
 # Créer l'application
 app = create_app()
 
-@app.after_request
-def add_cors_headers(response):
-    """
-    Ajouter les headers CORS à toutes les réponses.
-    """
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE, PATCH')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
-    return response
-
-@app.route('/upload', methods=['POST', 'OPTIONS'])
-def upload_file():
-    try:
-        if request.method == 'OPTIONS':  # Pré-demande CORS
-            return jsonify({'message': 'CORS preflight success'}), 200
-
-        # Récupérer le fichier de la requête
-        file = request.files.get('file')
-        if not file:
-            raise ValueError("Aucun fichier envoyé.")
-
-        # Log du fichier reçu pour debug
-        app.logger.info(f"Nom du fichier reçu : {file.filename}")
-
-        # Sauvegarder le fichier dans le dossier uploads
-        upload_dir = '/app/uploads'
-        if not os.path.exists(upload_dir):
-            os.makedirs(upload_dir)
-
-        upload_path = os.path.join(upload_dir, file.filename)
-        file.save(upload_path)
-
-        return jsonify({"message": f"Fichier {file.filename} reçu avec succès"}), 201
-
-    except Exception as e:
-        app.logger.error(f"Erreur lors de l'upload : {e}")
-        return jsonify({"error": str(e)}), 400
+# Importer les routes après la création de l'application
+from . import routes
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
