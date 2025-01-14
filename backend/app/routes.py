@@ -143,13 +143,11 @@ def upload_file():
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
 
-
         safe_filename = secure_filename(file.filename)
         upload_path = os.path.join(upload_dir, safe_filename)
 
         sanitized_filename = secure_filename(file.filename)
         upload_path = os.path.join(upload_dir, sanitized_filename)
-
         with open(upload_path, 'wb') as f:
             f.write(file_content)
 
