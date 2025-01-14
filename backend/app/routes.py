@@ -127,45 +127,34 @@ def upload_file():
 
     try:
         file = request.files.get('file')
-        recipient_email = request.form.get('email')  # Récupérer l'email du formulaire
+        recipient_email = request.form.get('email')
         sender_email = request.form.get('sender_email')
 
         if not file or not recipient_email or not sender_email:
             return jsonify({'error': 'Fichier ou email manquant'}), 400
 
         file_id = str(uuid.uuid4())
-        file_content = file.read()
-        encrypted_data = hashlib.sha256(file_content).hexdigest()
-
-        # Ajout de la logique pour sauvegarder le fichier
+        
+        # Sauvegarder le fichier
         upload_dir = '/app/uploads'
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
 
-        upload_path = os.path.join(upload_dir, file.filename)
+        upload_path = os.path.join(upload_dir, file_id)  # Utiliser file_id comme nom de fichier
+        file.save(upload_path)
         
-        # Sauvegarder le fichier
-        with open(upload_path, 'wb') as f:
-            f.write(file_content)
+        # Calculer le hash du fichier
+        with open(upload_path, 'rb') as f:
+            file_content = f.read()
+            encrypted_data = hashlib.sha256(file_content).hexdigest()
 
         # Créer l'entrée dans la base de données
-        new_file = FileUpload(
-            id=file_id,
-            filename=file.filename,
-            email=recipient_email,
-            sender_email=sender_email,
-            encrypted_data=encrypted_data
+        cursor = db.cursor()
+        cursor.execute(
+            'INSERT INTO file_upload (id, filename, recipient_email, sender_email, encrypted_data, downloaded) VALUES (%s, %s, %s, %s, %s, %s)',
+            (file_id, file.filename, recipient_email, sender_email, encrypted_data, False)
         )
-
-        try:
-            db.session.add(new_file)
-            db.session.commit()
-        except Exception as db_error:
-            app.logger.error(f"Erreur base de données : {str(db_error)}")
-            # Supprimer le fichier en cas d'erreur
-            if os.path.exists(upload_path):
-                os.remove(upload_path)
-            raise db_error
+        db.commit()
 
         # Charger la configuration SMTP
         config_file_path = '/app/data/smtp_config.json'
@@ -182,28 +171,18 @@ def upload_file():
         if not recipient_notified or not sender_notified:
             return jsonify({'warning': 'Fichier uploadé mais problème avec les notifications'}), 200
             
-        response_data = {
+        return jsonify({
+            'success': True,
             'file_id': file_id,
-            'message': 'Fichier reçu avec succès',
-            'email_sent': True
-        }
-
-        response = jsonify(response_data)
-        response.headers.add("Access-Control-Allow-Origin", '*')
-        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-        return response, 201
+            'message': 'Fichier uploadé avec succès'
+        }), 200
 
     except Exception as e:
         app.logger.error(f"Erreur lors de l'upload : {str(e)}")
-        # Si une erreur survient, on s'assure de nettoyer le fichier s'il existe
+        # Nettoyer le fichier en cas d'erreur
         if 'upload_path' in locals() and os.path.exists(upload_path):
             os.remove(upload_path)
-        response = jsonify({'error': 'Erreur lors de l\'upload. Veuillez vérifier que l\'email est valide et réessayer.'})
-        response.headers.add("Access-Control-Allow-Origin", '*')
-        response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        response.headers.add("Access-Control-Allow-Headers", "Content-Type")
-        return response, 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/save-smtp-settings', methods=['POST', 'OPTIONS'])
 def save_smtp_settings():
