@@ -2,9 +2,9 @@ services:
   frontend:
     image: tiritibambix/itransfer-frontend
     environment:
-      - BACKEND_URL=https://api.itransfer.domain.com # Production API URL
+      - BACKEND_URL=https://api.itransfer.domain.com  # Production API URL
     ports:
-      - "3500:80" # Production port
+      - "3500:80"                                    # Can be changed to any port
     depends_on:
       - backend
     networks:
@@ -13,12 +13,12 @@ services:
   backend:
     image: tiritibambix/itransfer-backend
     ports:
-      - "5500:5000" # backend port
+      - "5500:5000"                                  # Can be changed to any port
     environment:
-      - FRONTEND_URL=https://itransfer.domain.com # Production frontend URL
+      - FRONTEND_URL=https://itransfer.domain.com    # Production frontend URL
       - ADMIN_USERNAME=adminuser
       - ADMIN_PASSWORD=adminuserpassword
-      - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
+      - DATABASE_URL=mysql+mysqldb://itransfer:itransfer@db/itransfer
     volumes:
       - ./backend/data:/app/data
       - ./uploads:/app/uploads
@@ -29,14 +29,12 @@ services:
       - itransfer-network
 
   db:
-    image: mariadb
+    image: mariadb:10.6
     environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: mariadb_db
-      MYSQL_USER: mariadb_user
-      MYSQL_PASSWORD: mariadb_pass
-    ports:
-      - "3306:3306"
+      - MYSQL_ROOT_PASSWORD=root_password
+      - MYSQL_DATABASE=itransfer
+      - MYSQL_USER=itransfer
+      - MYSQL_PASSWORD=itransfer
     volumes:
       - ./db_data:/var/lib/mysql
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
