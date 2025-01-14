@@ -114,6 +114,11 @@ networks:
 
 The project uses several environment variables configurable in `docker-compose.yml`:
 
+#### Frontend
+- `BACKEND_URL`: Backend URL (default: http://localhost:5500)
+  - For local development: use `http://localhost:PORT` where PORT matches your backend port
+  - For production: use your domain (e.g., `https://api.yourdomain.com`)
+
 #### Backend
 - `FRONTEND_URL`: Frontend URL (default: http://localhost:3500)
 - `ADMIN_USERNAME`: Admin username
@@ -125,6 +130,28 @@ The project uses several environment variables configurable in `docker-compose.y
 - `MYSQL_DATABASE`: Database name
 - `MYSQL_USER`: MariaDB user
 - `MYSQL_PASSWORD`: MariaDB user password
+
+### Port Configuration
+
+The application uses several ports that can be configured in `docker-compose.yml`:
+
+```yaml
+frontend:
+  ports:
+    - "3500:80"    # Change 3500 to your desired frontend port
+
+backend:
+  ports:
+    - "5500:5000"  # Change 5500 to your desired backend port
+    # Important: Make sure BACKEND_URL matches this port in local development
+```
+
+Remember to update the `BACKEND_URL` environment variable to match your backend port:
+```yaml
+frontend:
+  environment:
+    - BACKEND_URL=http://localhost:5500  # Match your backend port here
+```
 
 ## Usage
 

@@ -1,6 +1,8 @@
 services:
   frontend:
     image: tiritibambix/itransfer-frontend
+    environment:
+      - BACKEND_URL=http://localhost:5500 # match backend port or enter domain
     ports:
       - "3500:80"
     depends_on:
@@ -11,7 +13,7 @@ services:
   backend:
     image: tiritibambix/itransfer-backend
     ports:
-      - "5500:5000"
+      - "5500:5000" # backend port
     environment:
       - FRONTEND_URL=http://localhost:3500
       - ADMIN_USERNAME=adminuser
