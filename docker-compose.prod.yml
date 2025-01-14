@@ -2,7 +2,7 @@ services:
   frontend:
     image: tiritibambix/itransfer-frontend
     environment:
-      - BACKEND_URL=https://api.itransfer.domaine.com # Production API URL
+      - BACKEND_URL=https://api.itransfer.domain.com # Production API URL
     ports:
       - "3500:80" # Production port
     depends_on:
@@ -13,9 +13,9 @@ services:
   backend:
     image: tiritibambix/itransfer-backend
     ports:
-      - "4434:5000" # backend port
+      - "5500:5000" # backend port
     environment:
-      - FRONTEND_URL=https://itransfer.domaine.com # Production frontend URL
+      - FRONTEND_URL=https://itransfer.domain.com # Production frontend URL
       - ADMIN_USERNAME=adminuser
       - ADMIN_PASSWORD=adminuserpassword
       - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
