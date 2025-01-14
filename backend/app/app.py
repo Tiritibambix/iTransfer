@@ -10,30 +10,31 @@ def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
     
-    # Initialiser les extensions
+    # Configuration CORS centralisée
+    CORS(app, resources={
+        r"/*": {
+            "origins": "*",
+            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+            "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"]
+        }
+    })
+    
+    # Initialiser la base de données
     init_db(app)
-    CORS(app, supports_credentials=True)
     
     # Créer les tables au démarrage
     with app.app_context():
-        db.create_all()
-        app.logger.info("Base de données initialisée avec succès")
-    
+        try:
+            db.create_all()
+            app.logger.info("Base de données initialisée avec succès")
+        except Exception as e:
+            app.logger.error(f"Erreur lors de l'initialisation de la base de données: {e}")
+            raise
+        
     return app
 
 # Créer l'application
 app = create_app()
-
-@app.after_request
-def add_cors_headers(response):
-    """
-    Ajouter les headers CORS à toutes les réponses.
-    """
-    response.headers.add('Access-Control-Allow-Origin', '*')
-    response.headers.add('Access-Control-Allow-Credentials', 'true')
-    response.headers.add('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, DELETE, PATCH')
-    response.headers.add('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
-    return response
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
