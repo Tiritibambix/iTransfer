@@ -4,6 +4,7 @@ from . import app, db
 from .config import Config
 from .database import init_db
 import os
+from werkzeug.utils import secure_filename
 
 def create_app():
     app = Flask(__name__)
@@ -53,7 +54,8 @@ def upload_file():
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
 
-        upload_path = os.path.join(upload_dir, file.filename)
+        safe_filename = secure_filename(file.filename)
+        upload_path = os.path.join(upload_dir, safe_filename)
         file.save(upload_path)
 
         return jsonify({"message": f"Fichier {file.filename} reçu avec succès"}), 201
