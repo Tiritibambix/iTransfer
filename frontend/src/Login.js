@@ -8,8 +8,10 @@ const Login = ({ backendUrl }) => {
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = async (e) => {
-    e.preventDefault(); // Empêcher le rechargement de la page
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (isLoading) return;
+    
     setIsLoading(true);
     setError('');
 
@@ -34,27 +36,6 @@ const Login = ({ backendUrl }) => {
     }
   };
 
-  const InputField = ({ type, placeholder, value, onChange }) => (
-    <input
-      type={type}
-      placeholder={placeholder}
-      value={value}
-      onChange={onChange}
-      style={{
-        width: '100%',
-        padding: '12px',
-        marginBottom: '1rem',
-        backgroundColor: 'var(--clr-surface-a20)',
-        color: 'var(--clr-primary-a50)',
-        border: '1px solid var(--clr-surface-a30)',
-        borderRadius: '6px',
-        fontSize: '1rem',
-        transition: 'all 0.3s ease',
-        outline: 'none'
-      }}
-    />
-  );
-
   return (
     <div style={{
       display: 'flex',
@@ -62,19 +43,19 @@ const Login = ({ backendUrl }) => {
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: '100vh',
-      padding: '2rem'
+      padding: '1rem'
     }}>
       <div style={{
-        width: '100%',
-        maxWidth: '400px',
+        width: '90%',
+        maxWidth: '320px',
         backgroundColor: 'var(--clr-surface-a10)',
-        padding: '2.5rem',
+        padding: '2rem',
         borderRadius: '12px',
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
       }}>
         <h1 style={{
-          fontSize: '2.5rem',
-          marginBottom: '2rem',
+          fontSize: '2rem',
+          marginBottom: '1.5rem',
           textAlign: 'center',
           background: 'linear-gradient(45deg, var(--clr-primary-a40), var(--clr-primary-a30))',
           WebkitBackgroundClip: 'text',
@@ -83,35 +64,58 @@ const Login = ({ backendUrl }) => {
           iTransfer
         </h1>
 
-        <form onSubmit={handleLogin} style={{ marginBottom: '1.5rem' }}>
-          <InputField
-            type="text"
-            placeholder="Nom d'utilisateur"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-          />
-          <InputField
-            type="password"
-            placeholder="Mot de passe"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
+        <form onSubmit={handleSubmit} style={{ marginBottom: '1.5rem' }}>
+          <div style={{ marginBottom: '1rem' }}>
+            <input
+              type="text"
+              placeholder="Nom d'utilisateur"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                backgroundColor: 'var(--clr-surface-a20)',
+                color: 'var(--clr-primary-a50)',
+                border: '1px solid var(--clr-surface-a30)',
+                borderRadius: '6px',
+                fontSize: '0.9rem',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
+
+          <div style={{ marginBottom: '1.5rem' }}>
+            <input
+              type="password"
+              placeholder="Mot de passe"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '0.75rem',
+                backgroundColor: 'var(--clr-surface-a20)',
+                color: 'var(--clr-primary-a50)',
+                border: '1px solid var(--clr-surface-a30)',
+                borderRadius: '6px',
+                fontSize: '0.9rem',
+                boxSizing: 'border-box'
+              }}
+            />
+          </div>
 
           <button
             type="submit"
             disabled={isLoading}
             style={{
               width: '100%',
-              padding: '1rem',
-              fontSize: '1.1rem',
+              padding: '0.75rem',
+              fontSize: '1rem',
               backgroundColor: 'var(--clr-primary-a30)',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
-              cursor: 'pointer',
-              transition: 'all 0.3s ease',
-              opacity: isLoading ? 0.7 : 1,
-              marginTop: '1rem'
+              cursor: isLoading ? 'wait' : 'pointer',
+              opacity: isLoading ? 0.7 : 1
             }}
           >
             {isLoading ? 'Connexion...' : 'Se connecter'}
@@ -120,13 +124,13 @@ const Login = ({ backendUrl }) => {
 
         {error && (
           <div style={{
-            padding: '1rem',
+            padding: '0.75rem',
             backgroundColor: 'rgba(255, 0, 0, 0.1)',
             color: '#f44336',
             border: '1px solid #f44336',
             borderRadius: '6px',
             textAlign: 'center',
-            fontSize: '0.9rem'
+            fontSize: '0.85rem'
           }}>
             {error}
           </div>
