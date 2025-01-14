@@ -3,9 +3,6 @@ services:
     image: tiritibambix/itransfer-frontend
     ports:
       - "3500:80"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
     depends_on:
       - backend
     networks:
