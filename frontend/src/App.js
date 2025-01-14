@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-function App() {
+function App({ backendUrl }) {
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
   const [recipientEmail, setRecipientEmail] = useState('');
@@ -9,9 +9,6 @@ function App() {
   const [dragActive, setDragActive] = useState(false);
   const xhrRef = useRef(null);
   const fileInputRef = useRef(null);
-
-  // Utiliser les variables d'environnement pour l'URL de l'API
-  const backendUrl = process.env.REACT_APP_BACKEND_URL || '/api';
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];

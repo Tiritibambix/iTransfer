@@ -28,14 +28,8 @@ def wait_for_db(max_retries=5, delay=2):
 
 def create_app():
     app = Flask(__name__)
-    app.config.from_object('app.config')
-
-    # Support for proxy
-    app.config['PREFERRED_URL_SCHEME'] = 'https'
-    if app.config.get('BEHIND_PROXY', False):
-        from werkzeug.middleware.proxy_fix import ProxyFix
-        app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
-
+    app.config.from_object(Config)
+    
     # Configuration CORS centralisée
     CORS(app, resources={
         r"/*": {

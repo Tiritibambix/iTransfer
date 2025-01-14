@@ -34,13 +34,6 @@ class Config:
     # Configuration SMTP
     SMTP_CONFIG_PATH = os.environ.get('SMTP_CONFIG_PATH') or os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'smtp_config.json')
     
-    # Configuration du proxy
-    BEHIND_PROXY = os.environ.get('BEHIND_PROXY', 'True').lower() == 'true'
-    PREFERRED_URL_SCHEME = os.environ.get('PREFERRED_URL_SCHEME', 'https')
-    
-    # CORS settings
-    CORS_ORIGINS = os.environ.get('CORS_ORIGINS', '*')
-    
     @staticmethod
     def init_app(app):
         """Initialize application configuration"""

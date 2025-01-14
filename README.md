@@ -1,166 +1,18 @@
 # iTransfer
 
-Application de transfert de fichiers sécurisée
+A simple file transfer application with web interface, secure backend, and email notifications.
 
-## Configuration Docker
+JUST FOR LOCAL USE FOR NOW. Will work on reverse proxying soon.
 
-### 1. Configuration locale (développement)
+## Features
 
-```yaml
-# docker-compose.yml
-version: '3.8'
-
-services:
-  frontend:
-    build: ./frontend
-    environment:
-      - REACT_APP_API_URL=http://localhost:5000
-    ports:
-      - "3000:3000"
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-
-  backend:
-    build: ./backend
-    environment:
-      - FLASK_ENV=development
-      - FLASK_APP=app
-      - DATABASE_URL=postgresql://user:password@db:5432/itransfer
-      - BEHIND_PROXY=False
-      - CORS_ORIGINS=http://localhost:3000
-    ports:
-      - "5000:5000"
-    volumes:
-      - ./backend:/app
-    depends_on:
-      - db
-
-  db:
-    image: postgres:13
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=itransfer
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-volumes:
-  postgres_data:
-```
-
-Pour lancer l'application en local :
-```bash
-docker-compose up --build
-```
-
-L'application sera accessible sur :
-- Frontend : http://localhost:3000
-- Backend : http://localhost:5000
-
-### 2. Configuration avec Nginx Proxy Manager (production)
-
-```yaml
-# docker-compose.prod.yml
-version: '3.8'
-
-services:
-  frontend:
-    build: 
-      context: ./frontend
-      args:
-        - REACT_APP_API_URL=/api  # Le backend sera accessible via /api
-    environment:
-      - NODE_ENV=production
-    restart: unless-stopped
-    networks:
-      - npm_network
-
-  backend:
-    build: ./backend
-    environment:
-      - FLASK_ENV=production
-      - FLASK_APP=app
-      - DATABASE_URL=postgresql://user:password@db:5432/itransfer
-      - BEHIND_PROXY=True
-      - PREFERRED_URL_SCHEME=https
-      - CORS_ORIGINS=https://itransfer.votredomaine.com
-    restart: unless-stopped
-    networks:
-      - npm_network
-    depends_on:
-      - db
-
-  db:
-    image: postgres:13
-    environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password
-      - POSTGRES_DB=itransfer
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    restart: unless-stopped
-    networks:
-      - npm_network
-
-networks:
-  npm_network:
-    external: true  # Ce réseau doit être créé manuellement et partagé avec NPM
-
-volumes:
-  postgres_data:
-```
-
-#### Configuration de Nginx Proxy Manager
-
-1. Créez d'abord le réseau Docker partagé :
-```bash
-docker network create npm_network
-```
-
-2. Dans l'interface de NPM, créez un nouveau "Proxy Host" :
-   - Domain: itransfer.votredomaine.com
-   - Scheme: https
-   - Forward Hostname: frontend
-   - Forward Port: 3000
-   - Configuration personnalisée :
-   ```nginx
-   location /api/ {
-       proxy_pass http://backend:5000/;
-       proxy_http_version 1.1;
-       proxy_set_header Upgrade $http_upgrade;
-       proxy_set_header Connection 'upgrade';
-       proxy_set_header Host $host;
-       proxy_cache_bypass $http_upgrade;
-       proxy_set_header X-Real-IP $remote_addr;
-       proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-       proxy_set_header X-Forwarded-Proto $scheme;
-   }
-   ```
-
-3. Activez SSL pour votre domaine dans NPM
-
-4. Lancez l'application :
-```bash
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-L'application sera accessible sur :
-- https://itransfer.votredomaine.com
-
-### Notes importantes
-
-1. En production :
-   - Changez les identifiants de base de données
-   - Utilisez des secrets Docker pour les mots de passe
-   - Configurez correctement les pare-feu
-   - Activez les sauvegardes de la base de données
-
-2. Pour la mise à jour :
-```bash
-docker-compose -f docker-compose.prod.yml pull
-docker-compose -f docker-compose.prod.yml up -d --build
-```
+- Responsive user interface
+- File upload with progress bar
+- Automatic email notifications for both sender and recipient
+- Secure admin interface
+- REST API backend
+- Easy deployment with Docker
+- File management with MariaDB database
 
 ## Prerequisites
 
@@ -194,7 +46,6 @@ CREATE TABLE IF NOT EXISTS file_upload (
 ```bash
 docker-compose up -d
 ```
-
 ## [docker-compose.yml](https://github.com/tiritibambix/iTransfer/blob/main/docker-compose.yml)
 
 Set up the database initialization file:
@@ -301,29 +152,29 @@ iTransfer/
 ├── LICENSE
 ├── README.md
 ├── backend
-|      ├── Dockerfile
-|      ├── app
-|      |      ├── __init__.py
-|      |      ├── app.py
-|      |      ├── config.py
-|      |      ├── models.py
-|      |      ├── routes.py
-|      ├── entrypoint.sh
-|      ├── init.sql
-|      ├── run.py
+|     ├── Dockerfile
+|     ├── app
+|     |     ├── __init__.py
+|     |     ├── app.py
+|     |     ├── config.py
+|     |     ├── models.py
+|     |     ├── routes.py
+|     ├── entrypoint.sh
+|     ├── init.sql
+|     ├── run.py
 ├── docker-compose.yml
 ├── frontend
-|      ├── Dockerfile
-|      ├── package.json
-|      ├── public
-|      |      ├── index.html
-|      ├── src
-|      |      ├── App.js
-|      |      ├── Login.js
-|      |      ├── PrivateRoute.js
-|      |      ├── SMTPSettings.js
-|      |      ├── index.css
-|      |      ├── index.js
+|     ├── Dockerfile
+|     ├── package.json
+|     ├── public
+|     |     ├── index.html
+|     ├── src
+|     |     ├── App.js
+|     |     ├── Login.js
+|     |     ├── PrivateRoute.js
+|     |     ├── SMTPSettings.js
+|     |     ├── index.css
+|     |     ├── index.js
 ├── requirements.txt
 ```
 
