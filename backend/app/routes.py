@@ -4,6 +4,7 @@ import hashlib
 import smtplib
 import json
 from flask import request, jsonify, send_file
+from werkzeug.utils import secure_filename
 from . import app, db
 from .models import FileUpload
 
@@ -142,7 +143,10 @@ def upload_file():
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
 
-        upload_path = os.path.join(upload_dir, file.filename)
+        sanitized_filename = secure_filename(file.filename)
+        upload_path = os.path.normpath(os.path.join(upload_dir, sanitized_filename))
+        if not upload_path.startswith(upload_dir):
+            raise Exception("Invalid file path")
         with open(upload_path, 'wb') as f:
             f.write(file_content)
 
