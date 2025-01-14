@@ -29,12 +29,13 @@ services:
       - itransfer-network
 
   db:
-    image: mariadb:10.6
+    image: mariadb
     environment:
-      - MYSQL_ROOT_PASSWORD=root_password
-      - MYSQL_DATABASE=itransfer
-      - MYSQL_USER=itransfer
-      - MYSQL_PASSWORD=itransfer
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: itransfer
+      MYSQL_USER: itransfer
+      MYSQL_PASSWORD: itransfer
+      MYSQL_ROOT_HOST: '%'          # Permettre à root de se connecter depuis n'importe où
     ports:
       - "3306:3306"                     # Exposed for local development
     volumes:

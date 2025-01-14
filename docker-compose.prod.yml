@@ -15,13 +15,13 @@ services:
     ports:
       - "5500:5000"                                  # Can be changed to any port
     environment:
-      - FRONTEND_URL=https://itransfer.domain.com    # Production frontend URL
+      - FRONTEND_URL=https://domain.com   # Production frontend URL
       - ADMIN_USERNAME=adminuser
       - ADMIN_PASSWORD=adminuserpassword
-      - DATABASE_URL=mysql+mysqldb://itransfer:itransfer@db/itransfer
+      - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
     volumes:
-      - ./backend/data:/app/data
-      - ./uploads:/app/uploads
+      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer//backend/data:/app/data
+      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer//uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -29,21 +29,22 @@ services:
       - itransfer-network
 
   db:
-    image: mariadb:10.6
+    image: mariadb
     environment:
-      - MYSQL_ROOT_PASSWORD=root_password
-      - MYSQL_DATABASE=itransfer
-      - MYSQL_USER=itransfer
-      - MYSQL_PASSWORD=itransfer
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: mariadb_db
+      MYSQL_USER: mariadb_user
+      MYSQL_PASSWORD: mariadb_pass
+      MYSQL_ROOT_HOST: '%'          # Permettre à root de se connecter depuis n'importe où
     volumes:
-      - ./db_data:/var/lib/mysql
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer//db_data:/var/lib/mysql
+      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer//backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./init-privileges.sql:/docker-entrypoint-initdb.d/init-privileges.sql  # Nouveau fichier pour les privilèges
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD || echo 'Healthcheck failed' >> /var/log/healthcheck.log"]
       interval: 10s
       timeout: 5s
       retries: 3
-      start_period: 30s
     networks:
       - itransfer-network
 
