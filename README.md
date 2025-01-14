@@ -2,6 +2,8 @@
 
 A simple file transfer application with web interface, secure backend, and email notifications.
 
+JUST FOR LOCAL USE FOR NOW. Will work on reverse proxying soon.
+
 ## Features
 
 - Responsive user interface
