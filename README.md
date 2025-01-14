@@ -85,10 +85,43 @@ backend:
 
 ### Port Configuration
 
-The application uses consistent ports across environments:
-- Frontend: Always runs on port 3500 (mapped to container port 80)
-- Backend: Always runs on port 5500 (mapped to container port 5000)
-- Database: Port 3306 (exposed in local development only)
+The application uses configurable ports that can be set in the docker-compose files:
+- Frontend: Container port 80, mapped to any external port (default: 3500)
+- Backend: Container port 5000, mapped to any external port (default: 5500)
+- Database: Container port 3306, mapped to any external port (exposed in local development only)
+
+Example with different ports:
+```yaml
+frontend:
+  ports:
+    - "8080:80"    # Map frontend to port 8080
+
+backend:
+  ports:
+    - "9000:5000"  # Map backend to port 9000
+```
+
+Remember to update the environment variables to match your chosen ports:
+```yaml
+frontend:
+  environment:
+    - BACKEND_URL=http://localhost:9000  # Match your backend port
+
+backend:
+  environment:
+    - FRONTEND_URL=http://localhost:8080  # Match your frontend port
+```
+
+For production, use your domains instead of ports:
+```yaml
+frontend:
+  environment:
+    - BACKEND_URL=https://api.yourdomain.com  # No port needed with reverse proxy
+
+backend:
+  environment:
+    - FRONTEND_URL=https://yourdomain.com     # No port needed with reverse proxy
+```
 
 ### Switching Between Environments
 
@@ -216,24 +249,42 @@ The project uses several environment variables configurable in `docker-compose.y
 
 ### Port Configuration
 
-The application uses several ports that can be configured in `docker-compose.yml`:
+The application uses configurable ports that can be set in the docker-compose files:
+- Frontend: Container port 80, mapped to any external port (default: 3500)
+- Backend: Container port 5000, mapped to any external port (default: 5500)
+- Database: Container port 3306, mapped to any external port (exposed in local development only)
 
+Example with different ports:
 ```yaml
 frontend:
   ports:
-    - "3500:80"    # Change 3500 to your desired frontend port
+    - "8080:80"    # Map frontend to port 8080
 
 backend:
   ports:
-    - "5500:5000"  # Change 5500 to your desired backend port
-    # Important: Make sure BACKEND_URL matches this port in local development
+    - "9000:5000"  # Map backend to port 9000
 ```
 
-Remember to update the `BACKEND_URL` environment variable to match your backend port:
+Remember to update the environment variables to match your chosen ports:
 ```yaml
 frontend:
   environment:
-    - BACKEND_URL=http://localhost:5500  # Match your backend port here
+    - BACKEND_URL=http://localhost:9000  # Match your backend port
+
+backend:
+  environment:
+    - FRONTEND_URL=http://localhost:8080  # Match your frontend port
+```
+
+For production, use your domains instead of ports:
+```yaml
+frontend:
+  environment:
+    - BACKEND_URL=https://api.yourdomain.com  # No port needed with reverse proxy
+
+backend:
+  environment:
+    - FRONTEND_URL=https://yourdomain.com     # No port needed with reverse proxy
 ```
 
 ## Usage
