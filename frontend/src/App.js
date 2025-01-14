@@ -5,6 +5,7 @@ function App({ backendUrl }) {
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
   const [recipientEmail, setRecipientEmail] = useState('');
+  const [senderEmail, setSenderEmail] = useState('');
   const xhrRef = useRef(null);
 
   const handleFileUpload = (event) => {
@@ -17,9 +18,11 @@ function App({ backendUrl }) {
     const formData = new FormData();
     formData.append('file', file);
     formData.append('email', recipientEmail);
+    formData.append('senderEmail', senderEmail);
 
     console.log('Fichier à envoyer :', file);
     console.log('Email du destinataire :', recipientEmail);
+    console.log('Email de l\'expéditeur :', senderEmail);
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${backendUrl}/upload`, true);
@@ -69,6 +72,10 @@ function App({ backendUrl }) {
     setRecipientEmail(event.target.value);
   };
 
+  const handleSenderEmailChange = (event) => {
+    setSenderEmail(event.target.value);
+  };
+
   const handleUpload = () => {
     const fileInput = document.querySelector('input[type="file"]');
     if (fileInput.files.length > 0) {
@@ -80,6 +87,7 @@ function App({ backendUrl }) {
     <div>
       <button className="btn" style={{ float: 'right' }} onClick={() => navigate('/smtp-settings')}>Paramètres</button>
       <h1>iTransfer</h1>
+      <input type="email" className="btn" value={senderEmail} onChange={handleSenderEmailChange} placeholder="Email de l'expéditeur" />
       <input type="email" className="btn" value={recipientEmail} onChange={handleRecipientEmailChange} placeholder="Email du destinataire" />
       <input type="file" className="btn" />
       <button className="btn" onClick={handleUpload}>Upload</button>

@@ -126,6 +126,46 @@ Content-Type: text/plain; charset=utf-8
             except Exception:
                 pass
 
+def send_confirmation_email(to_email, filename):
+    try:
+        # Charger la configuration SMTP
+        config_file_path = '/app/data/smtp_config.json'
+        if not os.path.exists(config_file_path):
+            app.logger.error(f"Fichier de configuration SMTP introuvable : {config_file_path}")
+            return False
+
+        with open(config_file_path, 'r') as config_file:
+            smtp_config = json.load(config_file)
+
+        # Configurer le message de confirmation
+        message = f"""
+        Bonjour,
+
+        Votre fichier '{filename}' a été téléchargé avec succès par le destinataire.
+
+        Cordialement,
+        L'équipe iTransfer
+        """
+
+        # Préparer l'email
+        email_message = f"""From: {smtp_config['smtp_sender_email']}
+To: {to_email}
+Subject: Confirmation de téléchargement de fichier
+Content-Type: text/plain; charset=utf-8
+
+{message}"""
+
+        # Envoyer l'email
+        server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
+        server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'].strip())
+        server.sendmail(smtp_config['smtp_sender_email'], to_email, email_message.encode('utf-8'))
+        server.quit()
+        return True
+
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'envoi de l'email de confirmation : {str(e)}")
+        return False
+
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
     if request.method == 'OPTIONS':  # Gérer la pré-demande CORS
@@ -138,12 +178,16 @@ def upload_file():
     try:
         file = request.files.get('file')
         recipient_email = request.form.get('email')  # Récupérer l'email du formulaire
+        sender_email = request.form.get('senderEmail')  # Récupérer l'email de l'expéditeur
 
         if not file:
             return jsonify({'error': 'Fichier requis'}), 400
 
         if not recipient_email:
             return jsonify({'error': 'Email du destinataire requis'}), 400
+
+        if not sender_email:
+            return jsonify({'error': 'Email de l\'expéditeur requis'}), 400
 
         file_id = str(uuid.uuid4())
         file_content = file.read()
@@ -183,6 +227,9 @@ def upload_file():
             email_sent = send_email(recipient_email, file_id, file.filename)
             if not email_sent:
                 app.logger.error("L'envoi de l'email a échoué")
+            else:
+                # Envoyer un email de confirmation à l'expéditeur
+                send_confirmation_email(sender_email, file.filename)
         except Exception as email_error:
             app.logger.error(f"Erreur lors de l'envoi de l'email : {str(email_error)}")
             email_sent = False
