@@ -118,7 +118,7 @@ def send_sender_download_notification(to_email, filename, smtp_config):
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
-    if request.method == 'OPTIONS':  # Gérer la pré-demande CORS
+    if request.method == 'OPTIONS':
         response = jsonify({'message': 'CORS preflight success'})
         response.headers.add("Access-Control-Allow-Origin", '*')
         response.headers.add("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
@@ -127,32 +127,30 @@ def upload_file():
 
     try:
         file = request.files.get('file')
-        recipient_email = request.form.get('email')
+        email = request.form.get('email')
         sender_email = request.form.get('sender_email')
 
-        if not file or not recipient_email or not sender_email:
+        if not file or not email or not sender_email:
             return jsonify({'error': 'Fichier ou email manquant'}), 400
 
         file_id = str(uuid.uuid4())
-        
+        file_content = file.read()
+        encrypted_data = hashlib.sha256(file_content).hexdigest()
+
         # Sauvegarder le fichier
         upload_dir = '/app/uploads'
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
 
-        upload_path = os.path.join(upload_dir, file_id)  # Utiliser file_id comme nom de fichier
-        file.save(upload_path)
-        
-        # Calculer le hash du fichier
-        with open(upload_path, 'rb') as f:
-            file_content = f.read()
-            encrypted_data = hashlib.sha256(file_content).hexdigest()
+        upload_path = os.path.join(upload_dir, file.filename)
+        with open(upload_path, 'wb') as f:
+            f.write(file_content)
 
-        # Créer l'entrée dans la base de données avec SQLAlchemy
+        # Créer l'entrée dans la base de données
         new_file = FileUpload(
             id=file_id,
             filename=file.filename,
-            recipient_email=recipient_email,
+            email=email,
             sender_email=sender_email,
             encrypted_data=encrypted_data,
             downloaded=False
@@ -176,12 +174,12 @@ def upload_file():
             smtp_config = json.load(config_file)
         
         # Envoyer les notifications
-        recipient_notified = send_recipient_notification(recipient_email, file_id, file.filename, smtp_config)
+        recipient_notified = send_recipient_notification(email, file_id, file.filename, smtp_config)
         sender_notified = send_sender_upload_confirmation(sender_email, file_id, file.filename, smtp_config)
         
         if not recipient_notified or not sender_notified:
             return jsonify({'warning': 'Fichier uploadé mais problème avec les notifications'}), 200
-            
+
         return jsonify({
             'success': True,
             'file_id': file_id,
@@ -190,14 +188,13 @@ def upload_file():
 
     except Exception as e:
         app.logger.error(f"Erreur lors de l'upload : {str(e)}")
-        # Nettoyer le fichier en cas d'erreur
         if 'upload_path' in locals() and os.path.exists(upload_path):
             os.remove(upload_path)
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/save-smtp-settings', methods=['POST', 'OPTIONS'])
 def save_smtp_settings():
-    if request.method == 'OPTIONS':  # Gérer la pré-demande CORS
+    if request.method == 'OPTIONS':
         response = jsonify({'message': 'CORS preflight success'})
         response.headers.add("Access-Control-Allow-Origin", '*')
         response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
@@ -269,17 +266,13 @@ def login():
 @app.route('/download/<file_id>', methods=['GET'])
 def download_file(file_id):
     try:
-        # Rechercher le fichier dans la base de données avec SQLAlchemy
-        file_upload = FileUpload.query.get(file_id)
+        file_upload = FileUpload.query.get_or_404(file_id)
         
-        if not file_upload:
-            return jsonify({'error': 'Fichier non trouvé'}), 404
-            
-        file_path = os.path.join('/app/uploads', file_id)
-        
+        # Vérifier si le fichier existe dans le système de fichiers
+        file_path = os.path.join('/app/uploads', file_upload.filename)
         if not os.path.exists(file_path):
             return jsonify({'error': 'Fichier non trouvé'}), 404
-            
+
         # Si le fichier n'a pas encore été marqué comme téléchargé
         if not file_upload.downloaded:
             # Marquer le fichier comme téléchargé
@@ -294,12 +287,14 @@ def download_file(file_id):
                 # Envoyer la notification à l'expéditeur
                 send_sender_download_notification(file_upload.sender_email, file_upload.filename, smtp_config)
         
+        # Envoyer le fichier
         return send_file(
             file_path,
             as_attachment=True,
-            download_name=file_upload.filename
+            download_name=file_upload.filename,
+            mimetype='application/octet-stream'
         )
-        
+
     except Exception as e:
         app.logger.error(f"Erreur lors du téléchargement : {str(e)}")
         return jsonify({'error': str(e)}), 500
