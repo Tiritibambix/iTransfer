@@ -1,0 +1,53 @@
+services:
+  frontend:
+    image: tiritibambix/itransfer-frontend
+    environment:
+      - BACKEND_URL=http://localhost:5500 # Local backend URL with port
+    ports:
+      - "3500:80" # Local frontend port
+    depends_on:
+      - backend
+    networks:
+      - itransfer-network
+
+  backend:
+    image: tiritibambix/itransfer-backend
+    ports:
+      - "5500:5000" # Local backend port
+    environment:
+      - FRONTEND_URL=http://localhost:3500 # Local frontend URL with port
+      - ADMIN_USERNAME=adminuser
+      - ADMIN_PASSWORD=adminuserpassword
+      - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
+    volumes:
+      - ./backend/data:/app/data
+      - ./uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - itransfer-network
+
+  db:
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: mariadb_db
+      MYSQL_USER: mariadb_user
+      MYSQL_PASSWORD: mariadb_pass
+    ports:
+      - "3306:3306" # Exposé en local pour le développement
+    volumes:
+      - ./db_data:/var/lib/mysql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - itransfer-network
+
+networks:
+  itransfer-network:
+    driver: bridge

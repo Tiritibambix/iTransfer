@@ -27,7 +27,100 @@ git clone https://github.com/tiritibambix/iTransfer.git
 cd iTransfer
 ```
 
-2. Set up the database initialization file:
+2. Choose your deployment mode:
+
+### Local Development
+Use `docker-compose.local.yml` for local development:
+```bash
+docker compose -f docker-compose.local.yml up -d
+```
+This will:
+- Start the frontend on http://localhost:3500
+- Start the backend on http://localhost:5500
+- Expose the database on port 3306 for development
+
+### Production
+Use `docker-compose.prod.yml` for production deployment:
+```bash
+docker compose -f docker-compose.prod.yml up -d
+```
+This requires:
+- A reverse proxy (like Nginx or Traefik) configured for:
+  - Frontend domain (e.g., itransfer.domain.com) on port 3500
+  - Backend domain (e.g., api.itransfer.domain.com) on port 5500
+- SSL certificates for both domains
+- DNS configuration for both domains
+
+### Configuration Files
+
+#### Local Development (`docker-compose.local.yml`)
+```yaml
+frontend:
+  environment:
+    - BACKEND_URL=http://localhost:5500  # Local backend URL
+  ports:
+    - "3500:80"                         # Local frontend port
+
+backend:
+  environment:
+    - FRONTEND_URL=http://localhost:3500 # Local frontend URL
+  ports:
+    - "5500:5000"                       # Local backend port
+```
+
+#### Production (`docker-compose.prod.yml`)
+```yaml
+frontend:
+  environment:
+    - BACKEND_URL=https://api.itransfer.domain.com  # Production API URL
+  ports:
+    - "3500:80"                                    # Production frontend port
+
+backend:
+  environment:
+    - FRONTEND_URL=https://itransfer.domain.com     # Production frontend URL
+  ports:
+    - "5500:5000"                                  # Production backend port
+```
+
+### Port Configuration
+
+The application uses consistent ports across environments:
+- Frontend: Always runs on port 3500 (mapped to container port 80)
+- Backend: Always runs on port 5500 (mapped to container port 5000)
+- Database: Port 3306 (exposed in local development only)
+
+### Switching Between Environments
+
+1. Stop the current environment:
+```bash
+# If running local
+docker compose -f docker-compose.local.yml down
+
+# If running production
+docker compose -f docker-compose.prod.yml down
+```
+
+2. Start the desired environment:
+```bash
+# For local development
+docker compose -f docker-compose.local.yml up -d
+
+# For production
+docker compose -f docker-compose.prod.yml up -d
+```
+
+### Reverse Proxy Configuration (Production)
+
+Your reverse proxy should be configured to:
+1. Forward traffic from itransfer.domain.com to frontend:80 (listening on port 3500)
+2. Forward traffic from api.itransfer.domain.com to backend:5000 (listening on port 5500)
+3. Handle SSL termination for both domains
+4. Forward the original protocol (HTTP/HTTPS) to the services
+
+## [docker-compose.yml](https://github.com/tiritibambix/iTransfer/blob/main/docker-compose.yml)
+
+Set up the database initialization file:
    - Either download [init.sql](https://github.com/tiritibambix/iTransfer/blob/main/backend/init.sql) and place it in `backend/init.sql`
    - Or create the file manually at `backend/init.sql` with the following content:
 ```sql
@@ -41,16 +134,6 @@ CREATE TABLE IF NOT EXISTS file_upload (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 ```
-
-3. Start the containers:
-```bash
-docker-compose up -d
-```
-## [docker-compose.yml](https://github.com/tiritibambix/iTransfer/blob/main/docker-compose.yml)
-
-Set up the database initialization file:
-   - Either download [init.sql](https://github.com/tiritibambix/iTransfer/blob/main/backend/init.sql) and place it in `backend/init.sql`
-   - Or create the file manually at `backend/init.sql`
 
 Then
 ```yaml
@@ -179,29 +262,29 @@ iTransfer/
 ├── LICENSE
 ├── README.md
 ├── backend
-|     ├── Dockerfile
-|     ├── app
-|     |     ├── __init__.py
-|     |     ├── app.py
-|     |     ├── config.py
-|     |     ├── models.py
-|     |     ├── routes.py
-|     ├── entrypoint.sh
-|     ├── init.sql
-|     ├── run.py
+|      ├── Dockerfile
+|      ├── app
+|      |      ├── __init__.py
+|      |      ├── app.py
+|      |      ├── config.py
+|      |      ├── models.py
+|      |      ├── routes.py
+|      ├── entrypoint.sh
+|      ├── init.sql
+|      ├── run.py
 ├── docker-compose.yml
 ├── frontend
-|     ├── Dockerfile
-|     ├── package.json
-|     ├── public
-|     |     ├── index.html
-|     ├── src
-|     |     ├── App.js
-|     |     ├── Login.js
-|     |     ├── PrivateRoute.js
-|     |     ├── SMTPSettings.js
-|     |     ├── index.css
-|     |     ├── index.js
+|      ├── Dockerfile
+|      ├── package.json
+|      ├── public
+|      |      ├── index.html
+|      ├── src
+|      |      ├── App.js
+|      |      ├── Login.js
+|      |      ├── PrivateRoute.js
+|      |      ├── SMTPSettings.js
+|      |      ├── index.css
+|      |      ├── index.js
 ├── requirements.txt
 ```
 
