@@ -228,7 +228,7 @@ def save_smtp_settings():
         return response, 200
     except Exception as e:
         app.logger.error(f"Erreur lors de la sauvegarde des paramètres SMTP : {e}")
-        response = jsonify({"error": str(e)})
+        response = jsonify({"error": "Une erreur interne est survenue."})
         response.headers.add("Access-Control-Allow-Origin", '*')
         response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
