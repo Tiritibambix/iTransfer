@@ -15,13 +15,13 @@ services:
     ports:
       - "5500:5000"                                  # Can be changed to any port
     environment:
-      - FRONTEND_URL=https://domain.com   # Production frontend URL
+      - FRONTEND_URL=https://itransfer.domain.com    # Production frontend URL
       - ADMIN_USERNAME=adminuser
       - ADMIN_PASSWORD=adminuserpassword
       - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
     volumes:
-      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer//backend/data:/app/data
-      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer//uploads:/app/uploads
+      - ./backend/data:/app/data
+      - ./uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -37,14 +37,14 @@ services:
       MYSQL_PASSWORD: mariadb_pass
       MYSQL_ROOT_HOST: '%'          # Permettre à root de se connecter depuis n'importe où
     volumes:
-      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer//db_data:/var/lib/mysql
-      - /srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer//backend/init.sql:/docker-entrypoint-initdb.d/init.sql
-      - ./init-privileges.sql:/docker-entrypoint-initdb.d/init-privileges.sql  # Nouveau fichier pour les privilèges
+      - ./db_data:/var/lib/mysql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD || echo 'Healthcheck failed' >> /var/log/healthcheck.log"]
       interval: 10s
       timeout: 5s
       retries: 3
+      start_period: 30s
     networks:
       - itransfer-network
 
