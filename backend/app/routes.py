@@ -29,65 +29,22 @@ def get_backend_url():
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 
-def send_email(to_email, file_id, filename):
+def send_notification_email(to_email, subject, message_content, smtp_config):
     server = None
     try:
-        # Charger la configuration SMTP
-        config_file_path = '/app/data/smtp_config.json'
-        app.logger.info(f"Tentative de lecture de la configuration SMTP depuis {config_file_path}")
-        
-        if not os.path.exists(config_file_path):
-            app.logger.error(f"Fichier de configuration SMTP introuvable : {config_file_path}")
-            return False
-        
-        with open(config_file_path, 'r') as config_file:
-            smtp_config = json.load(config_file)
-            app.logger.info(f"Configuration SMTP chargée : {json.dumps({**smtp_config, 'smtp_password': '***'})}")
-
-        # Vérifier les champs requis
-        required_fields = ['smtp_server', 'smtp_port', 'smtp_user', 'smtp_password', 'smtp_sender_email']
-        for field in required_fields:
-            if field not in smtp_config or not smtp_config[field]:
-                app.logger.error(f"Champ SMTP manquant ou vide : {field}")
-                return False
-
-        # Créer le lien de téléchargement avec l'URL dynamique
         backend_url = get_backend_url()
-        download_link = f"{backend_url}/download/{file_id}"
-
+        
         # Configurer le message
-        message = f"""
-        Bonjour,
-
-        Un fichier a été partagé avec vous via iTransfer.
-        
-        Fichier : {filename}
-        Lien de téléchargement : {download_link}
-        
-        Ce lien expirera dans 7 jours.
-        
-        Cordialement,
-        L'équipe iTransfer
-        """
-
-        app.logger.info(f"Tentative de connexion au serveur SMTP : {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
-        
-        # Utiliser SMTP_SSL pour le port 465
-        server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
-        app.logger.info("Connexion SMTP établie")
-
-        # Se connecter
-        app.logger.info(f"Tentative de connexion avec l'utilisateur : {smtp_config['smtp_user']}")
-        server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'].strip())
-        app.logger.info("Connexion SMTP réussie")
-
-        # Préparer l'email
         email_message = f"""From: {smtp_config['smtp_sender_email']}
 To: {to_email}
-Subject: iTransfer - Nouveau fichier partagé
+Subject: {subject}
 Content-Type: text/plain; charset=utf-8
 
-{message}"""
+{message_content}"""
+
+        # Utiliser SMTP_SSL pour le port 465
+        server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
+        server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'].strip())
 
         # Envoyer l'email
         app.logger.info(f"Envoi de l'email à {to_email}")
@@ -97,34 +54,67 @@ Content-Type: text/plain; charset=utf-8
             email_message.encode('utf-8')
         )
         app.logger.info("Email envoyé avec succès")
-        
-        if server:
-            server.quit()
         return True
-
-    except FileNotFoundError as e:
-        app.logger.error(f"Erreur de fichier SMTP : {str(e)}")
-        return False
-    except json.JSONDecodeError as e:
-        app.logger.error(f"Erreur de format JSON dans la configuration SMTP : {str(e)}")
-        return False
-    except smtplib.SMTPAuthenticationError as e:
-        app.logger.error(f"Erreur d'authentification SMTP : {str(e)}")
-        return False
-    except smtplib.SMTPException as e:
-        app.logger.error(f"Erreur SMTP : {str(e)}")
-        return False
     except Exception as e:
-        app.logger.error(f"Erreur inattendue lors de l'envoi de l'email : {str(e)}")
-        import traceback
-        app.logger.error(f"Traceback : {traceback.format_exc()}")
+        app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
         return False
     finally:
         if server:
-            try:
-                server.quit()
-            except Exception:
-                pass
+            server.quit()
+
+def send_recipient_notification(to_email, file_id, filename, smtp_config):
+    backend_url = get_backend_url()
+    download_link = f"{backend_url}/download/{file_id}"
+    
+    message = f"""
+    Bonjour,
+
+    Un fichier a été partagé avec vous via iTransfer.
+    
+    Fichier : {filename}
+    Lien de téléchargement : {download_link}
+    
+    Ce lien expirera dans 7 jours.
+    
+    Cordialement,
+    L'équipe iTransfer
+    """
+    
+    return send_notification_email(to_email, "iTransfer - Nouveau fichier partagé", message, smtp_config)
+
+def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config):
+    backend_url = get_backend_url()
+    download_link = f"{backend_url}/download/{file_id}"
+    
+    message = f"""
+    Bonjour,
+
+    Votre fichier a été uploadé avec succès sur iTransfer.
+    
+    Fichier : {filename}
+    Lien de téléchargement : {download_link}
+    
+    Vous recevrez une notification lorsque le destinataire aura téléchargé le fichier.
+    
+    Cordialement,
+    L'équipe iTransfer
+    """
+    
+    return send_notification_email(to_email, "iTransfer - Upload réussi", message, smtp_config)
+
+def send_sender_download_notification(to_email, filename, smtp_config):
+    message = f"""
+    Bonjour,
+
+    Le fichier que vous avez partagé via iTransfer a été téléchargé par le destinataire.
+    
+    Fichier : {filename}
+    
+    Cordialement,
+    L'équipe iTransfer
+    """
+    
+    return send_notification_email(to_email, "iTransfer - Fichier téléchargé", message, smtp_config)
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
@@ -138,12 +128,10 @@ def upload_file():
     try:
         file = request.files.get('file')
         recipient_email = request.form.get('email')  # Récupérer l'email du formulaire
+        sender_email = request.form.get('sender_email')
 
-        if not file:
-            return jsonify({'error': 'Fichier requis'}), 400
-
-        if not recipient_email:
-            return jsonify({'error': 'Email du destinataire requis'}), 400
+        if not file or not recipient_email or not sender_email:
+            return jsonify({'error': 'Fichier ou email manquant'}), 400
 
         file_id = str(uuid.uuid4())
         file_content = file.read()
@@ -165,6 +153,7 @@ def upload_file():
             id=file_id,
             filename=file.filename,
             email=recipient_email,
+            sender_email=sender_email,
             encrypted_data=encrypted_data
         )
 
@@ -178,19 +167,25 @@ def upload_file():
                 os.remove(upload_path)
             raise db_error
 
-        # Envoyer l'email
-        try:
-            email_sent = send_email(recipient_email, file_id, file.filename)
-            if not email_sent:
-                app.logger.error("L'envoi de l'email a échoué")
-        except Exception as email_error:
-            app.logger.error(f"Erreur lors de l'envoi de l'email : {str(email_error)}")
-            email_sent = False
-
+        # Charger la configuration SMTP
+        config_file_path = '/app/data/smtp_config.json'
+        if not os.path.exists(config_file_path):
+            return jsonify({'error': 'Configuration SMTP manquante'}), 500
+            
+        with open(config_file_path, 'r') as config_file:
+            smtp_config = json.load(config_file)
+        
+        # Envoyer les notifications
+        recipient_notified = send_recipient_notification(recipient_email, file_id, file.filename, smtp_config)
+        sender_notified = send_sender_upload_confirmation(sender_email, file_id, file.filename, smtp_config)
+        
+        if not recipient_notified or not sender_notified:
+            return jsonify({'warning': 'Fichier uploadé mais problème avec les notifications'}), 200
+            
         response_data = {
             'file_id': file_id,
             'message': 'Fichier reçu avec succès',
-            'email_sent': email_sent
+            'email_sent': True
         }
 
         response = jsonify(response_data)
@@ -295,6 +290,20 @@ def download_file(file_id):
         if not os.path.exists(file_path):
             return jsonify({'error': 'Fichier non trouvé'}), 404
 
+        # Si le fichier n'a pas encore été marqué comme téléchargé
+        if not file_upload.downloaded:
+            # Marquer le fichier comme téléchargé
+            file_upload.downloaded = True
+            db.session.commit()
+            
+            # Charger la configuration SMTP
+            config_file_path = '/app/data/smtp_config.json'
+            if os.path.exists(config_file_path):
+                with open(config_file_path, 'r') as config_file:
+                    smtp_config = json.load(config_file)
+                # Envoyer la notification à l'expéditeur
+                send_sender_download_notification(file_upload.sender_email, file_upload.filename, smtp_config)
+        
         # Envoyer le fichier
         return send_file(
             file_path,
@@ -355,15 +364,3 @@ Si vous recevez cet email, la configuration est correcte."""
         response = jsonify({"success": False, "error": str(e)})
         response.headers.add("Access-Control-Allow-Origin", '*')
         return response, 500
-
-def notify_user(file_id, email):
-    try:
-        with smtplib.SMTP('localhost') as smtp:
-            smtp.sendmail(
-                from_addr='no-reply@itransfer.com',
-                to_addrs=email,
-                msg=f"Votre fichier a été uploadé avec succès. ID: {file_id}"
-            )
-        app.logger.info(f"Notification envoyée à {email} pour le fichier {file_id}")
-    except Exception as e:
-        app.logger.error(f"Erreur lors de l'envoi de la notification : {e}")
