@@ -190,7 +190,7 @@ def upload_file():
         app.logger.error(f"Erreur lors de l'upload : {str(e)}")
         if 'upload_path' in locals() and os.path.exists(upload_path):
             os.remove(upload_path)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'An internal error has occurred.'}), 500
 
 @app.route('/api/save-smtp-settings', methods=['POST', 'OPTIONS'])
 def save_smtp_settings():
@@ -228,7 +228,7 @@ def save_smtp_settings():
         return response, 200
     except Exception as e:
         app.logger.error(f"Erreur lors de la sauvegarde des paramètres SMTP : {e}")
-        response = jsonify({"error": str(e)})
+        response = jsonify({"error": "An internal error has occurred."})
         response.headers.add("Access-Control-Allow-Origin", '*')
         response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
