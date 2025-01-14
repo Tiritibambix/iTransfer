@@ -4,6 +4,7 @@ import hashlib
 import smtplib
 import json
 from flask import request, jsonify, send_file
+from werkzeug.utils import secure_filename
 from . import app, db
 from .models import FileUpload
 
@@ -142,7 +143,8 @@ def upload_file():
         if not os.path.exists(upload_dir):
             os.makedirs(upload_dir)
 
-        upload_path = os.path.join(upload_dir, file.filename)
+        sanitized_filename = secure_filename(file.filename)
+        upload_path = os.path.join(upload_dir, sanitized_filename)
         with open(upload_path, 'wb') as f:
             f.write(file_content)
 
@@ -190,7 +192,7 @@ def upload_file():
         app.logger.error(f"Erreur lors de l'upload : {str(e)}")
         if 'upload_path' in locals() and os.path.exists(upload_path):
             os.remove(upload_path)
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'An internal error has occurred.'}), 500
 
 @app.route('/api/save-smtp-settings', methods=['POST', 'OPTIONS'])
 def save_smtp_settings():
@@ -228,7 +230,11 @@ def save_smtp_settings():
         return response, 200
     except Exception as e:
         app.logger.error(f"Erreur lors de la sauvegarde des paramètres SMTP : {e}")
+
         response = jsonify({"error": "Une erreur interne est survenue."})
+
+        response = jsonify({"error": "An internal error has occurred."})
+
         response.headers.add("Access-Control-Allow-Origin", '*')
         response.headers.add("Access-Control-Allow-Methods", "POST, OPTIONS")
         response.headers.add("Access-Control-Allow-Headers", "Content-Type")
@@ -297,7 +303,7 @@ def download_file(file_id):
 
     except Exception as e:
         app.logger.error(f"Erreur lors du téléchargement : {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'An internal error has occurred!'}), 500
 
 @app.route('/api/test-smtp', methods=['POST', 'OPTIONS'])
 def test_smtp():
@@ -344,6 +350,6 @@ Si vous recevez cet email, la configuration est correcte."""
 
     except Exception as e:
         app.logger.error(f"Erreur lors du test SMTP : {str(e)}")
-        response = jsonify({"success": False, "error": str(e)})
+        response = jsonify({"success": False, "error": "An internal error has occurred!"})
         response.headers.add("Access-Control-Allow-Origin", '*')
         return response, 500
