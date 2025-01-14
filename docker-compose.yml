@@ -21,7 +21,7 @@ services:
       - FRONTEND_URL=http://localhost:3500
       - ADMIN_USERNAME=adminuser
       - ADMIN_PASSWORD=adminuserpassword
-      - DATABASE_URL=mysql://mariadb_user:mariadb_pass@db/mariadb_db
+      - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
     volumes:
       - ./backend/data:/app/data
       - ./backend/uploads:/app/uploads
@@ -42,7 +42,7 @@ services:
       - "3306:3306"
     volumes:
       - ./db_data:/var/lib/mysql
-      - ./backend/init/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD || echo 'Healthcheck failed' >> /var/log/healthcheck.log"]
       interval: 10s
