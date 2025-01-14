@@ -133,6 +133,10 @@ def upload_file():
 
     try:
         # Vérification des données requises
+        app.logger.info("Données du formulaire reçues:")
+        app.logger.info(f"Files: {request.files}")
+        app.logger.info(f"Form data: {request.form}")
+        
         if 'file' not in request.files:
             return jsonify({'error': 'Aucun fichier envoyé'}), 400
         
@@ -140,14 +144,24 @@ def upload_file():
         email = request.form.get('email')
         sender_email = request.form.get('sender_email')
 
-        app.logger.info(f"Upload demandé : fichier={file.filename}, email={email}, sender={sender_email}")
+        app.logger.info(f"Upload demandé : fichier={file.filename}, email destinataire={email}, email expéditeur={sender_email}")
 
         if not file or not email or not sender_email:
+            app.logger.error(f"Données manquantes: file={bool(file)}, email={bool(email)}, sender_email={bool(sender_email)}")
             return jsonify({'error': 'Fichier ou email manquant'}), 400
         
         if not file.filename:
             return jsonify({'error': 'Nom de fichier invalide'}), 400
 
+        # Vérification basique des adresses email
+        if '@' not in email or '.' not in email:
+            app.logger.error(f"Adresse email destinataire invalide: {email}")
+            return jsonify({'error': 'Adresse email destinataire invalide'}), 400
+            
+        if '@' not in sender_email or '.' not in sender_email:
+            app.logger.error(f"Adresse email expéditeur invalide: {sender_email}")
+            return jsonify({'error': 'Adresse email expéditeur invalide'}), 400
+        
         # Génération d'un ID unique et sécurisation du nom de fichier
         file_id = str(uuid.uuid4())
         safe_filename = secure_filename(file.filename)
