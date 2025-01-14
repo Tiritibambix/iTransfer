@@ -297,7 +297,7 @@ def download_file(file_id):
 
     except Exception as e:
         app.logger.error(f"Erreur lors du téléchargement : {str(e)}")
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'error': 'An internal error has occurred!'}), 500
 
 @app.route('/api/test-smtp', methods=['POST', 'OPTIONS'])
 def test_smtp():
@@ -344,6 +344,6 @@ Si vous recevez cet email, la configuration est correcte."""
 
     except Exception as e:
         app.logger.error(f"Erreur lors du test SMTP : {str(e)}")
-        response = jsonify({"success": False, "error": str(e)})
+        response = jsonify({"success": False, "error": "An internal error has occurred!"})
         response.headers.add("Access-Control-Allow-Origin", '*')
         return response, 500
