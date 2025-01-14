@@ -57,34 +57,8 @@ def create_app():
 # Créer l'application
 app = create_app()
 
-@app.route('/upload', methods=['POST', 'OPTIONS'])
-def upload_file():
-    try:
-        if request.method == 'OPTIONS':  # Pré-demande CORS
-            return jsonify({'message': 'CORS preflight success'}), 200
-
-        # Récupérer le fichier de la requête
-        file = request.files.get('file')
-        if not file:
-            raise ValueError("Aucun fichier envoyé.")
-
-        # Log du fichier reçu pour debug
-        app.logger.info(f"Nom du fichier reçu : {file.filename}")
-
-        # Sauvegarder le fichier dans le dossier uploads
-        upload_dir = '/app/uploads'
-        if not os.path.exists(upload_dir):
-            os.makedirs(upload_dir)
-
-        safe_filename = secure_filename(file.filename)
-        upload_path = os.path.join(upload_dir, safe_filename)
-        file.save(upload_path)
-
-        return jsonify({"message": f"Fichier {file.filename} reçu avec succès"}), 201
-
-    except Exception as e:
-        app.logger.error(f"Erreur lors de l'upload : {e}")
-        return jsonify({"error": "An internal error has occurred."}), 400
+# Importer les routes après la création de l'application
+from . import routes
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
