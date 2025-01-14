@@ -17,18 +17,13 @@
   --clr-surface-a40: #746974;
   --clr-surface-a50: #8e858e;
 
-  /** Feedback colors */
-  --clr-error-a10: #4a1c1c;
-  --clr-error-a20: #802323;
-  --clr-error-a50: #ff4d4d;
-
-  --clr-success-a10: #1c4a1c;
-  --clr-success-a20: #238023;
-  --clr-success-a50: #4dff4d;
-
-  --clr-info-a10: #1c4a4a;
-  --clr-info-a20: #237880;
-  --clr-info-a50: #4dbaff;
+  /** Dark theme tonal surface colors */
+  --clr-surface-tonal-a0: #1b021b;
+  --clr-surface-tonal-a10: #2f1e30;
+  --clr-surface-tonal-a20: #463646;
+  --clr-surface-tonal-a30: #5e4f5e;
+  --clr-surface-tonal-a40: #766a77;
+  --clr-surface-tonal-a50: #908690;
 }
 
 body {
@@ -42,69 +37,44 @@ body {
   height: 100vh;
 }
 
+#root {
+  text-align: center;
+}
+
 h1 {
   color: var(--clr-primary-a40);
 }
 
-.container {
-  max-width: 800px;
-  margin: 0 auto;
-  padding: 20px;
-  background-color: var(--clr-surface-a10);
-  border-radius: 10px;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-}
-
-.input {
-  width: 100%;
+input[type="file"] {
+  margin-top: 20px;
   padding: 10px;
   background-color: var(--clr-surface-a20);
-  border: 1px solid var(--clr-surface-a30);
-  border-radius: 4px;
   color: var(--clr-primary-a50);
-  font-size: 16px;
-}
-
-.button {
-  width: 100%;
-  padding: 10px 20px;
-  background-color: var(--clr-primary-a30);
-  color: white;
   border: none;
   border-radius: 5px;
-  cursor: pointer;
-  transition: background-color 0.3s;
 }
 
-.button:hover {
-  background-color: var(--clr-primary-a40);
-}
-
-.button-secondary {
-  background-color: var(--clr-surface-a20);
-  color: var(--clr-primary-a50);
-}
-
-.message {
-  padding: 10px;
-  margin-bottom: 20px;
+button {
+  padding: 10px 20px;
+  font-size: 16px;
+  background-color: #007bff;  /* Bleu par défaut */
+  color: white;
+  border: none;
   border-radius: 4px;
+  cursor: pointer;
+  text-align: center;
+  margin-top: 20px;
 }
 
-.message-success {
-  background-color: var(--clr-success-a10);
-  color: var(--clr-success-a50);
-  border: 1px solid var(--clr-success-a20);
+button:hover {
+  background-color: #0056b3;  /* Couleur lors du survol */
 }
 
-.message-error {
-  background-color: var(--clr-error-a10);
-  color: var(--clr-error-a50);
-  border: 1px solid var(--clr-error-a20);
+button:focus {
+  outline: none;
 }
 
-.message-info {
-  background-color: var(--clr-info-a10);
-  color: var(--clr-info-a50);
-  border: 1px solid var(--clr-info-a20);
+p {
+  margin-top: 20px;
+  color: var(--clr-primary-a50);
 }
