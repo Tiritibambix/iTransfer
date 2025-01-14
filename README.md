@@ -44,7 +44,13 @@ CREATE TABLE IF NOT EXISTS file_upload (
 ```bash
 docker-compose up -d
 ```
-Or use [docker-compose.yml](https://github.com/tiritibambix/iTransfer/blob/main/docker-compose.yml)
+## [docker-compose.yml](https://github.com/tiritibambix/iTransfer/blob/main/docker-compose.yml)
+
+Set up the database initialization file:
+   - Either download [init.sql](https://github.com/tiritibambix/iTransfer/blob/main/backend/init.sql) and place it in `backend/init.sql`
+   - Or create the file manually at `backend/init.sql`
+
+Then
 ```yaml
 services:
   frontend:
