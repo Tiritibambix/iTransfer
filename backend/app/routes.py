@@ -148,13 +148,24 @@ def upload_file():
             file_content = f.read()
             encrypted_data = hashlib.sha256(file_content).hexdigest()
 
-        # Créer l'entrée dans la base de données
-        cursor = db.cursor()
-        cursor.execute(
-            'INSERT INTO file_upload (id, filename, recipient_email, sender_email, encrypted_data, downloaded) VALUES (%s, %s, %s, %s, %s, %s)',
-            (file_id, file.filename, recipient_email, sender_email, encrypted_data, False)
+        # Créer l'entrée dans la base de données avec SQLAlchemy
+        new_file = FileUpload(
+            id=file_id,
+            filename=file.filename,
+            recipient_email=recipient_email,
+            sender_email=sender_email,
+            encrypted_data=encrypted_data,
+            downloaded=False
         )
-        db.commit()
+
+        try:
+            db.session.add(new_file)
+            db.session.commit()
+        except Exception as db_error:
+            app.logger.error(f"Erreur base de données : {str(db_error)}")
+            if os.path.exists(upload_path):
+                os.remove(upload_path)
+            raise db_error
 
         # Charger la configuration SMTP
         config_file_path = '/app/data/smtp_config.json'
@@ -257,18 +268,18 @@ def login():
 
 @app.route('/download/<file_id>', methods=['GET'])
 def download_file(file_id):
-    """
-    Télécharger un fichier en utilisant son ID
-    """
     try:
-        # Récupérer le fichier depuis la base de données
-        file_upload = FileUpload.query.get_or_404(file_id)
+        # Rechercher le fichier dans la base de données avec SQLAlchemy
+        file_upload = FileUpload.query.get(file_id)
         
-        # Vérifier si le fichier existe dans le système de fichiers
-        file_path = os.path.join('/app/uploads', file_upload.filename)
+        if not file_upload:
+            return jsonify({'error': 'Fichier non trouvé'}), 404
+            
+        file_path = os.path.join('/app/uploads', file_id)
+        
         if not os.path.exists(file_path):
             return jsonify({'error': 'Fichier non trouvé'}), 404
-
+            
         # Si le fichier n'a pas encore été marqué comme téléchargé
         if not file_upload.downloaded:
             # Marquer le fichier comme téléchargé
@@ -283,14 +294,12 @@ def download_file(file_id):
                 # Envoyer la notification à l'expéditeur
                 send_sender_download_notification(file_upload.sender_email, file_upload.filename, smtp_config)
         
-        # Envoyer le fichier
         return send_file(
             file_path,
             as_attachment=True,
-            download_name=file_upload.filename,
-            mimetype='application/octet-stream'
+            download_name=file_upload.filename
         )
-
+        
     except Exception as e:
         app.logger.error(f"Erreur lors du téléchargement : {str(e)}")
         return jsonify({'error': str(e)}), 500
