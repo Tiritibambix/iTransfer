@@ -1,171 +1,134 @@
-[![Build and Push Docker Images](https://github.com/tiritibambix/iTransfer/actions/workflows/docker-build-push.yml/badge.svg)](https://github.com/tiritibambix/iTransfer_1minAI/actions/workflows/docker-build-push.yml)
-
 # iTransfer
 
-Une application moderne de transfert de fichiers avec interface web, backend sécurisé et notification par email.
+A simple file transfer application with web interface, secure backend, and email notifications.
 
-## Fonctionnalités
+## Features
 
-- Interface utilisateur moderne et réactive
-- Upload de fichiers avec barre de progression
-- Notifications par email automatiques
-- Interface d'administration sécurisée
-- API REST backend
-- Déploiement facile avec Docker
-- Gestion des fichiers avec base de données MariaDB
+- Responsive user interface
+- File upload with progress bar
+- Automatic email notifications for both sender and recipient
+- Secure admin interface
+- REST API backend
+- Easy deployment with Docker
+- File management with MariaDB database
 
-## Prérequis
+## Prerequisites
 
 - Docker
 - Docker Compose
-- Accès aux ports 3500 (frontend), 5500 (backend) et 3306 (MariaDB)
 
 ## Installation
 
-1. Clonez le dépôt :
+1. Clone the repository:
 ```bash
 git clone https://github.com/tiritibambix/iTransfer.git
 cd iTransfer
 ```
 
-2. Créez le fichier d'initialisation SQL :
-```bash
-# Créez le fichier init.sql dans le dossier spécifié
-mkdir -p .../iTransfer/backend/
-cat > ...iTransfer/backend/init.sql << EOL
+2. Set up the database initialization file:
+   - Either download [init.sql](https://github.com/tiritibambix/iTransfer/blob/main/backend/init.sql) and place it in `backend/init.sql`
+   - Or create the file manually at `backend/init.sql` with the following content:
+```sql
 CREATE TABLE IF NOT EXISTS file_upload (
     id VARCHAR(36) PRIMARY KEY,
     filename VARCHAR(256) NOT NULL,
     email VARCHAR(256) NOT NULL,
+    sender_email VARCHAR(256) NOT NULL,
     encrypted_data VARCHAR(256) NOT NULL,
+    downloaded BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
-EOL
 ```
 
-Or simply download [this file](https://github.com/tiritibambix/iTransfer/blob/main/backend/init.sql) here : ...iTransfer/backend/  
-
-3. Démarrez les conteneurs :
+3. Start the containers:
 ```bash
 docker-compose up -d
 ```
 
 ## Configuration
 
-### Variables d'environnement
+### Environment Variables
 
-Le projet utilise plusieurs variables d'environnement configurables dans le `docker-compose.yml` :
+The project uses several environment variables configurable in `docker-compose.yml`:
 
 #### Backend
-- `FRONTEND_URL`: URL du frontend (par défaut: http://localhost:3500)
-- `ADMIN_USERNAME`: Nom d'utilisateur admin
-- `ADMIN_PASSWORD`: Mot de passe admin
-- `DATABASE_URL`: URL de connexion à la base de données
+- `FRONTEND_URL`: Frontend URL (default: http://localhost:3500)
+- `ADMIN_USERNAME`: Admin username
+- `ADMIN_PASSWORD`: Admin password
+- `DATABASE_URL`: Database connection URL (using mysql+mysqldb driver)
 
-#### Base de données
-- `MYSQL_ROOT_PASSWORD`: Mot de passe root MariaDB
-- `MYSQL_DATABASE`: Nom de la base de données
-- `MYSQL_USER`: Utilisateur MariaDB
-- `MYSQL_PASSWORD`: Mot de passe utilisateur MariaDB
+#### Database
+- `MYSQL_ROOT_PASSWORD`: MariaDB root password
+- `MYSQL_DATABASE`: Database name
+- `MYSQL_USER`: MariaDB user
+- `MYSQL_PASSWORD`: MariaDB user password
 
-### Configuration SMTP
+## Usage
 
-La configuration SMTP peut être effectuée via l'interface d'administration :
-1. Connectez-vous à l'interface admin (http://localhost:3500/admin)
-2. Accédez aux paramètres SMTP
-3. Configurez les détails de votre serveur SMTP
-
-## Structure des volumes
-
-Le projet utilise plusieurs volumes Docker pour la persistance des données :
-
-- `/srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/db_data`: Données MariaDB
-- `/srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/backend/init.sql`: Script d'initialisation SQL
-- `/srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/backend_data`: Données du backend
-- `/srv/dev-disk-by-uuid-7fe66601-5ca0-4c09-bc13-a015025fe53a/Files/iTransfer/uploads`: Fichiers uploadés
-
-## Utilisation
-
-1. Accédez à l'interface web : http://localhost:3500
-2. Pour uploader un fichier :
-   - Glissez-déposez ou sélectionnez un fichier
-   - Entrez l'adresse email du destinataire
-   - Cliquez sur "Envoyer"
-3. Le destinataire recevra un email avec les informations de téléchargement
+1. Access the web interface: http://localhost:3500
+2. To upload a file:
+   - Drag and drop or select a file
+   - Enter the recipient's email address
+   - Enter your email address (sender)
+   - Click "Send"
 
 ## Administration
 
-1. Accédez à l'interface admin : http://localhost:3500/admin
-2. Connectez-vous avec les identifiants configurés
-3. Gérez les paramètres SMTP et autres configurations
+1. Access the admin interface: http://localhost:3500/admin
+2. Log in with the configured credentials
+3. Configure your SMTP settings to enable email notifications
 
-## Ports utilisés
+## Project Structure
 
-- Frontend: 3500
-- Backend: 5500
-- MariaDB: 3306
-
-## Sécurité
-
-- Authentification admin sécurisée
-- Chiffrement des données des fichiers
-- Validation des emails
-- Healthcheck de la base de données
-
-## Développement
-
-Pour le développement local sans Docker :
-
-### Backend (Python/Flask)
-```bash
-cd backend
-pip install -r requirements.txt
-python run.py
 ```
-
-### Frontend (React)
-```bash
-cd frontend
-npm install
-npm start
-```
-```
-├── .github
-|      ├── dependabot.yml
-|      ├── workflows
-|      |      ├── docker-build-push.yml
+iTransfer/
 ├── LICENSE
 ├── README.md
 ├── backend
-|      ├── Dockerfile
-|      ├── entrypoint.sh
-|      ├── app
-|      |      ├── __init__.py
-|      |      ├── app.py
-|      |      ├── config.py
-|      |      ├── models.py
-|      |      ├── routes.py
-|      |      ├── utils.py
-|      ├── run.py
-|      ├── tests
-|      |      ├── test_routes.py
+|     ├── Dockerfile
+|     ├── app
+|     |     ├── __init__.py
+|     |     ├── app.py
+|     |     ├── config.py
+|     |     ├── models.py
+|     |     ├── routes.py
+|     ├── entrypoint.sh
+|     ├── init.sql
+|     ├── run.py
 ├── docker-compose.yml
 ├── frontend
-|      ├── Dockerfile
-|      ├── package.json
-|      ├── public
-|      |      ├── index.html
-|      ├── src
-|      |      ├── Admin.js
-|      |      ├── App.js
-|      |      ├── FileManager.js
-|      |      ├── Login.js
-|      |      ├── PrivateRoute.js
-|      |      ├── Progress.js
-|      |      ├── ProgressBar.js
-|      |      ├── Settings.js
-|      |      ├── Uploads.js
-|      |      ├── index.css
-|      |      ├── index.js
+|     ├── Dockerfile
+|     ├── package.json
+|     ├── public
+|     |     ├── index.html
+|     ├── src
+|     |     ├── App.js
+|     |     ├── Login.js
+|     |     ├── PrivateRoute.js
+|     |     ├── SMTPSettings.js
+|     |     ├── index.css
+|     |     ├── index.js
 ├── requirements.txt
 ```
+
+## Troubleshooting
+
+### Database Connection Issues
+If you encounter database connection errors, ensure:
+1. The database service is running: `docker-compose ps`
+2. The database URL in `docker-compose.yml` uses the correct format:
+   ```yaml
+   DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
+   ```
+
+## Contributing
+
+1. Fork the repository
+2. Create your feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a new Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.
