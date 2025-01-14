@@ -16,6 +16,7 @@ services:
       - "5500:5000"                      # Map backend port
     environment:
       - FRONTEND_URL=http://localhost:3500
+      - BACKEND_URL=http://localhost:5500
       - ADMIN_USERNAME=adminuser
       - ADMIN_PASSWORD=adminuserpassword
       - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
