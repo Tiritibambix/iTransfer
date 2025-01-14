@@ -1,3 +1,5 @@
+[![Build and Push Docker Images](https://github.com/tiritibambix/iTransfer/actions/workflows/docker-build-push.yml/badge.svg)](https://github.com/tiritibambix/iTransfer/actions/workflows/docker-build-push.yml)
+
 # iTransfer
 
 A simple file transfer application with web interface, secure backend, and email notifications.
