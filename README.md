@@ -276,39 +276,6 @@ The application uses configurable ports that can be set in the docker-compose fi
 - Backend: Container port 5000, mapped to any external port (default: 5500)
 - Database: Container port 3306, mapped to any external port (exposed in local development only)
 
-Example with different ports:
-```yaml
-frontend:
-  ports:
-    - "8080:80"    # Map frontend to port 8080
-
-backend:
-  ports:
-    - "9000:5000"  # Map backend to port 9000
-```
-
-Remember to update the environment variables to match your chosen ports:
-```yaml
-frontend:
-  environment:
-    - BACKEND_URL=http://localhost:9000  # Match your backend port
-
-backend:
-  environment:
-    - FRONTEND_URL=http://localhost:8080  # Match your frontend port
-```
-
-For production, use your domains instead of ports:
-```yaml
-frontend:
-  environment:
-    - BACKEND_URL=https://api.yourdomain.com  # No port needed with reverse proxy
-
-backend:
-  environment:
-    - FRONTEND_URL=https://yourdomain.com     # No port needed with reverse proxy
-```
-
 ## Usage
 
 1. Access the web interface: http://localhost:3500
