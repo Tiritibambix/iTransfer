@@ -51,37 +51,132 @@ This requires:
 - SSL certificates for both domains
 - DNS configuration for both domains
 
-### Configuration Files
+## Docker Compose Configuration Files
 
-#### Local Development (`docker-compose.local.yml`)
+The project includes two docker-compose files for different environments:
+
+### Local Development (`docker-compose.local.yml`)
 ```yaml
-frontend:
-  environment:
-    - BACKEND_URL=http://localhost:5500  # Local backend URL
-  ports:
-    - "3500:80"                         # Local frontend port
+services:
+  frontend:
+    image: tiritibambix/itransfer-frontend
+    environment:
+      - BACKEND_URL=http://localhost:5500  # Local backend URL with port
+    ports:
+      - "3500:80"                         # Map frontend port
+    depends_on:
+      - backend
+    networks:
+      - itransfer-network
 
-backend:
-  environment:
-    - FRONTEND_URL=http://localhost:3500 # Local frontend URL
-  ports:
-    - "5500:5000"                       # Local backend port
+  backend:
+    image: tiritibambix/itransfer-backend
+    ports:
+      - "5500:5000"                      # Map backend port
+    environment:
+      - FRONTEND_URL=http://localhost:3500
+      - ADMIN_USERNAME=adminuser
+      - ADMIN_PASSWORD=adminuserpassword
+      - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
+    volumes:
+      - ./backend/data:/app/data
+      - ./uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - itransfer-network
+
+  db:
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: mariadb_db
+      MYSQL_USER: mariadb_user
+      MYSQL_PASSWORD: mariadb_pass
+    ports:
+      - "3306:3306"                     # Exposed for local development
+    volumes:
+      - ./db_data:/var/lib/mysql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - itransfer-network
+
+networks:
+  itransfer-network:
+    driver: bridge
 ```
 
-#### Production (`docker-compose.prod.yml`)
+### Production (`docker-compose.prod.yml`)
 ```yaml
-frontend:
-  environment:
-    - BACKEND_URL=https://api.itransfer.domain.com  # Production API URL
-  ports:
-    - "3500:80"                                    # Production frontend port
+services:
+  frontend:
+    image: tiritibambix/itransfer-frontend
+    environment:
+      - BACKEND_URL=https://api.itransfer.domain.com  # Production API URL
+    ports:
+      - "3500:80"                                    # Can be changed to any port
+    depends_on:
+      - backend
+    networks:
+      - itransfer-network
 
-backend:
-  environment:
-    - FRONTEND_URL=https://itransfer.domain.com     # Production frontend URL
-  ports:
-    - "5500:5000"                                  # Production backend port
+  backend:
+    image: tiritibambix/itransfer-backend
+    ports:
+      - "5500:5000"                                  # Can be changed to any port
+    environment:
+      - FRONTEND_URL=https://itransfer.domain.com    # Production frontend URL
+      - ADMIN_USERNAME=adminuser
+      - ADMIN_PASSWORD=adminuserpassword
+      - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
+    volumes:
+      - ./backend/data:/app/data
+      - ./uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - itransfer-network
+
+  db:
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: mariadb_db
+      MYSQL_USER: mariadb_user
+      MYSQL_PASSWORD: mariadb_pass
+    volumes:
+      - ./db_data:/var/lib/mysql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    networks:
+      - itransfer-network
+
+networks:
+  itransfer-network:
+    driver: bridge
 ```
+
+Key differences between environments:
+1. URLs and Ports:
+   - Local: Uses localhost with ports (http://localhost:XXXX)
+   - Production: Uses domains with HTTPS (https://domain.com)
+2. Database:
+   - Local: Port 3306 exposed for development
+   - Production: No exposed ports for security
+3. Port Mapping:
+   - Both configurations use default ports (3500/5500) but these can be changed
+   - Container ports remain fixed (80 for frontend, 5000 for backend)
 
 ### Port Configuration
 
