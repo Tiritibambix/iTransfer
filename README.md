@@ -199,4 +199,4 @@ If you encounter database connection errors, ensure:
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+This project is licensed under The GNU General Public License - see the [LICENSE](LICENSE) file for details.
