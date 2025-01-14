@@ -29,7 +29,7 @@ def get_backend_url():
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 
-def send_email(to_email, file_id, filename):
+def send_email(to_email, file_id, filename, sender_email=None):
     server = None
     try:
         # Charger la configuration SMTP
@@ -69,6 +69,31 @@ def send_email(to_email, file_id, filename):
         Cordialement,
         L'équipe iTransfer
         """
+
+        # Message pour l'expéditeur après l'upload
+        if sender_email:
+            message_sender = f"""
+            Bonjour,
+
+            Votre fichier '{filename}' a été uploadé avec succès.
+            
+            Lien de téléchargement pour le destinataire : {download_link}
+            
+            Cordialement,
+            L'équipe iTransfer
+            """
+            email_message_sender = f"""From: {smtp_config['smtp_sender_email']}
+To: {sender_email}
+Subject: Confirmation d'upload réussi
+Content-Type: text/plain; charset=utf-8
+
+{message_sender}"""
+
+            # Envoyer l'email à l'expéditeur
+            app.logger.info(f"Envoi de l'email de confirmation à l'expéditeur {sender_email}")
+            server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
+            server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'].strip())
+            server.sendmail(smtp_config['smtp_sender_email'], sender_email, email_message_sender.encode('utf-8'))
 
         app.logger.info(f"Tentative de connexion au serveur SMTP : {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
         
@@ -224,7 +249,7 @@ def upload_file():
 
         # Envoyer l'email
         try:
-            email_sent = send_email(recipient_email, file_id, file.filename)
+            email_sent = send_email(recipient_email, file_id, file.filename, sender_email)
             if not email_sent:
                 app.logger.error("L'envoi de l'email a échoué")
             else:
