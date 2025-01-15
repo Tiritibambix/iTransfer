@@ -5,11 +5,12 @@ import smtplib
 import json
 from flask import request, jsonify, send_file
 from werkzeug.utils import secure_filename
-from . import app, db
-from .models import FileUpload
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate, make_msgid, formataddr
+from . import app, db
+from .models import FileUpload
+from email.utils import formatdate
 
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
 def get_backend_url():
@@ -154,6 +155,7 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
                 app.logger.error(f"Erreur lors de la fermeture de la connexion SMTP : {str(e)}")
 
 def send_recipient_notification(to_email, file_id, filename, smtp_config):
+    """Envoie une notification au destinataire avec le lien de téléchargement"""
     app.logger.info(f"Préparation de la notification pour le destinataire : {to_email}")
     backend_url = get_backend_url()
     app.logger.info(f"URL backend : {backend_url}")
@@ -181,6 +183,7 @@ def send_recipient_notification(to_email, file_id, filename, smtp_config):
     return success
 
 def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config):
+    """Envoie une confirmation à l'expéditeur après l'upload"""
     app.logger.info(f"Préparation de la confirmation pour l'expéditeur : {to_email}")
     backend_url = get_backend_url()
     app.logger.info(f"URL backend : {backend_url}")
@@ -209,13 +212,18 @@ def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config):
     return success
 
 def send_sender_download_notification(to_email, filename, smtp_config):
+    """Envoie une notification à l'expéditeur quand le fichier est téléchargé"""
     app.logger.info(f"Préparation de la notification pour l'expéditeur : {to_email}")
+    
     message = f"""
     Bonjour,
 
     Le fichier que vous avez partagé via iTransfer a été téléchargé par le destinataire.
     
     Fichier : {filename}
+    Date de téléchargement : {formatdate(localtime=True)}
+    
+    Cette notification vous est envoyée à titre informatif.
     
     Cordialement,
     L'équipe iTransfer
