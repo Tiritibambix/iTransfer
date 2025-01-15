@@ -11,21 +11,24 @@ from .models import FileUpload
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
 def get_backend_url():
     """
-    Génère l'URL du backend en se basant sur la requête entrante
+    Génère l'URL du backend en se basant sur la variable d'environnement BACKEND_URL
+    ou sur la requête entrante en développement
     """
+    # Utiliser BACKEND_URL s'il est défini
+    backend_url = os.environ.get('BACKEND_URL')
+    if backend_url:
+        app.logger.info(f"Utilisation de l'URL backend depuis l'environnement : {backend_url}")
+        return backend_url
+    
+    # Sinon, construire l'URL à partir de la requête (pour le développement)
     if not request:
-        return os.environ.get('BACKEND_URL', 'http://localhost:5000')
+        return 'http://localhost:5500'
     
-    # Récupérer le protocole (http ou https)
     protocol = request.scheme
-    
-    # Récupérer l'hôte complet (hostname:port)
-    host = request.headers.get('Host')
-    if not host:
-        # Fallback sur l'environnement ou la valeur par défaut
-        return os.environ.get('BACKEND_URL', 'http://localhost:5000')
-    
-    return f"{protocol}://{host}"
+    host = request.headers.get('Host', 'localhost:5500')
+    generated_url = f"{protocol}://{host}"
+    app.logger.info(f"URL backend générée depuis la requête : {generated_url}")
+    return generated_url
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
@@ -325,18 +328,23 @@ def test_smtp():
         return response
 
     try:
+        app.logger.info("Début du test SMTP")
         # Charger la configuration SMTP
         try:
+            app.logger.info(f"Tentative de lecture de la configuration SMTP depuis {app.config['SMTP_CONFIG_PATH']}")
             with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
                 smtp_config = json.load(config_file)
+                app.logger.info(f"Configuration SMTP chargée : serveur={smtp_config['smtp_server']}, port={smtp_config['smtp_port']}, user={smtp_config['smtp_user']}, sender={smtp_config['smtp_sender_email']}")
         except Exception as e:
             app.logger.error(f"Erreur lors du chargement de la configuration SMTP: {str(e)}")
             return jsonify({'error': 'Configuration SMTP manquante'}), 500
 
         # Tenter d'envoyer un email de test
+        app.logger.info(f"Tentative de connexion à {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
         server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
         app.logger.info("Connexion SMTP établie pour le test")
 
+        app.logger.info(f"Tentative de connexion avec l'utilisateur {smtp_config['smtp_user']}")
         server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'])
         app.logger.info("Connexion SMTP réussie pour le test")
 
@@ -348,6 +356,7 @@ Content-Type: text/plain; charset=utf-8
 Ceci est un email de test pour vérifier la configuration SMTP d'iTransfer.
 Si vous recevez cet email, la configuration est correcte."""
 
+        app.logger.info(f"Tentative d'envoi de l'email de test à {smtp_config['smtp_sender_email']}")
         server.sendmail(
             smtp_config['smtp_sender_email'],
             smtp_config['smtp_sender_email'],
@@ -355,7 +364,7 @@ Si vous recevez cet email, la configuration est correcte."""
         )
         
         server.quit()
-        app.logger.info("Test SMTP réussi")
+        app.logger.info("Test SMTP réussi, email envoyé avec succès")
 
         response = jsonify({"success": True, "message": "Test SMTP réussi! Un email de test a été envoyé."})
         response.headers.add("Access-Control-Allow-Origin", '*')
@@ -363,6 +372,12 @@ Si vous recevez cet email, la configuration est correcte."""
 
     except Exception as e:
         app.logger.error(f"Erreur lors du test SMTP : {str(e)}")
-        response = jsonify({"success": False, "error": "An internal error has occurred!"})
+        app.logger.error(f"Type d'erreur : {type(e).__name__}")
+        app.logger.error(f"Détails de l'erreur : {str(e)}")
+        if hasattr(e, 'smtp_error'):
+            app.logger.error(f"Erreur SMTP : {e.smtp_error}")
+        if hasattr(e, 'smtp_code'):
+            app.logger.error(f"Code SMTP : {e.smtp_code}")
+        response = jsonify({"success": False, "error": str(e)})
         response.headers.add("Access-Control-Allow-Origin", '*')
         return response, 500
