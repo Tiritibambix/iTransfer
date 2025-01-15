@@ -127,8 +127,18 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
 
         app.logger.info(f"Configuration du serveur SMTP : {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
         
-        # Utiliser SMTP_SSL pour le port 465
-        server = smtplib.SMTP_SSL(smtp_config['smtp_server'], smtp_config['smtp_port'])
+        # Choisir le type de connexion en fonction du port
+        port = int(smtp_config['smtp_port'])
+        if port == 465:
+            # Port 465 : SMTP_SSL
+            app.logger.info("Utilisation de SMTP_SSL (port 465)")
+            server = smtplib.SMTP_SSL(smtp_config['smtp_server'], port)
+        else:
+            # Port 587 ou autre : SMTP + STARTTLS
+            app.logger.info(f"Utilisation de SMTP + STARTTLS (port {port})")
+            server = smtplib.SMTP(smtp_config['smtp_server'], port)
+            server.starttls()
+        
         app.logger.info("Connexion SMTP établie")
         
         app.logger.info(f"Tentative de connexion avec l'utilisateur : {smtp_config['smtp_user']}")
