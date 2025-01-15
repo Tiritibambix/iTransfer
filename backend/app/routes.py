@@ -69,16 +69,16 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         msg.attach(text_part)
         
         # Ajouter le contenu en HTML (version plus jolie du message)
-        html_content = f"""
-        <html>
-          <head></head>
-          <body>
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              {message_content.replace('\n', '<br>')}
-            </div>
-          </body>
-        </html>
-        """
+        html_content = (
+            '<html>'
+            '<head></head>'
+            '<body>'
+            '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">'
+            + message_content.replace('\n', '<br>') +
+            '</div>'
+            '</body>'
+            '</html>'
+        )
         html_part = MIMEText(html_content, 'html', 'utf-8')
         msg.attach(html_part)
 
