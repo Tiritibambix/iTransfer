@@ -44,19 +44,20 @@ const Login = () => {
       alignItems: 'center',
       justifyContent: 'center',
       minHeight: '100vh',
-      padding: '1rem'
+      padding: 'clamp(1rem, 3vw, 2rem)',
+      boxSizing: 'border-box'
     }}>
       <div style={{
-        width: '90%',
+        width: '100%',
         maxWidth: '320px',
         backgroundColor: 'var(--clr-surface-a10)',
-        padding: '2rem',
+        padding: 'clamp(1.5rem, 4vw, 2rem)',
         borderRadius: '12px',
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
       }}>
         <h1 style={{
-          fontSize: '2rem',
-          marginBottom: '1.5rem',
+          fontSize: 'clamp(1.5rem, 5vw, 2rem)',
+          marginBottom: 'clamp(1rem, 3vw, 1.5rem)',
           textAlign: 'center',
           background: 'linear-gradient(45deg, var(--clr-primary-a40), var(--clr-primary-a30))',
           WebkitBackgroundClip: 'text',
@@ -65,8 +66,8 @@ const Login = () => {
           iTransfer
         </h1>
 
-        <form onSubmit={handleSubmit} style={{ marginBottom: '1.5rem' }}>
-          <div style={{ marginBottom: '1rem' }}>
+        <form onSubmit={handleSubmit} style={{ marginBottom: 'clamp(1rem, 3vw, 1.5rem)' }}>
+          <div style={{ marginBottom: 'clamp(0.75rem, 2vw, 1rem)' }}>
             <input
               type="text"
               placeholder="Nom d'utilisateur"
@@ -74,18 +75,18 @@ const Login = () => {
               onChange={e => setUsername(e.target.value)}
               style={{
                 width: '100%',
-                padding: '0.75rem',
+                padding: 'clamp(0.5rem, 2vw, 0.75rem)',
                 backgroundColor: 'var(--clr-surface-a20)',
                 color: 'var(--clr-primary-a50)',
                 border: '1px solid var(--clr-surface-a30)',
                 borderRadius: '6px',
-                fontSize: '0.9rem',
+                fontSize: 'clamp(0.875rem, 2vw, 0.9rem)',
                 boxSizing: 'border-box'
               }}
             />
           </div>
 
-          <div style={{ marginBottom: '1.5rem' }}>
+          <div style={{ marginBottom: 'clamp(1rem, 3vw, 1.5rem)' }}>
             <input
               type="password"
               placeholder="Mot de passe"
@@ -93,12 +94,12 @@ const Login = () => {
               onChange={e => setPassword(e.target.value)}
               style={{
                 width: '100%',
-                padding: '0.75rem',
+                padding: 'clamp(0.5rem, 2vw, 0.75rem)',
                 backgroundColor: 'var(--clr-surface-a20)',
                 color: 'var(--clr-primary-a50)',
                 border: '1px solid var(--clr-surface-a30)',
                 borderRadius: '6px',
-                fontSize: '0.9rem',
+                fontSize: 'clamp(0.875rem, 2vw, 0.9rem)',
                 boxSizing: 'border-box'
               }}
             />
@@ -109,14 +110,15 @@ const Login = () => {
             disabled={isLoading}
             style={{
               width: '100%',
-              padding: '0.75rem',
-              fontSize: '1rem',
+              padding: 'clamp(0.75rem, 2vw, 0.75rem)',
+              fontSize: 'clamp(0.875rem, 2vw, 1rem)',
               backgroundColor: 'var(--clr-primary-a30)',
               color: 'white',
               border: 'none',
               borderRadius: '6px',
               cursor: isLoading ? 'wait' : 'pointer',
-              opacity: isLoading ? 0.7 : 1
+              opacity: isLoading ? 0.7 : 1,
+              transition: 'all 0.3s ease'
             }}
           >
             {isLoading ? 'Connexion...' : 'Se connecter'}
@@ -125,13 +127,13 @@ const Login = () => {
 
         {error && (
           <div style={{
-            padding: '0.75rem',
+            padding: 'clamp(0.5rem, 2vw, 0.75rem)',
             backgroundColor: 'rgba(255, 0, 0, 0.1)',
             color: '#f44336',
             border: '1px solid #f44336',
             borderRadius: '6px',
             textAlign: 'center',
-            fontSize: '0.85rem'
+            fontSize: 'clamp(0.75rem, 2vw, 0.85rem)'
           }}>
             {error}
           </div>

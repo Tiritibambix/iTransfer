@@ -3,15 +3,15 @@ import { useNavigate } from 'react-router-dom';
 
 const InputField = memo(({ label, type = "text", value, onChange, placeholder, id }) => (
   <div className="form-group" style={{
-    marginBottom: '1.5rem',
+    marginBottom: 'clamp(1rem, 3vw, 1.5rem)',
   }}>
     <label 
       htmlFor={id}
       style={{
         display: 'block',
-        marginBottom: '0.5rem',
+        marginBottom: 'clamp(0.25rem, 1vw, 0.5rem)',
         color: 'var(--clr-primary-a40)',
-        fontSize: '0.9rem'
+        fontSize: 'clamp(0.8rem, 2vw, 0.9rem)'
       }}
     >
       {label}
@@ -24,13 +24,14 @@ const InputField = memo(({ label, type = "text", value, onChange, placeholder, i
       placeholder={placeholder}
       style={{
         width: '100%',
-        padding: '12px',
+        padding: 'clamp(0.5rem, 2vw, 0.75rem)',
         backgroundColor: 'var(--clr-surface-a20)',
         color: 'var(--clr-primary-a50)',
         border: '1px solid var(--clr-surface-a30)',
         borderRadius: '6px',
-        fontSize: '1rem',
-        transition: 'all 0.3s ease'
+        fontSize: 'clamp(0.875rem, 2vw, 1rem)',
+        transition: 'all 0.3s ease',
+        boxSizing: 'border-box'
       }}
     />
   </div>
@@ -114,23 +115,27 @@ const SMTPSettings = () => {
 
   return (
     <div className="settings-container" style={{
-      padding: '2rem',
+      padding: 'clamp(1rem, 3vw, 2rem)',
       maxWidth: '600px',
       width: '100%',
-      margin: '0 auto'
+      margin: '0 auto',
+      boxSizing: 'border-box'
     }}>
       <div className="header" style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '2rem'
+        marginBottom: 'clamp(1.5rem, 4vw, 2rem)',
+        flexWrap: 'wrap',
+        gap: 'clamp(0.5rem, 2vw, 1rem)'
       }}>
         <h1 style={{
-          fontSize: '2.5rem',
+          fontSize: 'clamp(1.5rem, 5vw, 2.5rem)',
           margin: 0,
           background: 'linear-gradient(45deg, var(--clr-primary-a40), var(--clr-primary-a30))',
           WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent'
+          WebkitTextFillColor: 'transparent',
+          flex: '1'
         }}>
           Configuration SMTP
         </h1>
@@ -139,6 +144,11 @@ const SMTPSettings = () => {
           style={{
             backgroundColor: 'var(--clr-surface-a20)',
             color: 'var(--clr-primary-a50)',
+            padding: 'clamp(0.5rem, 2vw, 0.75rem) clamp(0.75rem, 3vw, 1.25rem)',
+            fontSize: 'clamp(0.875rem, 2vw, 1rem)',
+            borderRadius: '6px',
+            border: 'none',
+            cursor: 'pointer',
             transition: 'all 0.3s ease'
           }}
         >
@@ -148,8 +158,8 @@ const SMTPSettings = () => {
 
       {message && (
         <div style={{
-          padding: '1rem',
-          marginBottom: '2rem',
+          padding: 'clamp(0.75rem, 2vw, 1rem)',
+          marginBottom: 'clamp(1.5rem, 4vw, 2rem)',
           borderRadius: '6px',
           backgroundColor: messageType === 'success' ? 'rgba(0, 255, 0, 0.1)' : 
                          messageType === 'error' ? 'rgba(255, 0, 0, 0.1)' : 
@@ -161,7 +171,8 @@ const SMTPSettings = () => {
             messageType === 'success' ? '#4caf50' : 
             messageType === 'error' ? '#f44336' : 
             '#2196f3'
-          }`
+          }`,
+          fontSize: 'clamp(0.875rem, 2vw, 1rem)'
         }}>
           {message}
         </div>
@@ -169,7 +180,7 @@ const SMTPSettings = () => {
 
       <div className="settings-form" style={{
         backgroundColor: 'var(--clr-surface-a10)',
-        padding: '2rem',
+        padding: 'clamp(1.5rem, 4vw, 2rem)',
         borderRadius: '12px',
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
       }}>
@@ -203,45 +214,56 @@ const SMTPSettings = () => {
           type="password"
           value={smtpPassword}
           onChange={(e) => setSmtpPassword(e.target.value)}
-          placeholder="Votre mot de passe"
+          placeholder="••••••••"
         />
-        
+
         <InputField 
           id="smtp-sender"
-          label="Email expéditeur"
+          label="Email d'envoi"
           value={smtpSenderEmail}
           onChange={(e) => setSmtpSenderEmail(e.target.value)}
           placeholder="ex: no-reply@domain.com"
         />
 
-        <div className="button-group" style={{
+        <div style={{
           display: 'flex',
-          gap: '1rem',
-          marginTop: '2rem'
+          gap: 'clamp(0.5rem, 2vw, 1rem)',
+          marginTop: 'clamp(1.5rem, 4vw, 2rem)',
+          flexWrap: 'wrap'
         }}>
-          <button 
+          <button
             onClick={handleSave}
             disabled={isLoading}
             style={{
-              flex: 1,
-              padding: '1rem',
-              fontSize: '1.1rem',
+              flex: '1',
+              minWidth: '120px',
+              padding: 'clamp(0.75rem, 2vw, 1rem)',
+              fontSize: 'clamp(0.875rem, 2vw, 1rem)',
               backgroundColor: 'var(--clr-primary-a30)',
+              color: 'white',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: isLoading ? 'wait' : 'pointer',
               opacity: isLoading ? 0.7 : 1,
               transition: 'all 0.3s ease'
             }}
           >
             {isLoading ? 'Enregistrement...' : 'Enregistrer'}
           </button>
-          
-          <button 
+
+          <button
             onClick={handleTest}
             disabled={isLoading}
             style={{
-              flex: 1,
-              padding: '1rem',
-              fontSize: '1.1rem',
+              flex: '1',
+              minWidth: '120px',
+              padding: 'clamp(0.75rem, 2vw, 1rem)',
+              fontSize: 'clamp(0.875rem, 2vw, 1rem)',
               backgroundColor: 'var(--clr-surface-a30)',
+              color: 'var(--clr-primary-a50)',
+              border: 'none',
+              borderRadius: '6px',
+              cursor: isLoading ? 'wait' : 'pointer',
               opacity: isLoading ? 0.7 : 1,
               transition: 'all 0.3s ease'
             }}

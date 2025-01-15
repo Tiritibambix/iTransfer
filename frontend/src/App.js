@@ -116,30 +116,36 @@ function App() {
 
   return (
     <div className="app-container" style={{
-      padding: '2rem',
+      padding: 'clamp(1rem, 3vw, 2rem)',
       maxWidth: '800px',
       width: '100%',
-      margin: '0 auto'
+      margin: '0 auto',
+      boxSizing: 'border-box'
     }}>
       <div className="header" style={{
         display: 'flex',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: '2rem'
+        marginBottom: 'clamp(1rem, 3vw, 2rem)',
+        flexWrap: 'wrap',
+        gap: '1rem'
       }}>
         <h1 style={{
-          fontSize: '2.5rem',
+          fontSize: 'clamp(1.5rem, 5vw, 2.5rem)',
           margin: 0,
           background: 'linear-gradient(45deg, var(--clr-primary-a40), var(--clr-primary-a30))',
           WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent'
+          WebkitTextFillColor: 'transparent',
+          flex: '1 1 auto'
         }}>iTransfer</h1>
         <button 
           onClick={() => navigate('/smtp-settings')}
           style={{
             backgroundColor: 'var(--clr-surface-a20)',
             color: 'var(--clr-primary-a50)',
-            transition: 'all 0.3s ease'
+            transition: 'all 0.3s ease',
+            padding: 'clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 3vw, 1.5rem)',
+            fontSize: 'clamp(0.875rem, 2vw, 1rem)'
           }}
         >
           Paramètres
@@ -148,14 +154,15 @@ function App() {
 
       <div className="main-content" style={{
         backgroundColor: 'var(--clr-surface-a10)',
-        padding: '2rem',
+        padding: 'clamp(1rem, 3vw, 2rem)',
         borderRadius: '12px',
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
       }}>
         <div className="email-inputs" style={{
           display: 'flex',
-          gap: '1rem',
-          marginBottom: '2rem'
+          flexDirection: window.innerWidth <= 768 ? 'column' : 'row',
+          gap: 'clamp(0.5rem, 2vw, 1rem)',
+          marginBottom: 'clamp(1rem, 3vw, 2rem)'
         }}>
           <input 
             type="email" 
@@ -164,12 +171,14 @@ function App() {
             onChange={handleRecipientEmailChange}
             style={{
               flex: 1,
-              padding: '12px',
+              padding: 'clamp(0.5rem, 2vw, 0.75rem)',
               backgroundColor: 'var(--clr-surface-a20)',
               color: 'var(--clr-primary-a50)',
               border: '1px solid var(--clr-surface-a30)',
               borderRadius: '6px',
-              fontSize: '1rem'
+              fontSize: 'clamp(0.875rem, 2vw, 1rem)',
+              width: '100%',
+              boxSizing: 'border-box'
             }}
           />
           <input 
@@ -179,12 +188,14 @@ function App() {
             onChange={handleSenderEmailChange}
             style={{
               flex: 1,
-              padding: '12px',
+              padding: 'clamp(0.5rem, 2vw, 0.75rem)',
               backgroundColor: 'var(--clr-surface-a20)',
               color: 'var(--clr-primary-a50)',
               border: '1px solid var(--clr-surface-a30)',
               borderRadius: '6px',
-              fontSize: '1rem'
+              fontSize: 'clamp(0.875rem, 2vw, 1rem)',
+              width: '100%',
+              boxSizing: 'border-box'
             }}
           />
         </div>
@@ -197,13 +208,14 @@ function App() {
           onDrop={handleDrop}
           onClick={() => fileInputRef.current.click()}
           style={{
-            padding: '3rem',
-            border: `2px dashed ${dragActive ? 'var(--clr-primary-a40)' : 'var(--clr-surface-a30)'}`,
-            borderRadius: '12px',
-            backgroundColor: dragActive ? 'var(--clr-surface-tonal-a10)' : 'var(--clr-surface-a20)',
-            cursor: 'pointer',
+            padding: 'clamp(1.5rem, 4vw, 3rem)',
+            border: '2px dashed var(--clr-surface-a30)',
+            borderRadius: '8px',
+            backgroundColor: dragActive ? 'var(--clr-surface-a30)' : 'var(--clr-surface-a20)',
             transition: 'all 0.3s ease',
-            marginBottom: '2rem'
+            cursor: 'pointer',
+            textAlign: 'center',
+            marginBottom: 'clamp(1rem, 3vw, 2rem)'
           }}
         >
           <div style={{ textAlign: 'center' }}>
@@ -222,7 +234,7 @@ function App() {
 
         {progress > 0 && (
           <div className="progress-container" style={{
-            marginBottom: '1rem'
+            marginBottom: 'clamp(1rem, 3vw, 2rem)'
           }}>
             <div className="progress-bar" style={{
               height: '4px',
@@ -239,7 +251,7 @@ function App() {
             </div>
             <p style={{ 
               margin: '0.5rem 0 0 0',
-              fontSize: '0.9rem'
+              fontSize: 'clamp(0.875rem, 2vw, 1rem)'
             }}>
               {progress}% uploadé
             </p>
@@ -247,8 +259,8 @@ function App() {
               onClick={cancelUpload}
               style={{
                 backgroundColor: 'var(--clr-surface-a30)',
-                fontSize: '0.9rem',
-                padding: '8px 16px'
+                fontSize: 'clamp(0.875rem, 2vw, 1rem)',
+                padding: 'clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 3vw, 1.5rem)'
               }}
             >
               Annuler
@@ -260,8 +272,8 @@ function App() {
           onClick={handleUpload}
           style={{
             width: '100%',
-            padding: '1rem',
-            fontSize: '1.1rem',
+            padding: 'clamp(1rem, 3vw, 1.5rem)',
+            fontSize: 'clamp(1rem, 3vw, 1.25rem)',
             backgroundColor: 'var(--clr-primary-a30)',
             transition: 'all 0.3s ease'
           }}
