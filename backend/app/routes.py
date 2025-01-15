@@ -3,6 +3,7 @@ import uuid
 import hashlib
 import smtplib
 import json
+import zipfile
 from flask import request, jsonify, send_file
 from werkzeug.utils import secure_filename
 from email.mime.text import MIMEText
@@ -167,59 +168,51 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
             except Exception as e:
                 app.logger.error(f"Erreur lors de la fermeture de la connexion SMTP : {str(e)}")
 
-def send_recipient_notification(to_email, file_id, filename, smtp_config):
+def send_recipient_notification(to_email, file_id, filename, smtp_config, file_list=""):
     """Envoie une notification au destinataire avec le lien de téléchargement"""
+    
     app.logger.info(f"Préparation de la notification pour le destinataire : {to_email}")
     backend_url = get_backend_url()
-    app.logger.info(f"URL backend : {backend_url}")
-    download_link = f"{backend_url}/download/{file_id}"
-    app.logger.info(f"Lien de téléchargement généré : {download_link}")
     
     message = f"""
     Bonjour,
 
-    Un fichier a été partagé avec vous via iTransfer.
-    
-    Fichier : {filename}
-    Lien de téléchargement : {download_link}
-    
-    Ce lien expirera dans 7 jours.
-    
+    Un fichier zip contenant les éléments suivants vous a été envoyé via iTransfer :
+
+    {file_list}
+
+    Pour le télécharger, cliquez sur le lien suivant :
+    {backend_url}/download/{file_id}
+
+    Ce lien est valable jusqu'au premier téléchargement du fichier.
+
     Cordialement,
     L'équipe iTransfer
     """
     
-    app.logger.info("Envoi de la notification au destinataire")
     success = send_notification_email(to_email, "iTransfer - Nouveau fichier partagé", message, smtp_config)
     if not success:
         app.logger.error(f"Échec de l'envoi de la notification au destinataire : {to_email}")
     return success
 
-def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config):
+def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config, file_list=""):
     """Envoie une confirmation à l'expéditeur après l'upload"""
-    app.logger.info(f"Préparation de la confirmation pour l'expéditeur : {to_email}")
-    backend_url = get_backend_url()
-    app.logger.info(f"URL backend : {backend_url}")
-    download_link = f"{backend_url}/download/{file_id}"
-    app.logger.info(f"Lien de téléchargement généré : {download_link}")
     
     message = f"""
     Bonjour,
 
-    Votre fichier a été uploadé avec succès sur iTransfer.
-    
-    Fichier : {filename}
-    ID : {file_id}
-    Lien de téléchargement : {download_link}
-    
-    Une notification a été envoyée au destinataire avec ce même lien.
-    
+    Votre fichier zip contenant les éléments suivants a été uploadé avec succès :
+
+    {file_list}
+
+    Le destinataire recevra un email contenant le lien de téléchargement.
+    Vous serez notifié lorsque le fichier aura été téléchargé.
+
     Cordialement,
     L'équipe iTransfer
     """
     
-    app.logger.info("Envoi de la confirmation à l'expéditeur")
-    success = send_notification_email(to_email, "iTransfer - Upload réussi", message, smtp_config)
+    success = send_notification_email(to_email, "iTransfer - Fichiers envoyés avec succès", message, smtp_config)
     if not success:
         app.logger.error(f"Échec de l'envoi de la confirmation à l'expéditeur : {to_email}")
     return success
@@ -255,112 +248,100 @@ def upload_file():
 
     try:
         app.logger.info("Début du traitement de l'upload")
+        
         # Vérification des données requises
-        if 'file' not in request.files:
+        if 'files[]' not in request.files:
             return jsonify({'error': 'Aucun fichier envoyé'}), 400
         
-        file = request.files['file']
-        # Normalisation des emails en minuscules et suppression des espaces
-        email = request.form.get('email')
-        sender_email = request.form.get('sender_email')
-        if email:
-            email = email.lower().strip()
-        if sender_email:
-            sender_email = sender_email.lower().strip()
+        files = request.files.getlist('files[]')
+        paths = request.form.getlist('paths[]')
+        email = request.form.get('email', '').lower().strip()
+        sender_email = request.form.get('sender_email', '').lower().strip()
 
-        app.logger.info(f"Fichier reçu : {file.filename}")
-        app.logger.info(f"Email destinataire : {email}")
-        app.logger.info(f"Email expéditeur : {sender_email}")
+        if not files or not email or not sender_email:
+            return jsonify({'error': 'Fichiers ou email manquant'}), 400
 
-        if not file or not email or not sender_email:
-            return jsonify({'error': 'Fichier ou email manquant'}), 400
+        # Génération d'un ID unique pour le zip
+        zip_id = str(uuid.uuid4())
+        zip_filename = f"transfer_{zip_id}.zip"
+        zip_path = os.path.join(app.config['UPLOAD_FOLDER'], zip_filename)
         
-        if not file.filename:
-            return jsonify({'error': 'Nom de fichier invalide'}), 400
+        # Création du zip
+        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+            for file, path in zip(files, paths):
+                if file.filename:
+                    # Utiliser le chemin relatif fourni pour préserver la structure
+                    zipf.writestr(path, file.read())
 
-        # Génération d'un ID unique et sécurisation du nom de fichier
-        file_id = str(uuid.uuid4())
-        file_content = file.read()
-        encrypted_data = hashlib.sha256(file_content).hexdigest()
-        safe_filename = secure_filename(file.filename)
-        
-        app.logger.info(f"ID généré : {file_id}")
-        app.logger.info(f"Nom de fichier sécurisé : {safe_filename}")
-        
-        # Création du chemin de fichier unique
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_id}_{safe_filename}")
-        
-        try:
-            # Sauvegarde du fichier
-            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-            with open(file_path, 'wb') as f:
-                f.write(file_content)
-            app.logger.info(f"Fichier sauvegardé : {file_path}")
-        except Exception as e:
-            app.logger.error(f"Erreur lors de la sauvegarde du fichier: {str(e)}")
-            return jsonify({'error': 'Erreur lors de la sauvegarde du fichier'}), 500
+        # Calcul du hash du zip
+        with open(zip_path, 'rb') as f:
+            zip_content = f.read()
+            encrypted_data = hashlib.sha256(zip_content).hexdigest()
 
+        # Création de la liste des fichiers pour le mail
+        file_list = "\n".join([f"- {path}" for path in paths])
+        
         try:
             # Création de l'entrée dans la base de données
             new_file = FileUpload(
-                id=file_id,
-                filename=safe_filename,
+                id=zip_id,
+                filename=zip_filename,
                 email=email,
                 sender_email=sender_email,
-                encrypted_data=encrypted_data,
-                downloaded=False
+                encrypted_data=encrypted_data
             )
             db.session.add(new_file)
             db.session.commit()
-            app.logger.info("Entrée créée dans la base de données")
-        except Exception as db_error:
-            app.logger.error(f"Erreur base de données: {str(db_error)}")
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            return jsonify({'error': 'Erreur lors de l\'enregistrement en base de données'}), 500
+            app.logger.info(f"Fichier zip créé et enregistré en base : {zip_filename}")
 
-        # Chargement de la configuration SMTP
-        try:
-            app.logger.info("Chargement de la configuration SMTP")
-            with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
-                smtp_config = json.load(config_file)
-            app.logger.info("Configuration SMTP chargée avec succès")
         except Exception as e:
-            app.logger.error(f"Erreur lors du chargement de la configuration SMTP: {str(e)}")
-            return jsonify({'warning': 'Fichier uploadé mais impossible d\'envoyer les notifications'}), 200
+            app.logger.error(f"Erreur lors de l'enregistrement en base : {str(e)}")
+            if os.path.exists(zip_path):
+                os.remove(zip_path)
+            return jsonify({'error': 'Erreur lors de l\'enregistrement du fichier'}), 500
 
-        # Envoi des notifications
-        notification_errors = []
-        
-        # Envoi au destinataire
-        app.logger.info("Tentative d'envoi de la notification au destinataire")
-        if not send_recipient_notification(email, file_id, safe_filename, smtp_config):
-            app.logger.error("Échec de l'envoi au destinataire")
-            notification_errors.append("destinataire")
-        
-        # Envoi à l'expéditeur
-        app.logger.info("Tentative d'envoi de la confirmation à l'expéditeur")
-        if not send_sender_upload_confirmation(sender_email, file_id, safe_filename, smtp_config):
-            app.logger.error("Échec de l'envoi à l'expéditeur")
-            notification_errors.append("expéditeur")
+        # Configuration SMTP
+        smtp_config = None
+        try:
+            with open('smtp_config.json', 'r') as f:
+                smtp_config = json.load(f)
+        except Exception as e:
+            app.logger.error(f"Erreur lors de la lecture de la configuration SMTP : {str(e)}")
+            return jsonify({
+                'message': 'Fichiers uploadés mais impossible d\'envoyer les notifications',
+                'warning': 'Configuration SMTP manquante'
+            }), 201
 
-        response_data = {
-            'success': True,
-            'file_id': file_id,
-            'message': 'Fichier uploadé avec succès'
-        }
+        # Envoi des notifications avec la liste des fichiers
+        notification_success = True
+        if smtp_config:
+            recipient_success = send_recipient_notification(
+                email, 
+                zip_id, 
+                zip_filename, 
+                smtp_config,
+                file_list=file_list
+            )
+            sender_success = send_sender_upload_confirmation(
+                sender_email, 
+                zip_id, 
+                zip_filename, 
+                smtp_config,
+                file_list=file_list
+            )
+            notification_success = recipient_success and sender_success
 
-        if notification_errors:
-            response_data['warning'] = f"Impossible d'envoyer les notifications aux destinataires suivants: {', '.join(notification_errors)}"
-
-        app.logger.info("Upload terminé avec succès")
-        return jsonify(response_data), 200
+        if notification_success:
+            return jsonify({'message': 'Fichiers uploadés et notifications envoyées'}), 201
+        else:
+            return jsonify({
+                'message': 'Fichiers uploadés mais problème avec les notifications',
+                'warning': 'Notifications non envoyées'
+            }), 201
 
     except Exception as e:
-        app.logger.error(f"Erreur lors de l'upload: {str(e)}")
-        if 'file_path' in locals() and os.path.exists(file_path):
-            os.remove(file_path)
-        return jsonify({'error': 'Une erreur interne est survenue'}), 500
+        app.logger.error(f"Erreur lors de l'upload : {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/save-smtp-settings', methods=['POST', 'OPTIONS'])
 def save_smtp_settings():
@@ -503,7 +484,7 @@ def test_smtp():
 
         # Tenter d'envoyer un email de test
         app.logger.info(f"Tentative de connexion à {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
-        
+
         # Choisir le type de connexion en fonction du port
         port = int(smtp_config['smtp_port'])
         if port == 465:

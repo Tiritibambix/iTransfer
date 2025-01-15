@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 function App() {
@@ -7,73 +7,125 @@ function App() {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  const [fileList, setFileList] = useState([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [message, setMessage] = useState('');
   const xhrRef = useRef(null);
   const fileInputRef = useRef(null);
   const backendUrl = window.BACKEND_URL;
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) {
-      console.error('Aucun fichier sélectionné');
-      return;
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    setDragActive(false);
+
+    let items;
+    if (e.dataTransfer.items) {
+      items = [...e.dataTransfer.items];
+    } else {
+      items = [...e.dataTransfer.files];
     }
 
-    if (!recipientEmail || !senderEmail) {
-      alert('Veuillez remplir les adresses email du destinataire et de l\'expéditeur');
-      return;
-    }
+    processItems(items);
+  }, []);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('email', recipientEmail);
-    formData.append('sender_email', senderEmail);
+  const processItems = async (items) => {
+    const allFiles = [];
+    const fileList = [];
 
-    console.log('Fichier à envoyer :', file);
-    console.log('Email du destinataire :', recipientEmail);
-    console.log('Email de l\'expéditeur :', senderEmail);
-
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${backendUrl}/upload`, true);
-
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const percent = Math.round((event.loaded / event.total) * 100);
-        setProgress(percent);
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status === 201 || xhr.status === 200) {
-        const response = JSON.parse(xhr.responseText);
-        console.log('Upload réussi');
-        if (response.warning) {
-          alert('Le fichier a été uploadé mais il y a eu un problème avec l\'envoi des notifications.');
-        } else {
-          alert('Le fichier a été uploadé et les notifications ont été envoyées.');
+    const processItem = async (item) => {
+      if (item.kind === 'file') {
+        const file = item.getAsFile();
+        if (file) {
+          allFiles.push(file);
+          fileList.push({ 
+            name: file.name, 
+            path: file.webkitRelativePath || file.name,
+            size: file.size 
+          });
         }
-      } else {
-        console.error('Erreur lors de l\'upload :', xhr.status, xhr.statusText);
-        alert('Erreur lors de l\'upload. Veuillez vérifier que les emails sont valides et réessayer.');
+      } else if (item.isDirectory) {
+        const reader = item.createReader();
+        const entries = await new Promise((resolve) => {
+          reader.readEntries(resolve);
+        });
+        for (const entry of entries) {
+          await processItem(entry);
+        }
       }
-      setProgress(0);
     };
 
-    xhr.onerror = () => {
-      console.error('Erreur réseau lors de l\'upload');
-      alert('Erreur réseau lors de l\'upload. Veuillez vérifier votre connexion et réessayer.');
-      setProgress(0);
-    };
+    for (const item of items) {
+      if (item.kind === 'file' || item.isDirectory) {
+        await processItem(item);
+      } else if (item instanceof File) {
+        allFiles.push(item);
+        fileList.push({ 
+          name: item.name, 
+          path: item.webkitRelativePath || item.name,
+          size: item.size 
+        });
+      }
+    }
 
-    xhr.setRequestHeader('Accept', 'application/json');
-    xhr.send(formData);
-    xhrRef.current = xhr;
+    setSelectedFiles(allFiles);
+    setFileList(fileList);
   };
 
-  const cancelUpload = () => {
-    if (xhrRef.current) {
-      xhrRef.current.abort();
-      console.log('Upload annulé');
-      setProgress(0);
+  const handleFileSelect = (e) => {
+    const files = [...e.target.files];
+    processItems(files);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!selectedFiles.length || !recipientEmail || !senderEmail) {
+      alert('Veuillez sélectionner au moins un fichier et remplir les adresses email');
+      return;
+    }
+
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    const formData = new FormData();
+    formData.append('email', recipientEmail);
+    formData.append('sender_email', senderEmail);
+    
+    // Ajout de tous les fichiers sélectionnés
+    selectedFiles.forEach((file, index) => {
+      formData.append('files[]', file);
+      formData.append('paths[]', fileList[index].path);
+    });
+
+    try {
+      console.log('Fichiers à envoyer :', fileList.map(f => f.path));
+      console.log('Email du destinataire :', recipientEmail);
+      console.log('Email de l\'expéditeur :', senderEmail);
+
+      const response = await fetch(`${backendUrl}/upload`, {
+        method: 'POST',
+        body: formData,
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+        },
+      });
+
+      if (response.ok) {
+        setMessage('Fichiers envoyés avec succès !');
+        setSelectedFiles([]);
+        setFileList([]);
+        setUploadProgress(0);
+      } else {
+        const error = await response.json();
+        setMessage(error.error || 'Erreur lors de l\'upload');
+      }
+    } catch (error) {
+      console.error('Erreur:', error);
+      setMessage('Erreur lors de l\'upload. Veuillez vérifier que les emails sont valides et réessayer.');
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -83,35 +135,6 @@ function App() {
 
   const handleSenderEmailChange = (event) => {
     setSenderEmail(event.target.value);
-  };
-
-  const handleUpload = () => {
-    const fileInput = document.querySelector('input[type="file"]');
-    if (fileInput.files.length > 0) {
-      handleFileUpload({ target: fileInput });
-    } else {
-      alert('Veuillez sélectionner un fichier');
-    }
-  };
-
-  const handleDrag = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
-      setDragActive(true);
-    } else if (e.type === "dragleave") {
-      setDragActive(false);
-    }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileUpload({ target: { files: [e.dataTransfer.files[0]] } });
-    }
   };
 
   return (
@@ -201,38 +224,73 @@ function App() {
         </div>
 
         <div 
-          className={`drop-zone ${dragActive ? 'active' : ''}`}
-          onDragEnter={handleDrag}
-          onDragLeave={handleDrag}
-          onDragOver={handleDrag}
+          className="drop-zone" 
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current.click()}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragActive(true);
+          }}
+          onDragEnter={() => setDragActive(true)}
+          onDragLeave={() => setDragActive(false)}
           style={{
-            padding: 'clamp(1.5rem, 4vw, 3rem)',
             border: '2px dashed var(--clr-surface-a30)',
             borderRadius: '8px',
+            padding: 'var(--spacing-xl)',
             backgroundColor: dragActive ? 'var(--clr-surface-a30)' : 'var(--clr-surface-a20)',
-            transition: 'all 0.3s ease',
             cursor: 'pointer',
-            textAlign: 'center',
-            marginBottom: 'clamp(1rem, 3vw, 2rem)'
+            transition: 'all 0.3s ease'
           }}
         >
+          <input
+            type="file"
+            onChange={handleFileSelect}
+            multiple
+            webkitdirectory=""
+            directory=""
+            style={{ display: 'none' }}
+            id="file-upload"
+          />
           <div style={{ textAlign: 'center' }}>
-            <p style={{ margin: '0 0 1rem 0' }}>
-              Glissez et déposez votre fichier ici<br />
-              ou cliquez pour sélectionner
+            <p style={{ marginBottom: 'var(--spacing-md)' }}>
+              Glissez-déposez vos fichiers ou dossiers ici ou
+              <label 
+                htmlFor="file-upload" 
+                style={{ 
+                  color: 'var(--clr-primary-a40)',
+                  cursor: 'pointer',
+                  marginLeft: '0.5rem'
+                }}
+              >
+                parcourez
+              </label>
             </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              onChange={handleFileUpload}
-              style={{ display: 'none' }}
-            />
+            {fileList.length > 0 && (
+              <div style={{ 
+                marginTop: 'var(--spacing-md)',
+                textAlign: 'left',
+                maxHeight: '200px',
+                overflowY: 'auto',
+                padding: 'var(--spacing-sm)',
+                backgroundColor: 'var(--clr-surface-a10)',
+                borderRadius: '4px'
+              }}>
+                <h4 style={{ marginBottom: 'var(--spacing-sm)' }}>
+                  Fichiers sélectionnés ({fileList.length}):
+                </h4>
+                {fileList.map((file, index) => (
+                  <div key={index} style={{ 
+                    fontSize: 'var(--font-size-sm)',
+                    marginBottom: 'var(--spacing-xs)'
+                  }}>
+                    {file.path} ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {progress > 0 && (
+        {isUploading && (
           <div className="progress-container" style={{
             marginBottom: 'clamp(1rem, 3vw, 2rem)'
           }}>
@@ -243,7 +301,7 @@ function App() {
               overflow: 'hidden'
             }}>
               <div style={{
-                width: `${progress}%`,
+                width: `${uploadProgress}%`,
                 height: '100%',
                 backgroundColor: 'var(--clr-primary-a40)',
                 transition: 'width 0.3s ease'
@@ -253,23 +311,13 @@ function App() {
               margin: '0.5rem 0 0 0',
               fontSize: 'clamp(0.875rem, 2vw, 1rem)'
             }}>
-              {progress}% uploadé
+              {uploadProgress}% uploadé
             </p>
-            <button 
-              onClick={cancelUpload}
-              style={{
-                backgroundColor: 'var(--clr-surface-a30)',
-                fontSize: 'clamp(0.875rem, 2vw, 1rem)',
-                padding: 'clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 3vw, 1.5rem)'
-              }}
-            >
-              Annuler
-            </button>
           </div>
         )}
 
         <button 
-          onClick={handleUpload}
+          onClick={handleSubmit}
           style={{
             width: '100%',
             padding: 'clamp(1rem, 3vw, 1.5rem)',
@@ -280,6 +328,15 @@ function App() {
         >
           Envoyer le fichier
         </button>
+        {message && (
+          <p style={{ 
+            marginTop: 'var(--spacing-md)',
+            fontSize: 'var(--font-size-sm)',
+            color: 'var(--clr-primary-a40)'
+          }}>
+            {message}
+          </p>
+        )}
       </div>
     </div>
   );
