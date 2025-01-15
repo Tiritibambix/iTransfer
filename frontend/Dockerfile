@@ -22,9 +22,14 @@ FROM nginx:alpine
 # Copier les fichiers construits depuis l'étape de build
 COPY --from=builder /app/build /usr/share/nginx/html
 
-# Copier le script d'environnement
-COPY env.sh /docker-entrypoint.d/40-env.sh
-RUN chmod +x /docker-entrypoint.d/40-env.sh
+# Créer le script d'environnement directement
+RUN echo '#!/bin/sh\n\
+# Remplacer la configuration dans le HTML\n\
+sed -i "s|window.BACKEND_URL = .*|window.BACKEND_URL = '\''$BACKEND_URL'\''|g" /usr/share/nginx/html/index.html\n\
+# Démarrer nginx\n\
+nginx -g '\''daemon off;'\''\n\
+' > /docker-entrypoint.d/40-env.sh \
+&& chmod +x /docker-entrypoint.d/40-env.sh
 
 # Configuration Nginx pour SPA
 RUN echo 'server { \
