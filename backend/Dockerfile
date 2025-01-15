@@ -25,8 +25,8 @@ RUN pip install --no-cache-dir -r /app/requirements.txt && \
     pip-check
 
 # Créer les dossiers nécessaires
-RUN mkdir -p /app/uploads /app/data && \
-    chmod -R 777 /app/uploads /app/data
+RUN mkdir -p /app/uploads /app/data /app/logs && \
+    chmod -R 777 /app/uploads /app/data /app/logs
 
 # Copier le code de l'application
 COPY backend /app/
