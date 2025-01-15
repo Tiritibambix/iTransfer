@@ -5,13 +5,13 @@ FROM node:14 AS builder
 WORKDIR /app
 
 # Copier les fichiers de configuration pour npm
-COPY package.json package-lock.json* ./
+COPY frontend/package.json frontend/package-lock.json* ./
 
 # Installer les dépendances
 RUN npm install
 
 # Copier tout le code source du frontend
-COPY . .
+COPY frontend/ .
 
 # Construire l'application
 RUN npm run build
