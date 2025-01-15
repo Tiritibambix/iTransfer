@@ -50,21 +50,36 @@ git clone https://github.com/yourusername/iTransfer.git
 cd iTransfer
 ```
 
-2. Create a .env file (optional):
-```bash
-# Database
-DB_PASSWORD=your_db_password
-DB_ROOT_PASSWORD=your_root_password
-
-# Admin access
-ADMIN_USERNAME=your_admin_username
-ADMIN_PASSWORD=your_admin_password
-
-# Deployment
-BACKEND_URL=https://api.yourdomain.com  # If behind reverse proxy
-FRONTEND_URL=https://yourdomain.com     # If behind reverse proxy
-FORCE_HTTPS=true                        # Force HTTPS in production
-PROXY_COUNT=1                           # Number of reverse proxies
+2. Configure the application in `docker-compose.yml`:
+```yaml
+services:
+  frontend:
+    # ... other settings ...
+    environment:
+      # Local development
+      - BACKEND_URL=http://localhost:5500
+      
+  backend:
+    # ... other settings ...
+    environment:
+      # Database settings
+      - DATABASE_URL=mysql+mysqldb://itransfer:your_db_password@db/itransfer
+      
+      # Admin access (change these!)
+      - ADMIN_USERNAME=your_admin_username
+      - ADMIN_PASSWORD=your_admin_password
+      
+      # Local development
+      - FRONTEND_URL=http://localhost:3500
+      - BACKEND_URL=http://localhost:5500
+      
+  db:
+    # ... other settings ...
+    environment:
+      - MYSQL_DATABASE=itransfer
+      - MYSQL_USER=itransfer
+      - MYSQL_PASSWORD=your_db_password
+      - MYSQL_ROOT_PASSWORD=your_root_password
 ```
 
 3. Start the application:
@@ -92,17 +107,42 @@ The application will automatically detect the correct protocol based on the port
 
 ### Production Deployment
 
-For production deployment behind a reverse proxy:
+For production deployment behind a reverse proxy, update your `docker-compose.yml`:
 
-1. Set environment variables in .env:
-```bash
-BACKEND_URL=https://api.yourdomain.com
-FRONTEND_URL=https://yourdomain.com
-FORCE_HTTPS=true
-PROXY_COUNT=1  # Adjust based on your setup
+```yaml
+services:
+  frontend:
+    # ... other settings ...
+    environment:
+      # Production URL (with https)
+      - BACKEND_URL=https://api.yourdomain.com
+      
+  backend:
+    # ... other settings ...
+    environment:
+      # Production settings
+      - FRONTEND_URL=https://yourdomain.com
+      - BACKEND_URL=https://api.yourdomain.com
+      - FORCE_HTTPS=true
+      - PROXY_COUNT=1  # Number of reverse proxies
+      
+      # Security (change these!)
+      - ADMIN_USERNAME=secure_admin_username
+      - ADMIN_PASSWORD=secure_admin_password
+      
+      # Database (use strong passwords)
+      - DATABASE_URL=mysql+mysqldb://itransfer:strong_db_password@db/itransfer
+      
+  db:
+    # ... other settings ...
+    environment:
+      - MYSQL_DATABASE=itransfer
+      - MYSQL_USER=itransfer
+      - MYSQL_PASSWORD=strong_db_password
+      - MYSQL_ROOT_PASSWORD=strong_root_password
 ```
 
-2. Configure your reverse proxy (example for Nginx):
+Configure your reverse proxy (example for Nginx):
 ```nginx
 # Frontend
 server {
@@ -131,7 +171,7 @@ server {
 }
 ```
 
-3. Start the application:
+Start the application:
 ```bash
 docker-compose up -d
 ```
