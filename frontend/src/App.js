@@ -20,62 +20,83 @@ function App() {
     e.preventDefault();
     setDragActive(false);
 
-    let items;
-    if (e.dataTransfer.items) {
-      items = [...e.dataTransfer.items];
-    } else {
-      items = [...e.dataTransfer.files];
-    }
+    const items = e.dataTransfer.items;
+    const files = e.dataTransfer.files;
+    
+    if (items && items.length > 0) {
+      const fileList = [];
+      const selectedFiles = [];
 
-    processItems(items);
+      const processEntry = async (entry) => {
+        if (entry.isFile) {
+          const file = await new Promise((resolve) => entry.file(resolve));
+          fileList.push({
+            name: file.name,
+            path: entry.fullPath.substring(1), // Enlève le / initial
+            size: file.size
+          });
+          selectedFiles.push(file);
+        } else if (entry.isDirectory) {
+          const reader = entry.createReader();
+          const entries = await new Promise((resolve) => reader.readEntries(resolve));
+          for (const childEntry of entries) {
+            await processEntry(childEntry);
+          }
+        }
+      };
+
+      const promises = [];
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.kind === 'file') {
+          const entry = item.webkitGetAsEntry() || item.getAsEntry();
+          if (entry) {
+            promises.push(processEntry(entry));
+          }
+        }
+      }
+
+      Promise.all(promises).then(() => {
+        setSelectedFiles(prevFiles => [...prevFiles, ...selectedFiles]);
+        setFileList(prevList => [...prevList, ...fileList]);
+      });
+    } else if (files.length > 0) {
+      // Fallback pour les navigateurs qui ne supportent pas l'API FileSystem
+      const fileList = [];
+      const selectedFiles = [];
+
+      Array.from(files).forEach(file => {
+        fileList.push({
+          name: file.name,
+          path: file.name,
+          size: file.size
+        });
+        selectedFiles.push(file);
+      });
+
+      setSelectedFiles(prevFiles => [...prevFiles, ...selectedFiles]);
+      setFileList(prevList => [...prevList, ...fileList]);
+    }
   }, []);
 
-  const processItems = async (items) => {
-    const allFiles = [];
-    const fileList = [];
-
-    const processItem = async (item) => {
-      if (item.kind === 'file') {
-        const file = item.getAsFile();
-        if (file) {
-          allFiles.push(file);
-          fileList.push({ 
-            name: file.name, 
-            path: file.webkitRelativePath || file.name,
-            size: file.size 
-          });
-        }
-      } else if (item.isDirectory) {
-        const reader = item.createReader();
-        const entries = await new Promise((resolve) => {
-          reader.readEntries(resolve);
-        });
-        for (const entry of entries) {
-          await processItem(entry);
-        }
-      }
-    };
-
-    for (const item of items) {
-      if (item.kind === 'file' || item.isDirectory) {
-        await processItem(item);
-      } else if (item instanceof File) {
-        allFiles.push(item);
-        fileList.push({ 
-          name: item.name, 
-          path: item.webkitRelativePath || item.name,
-          size: item.size 
-        });
-      }
-    }
-
-    setSelectedFiles(allFiles);
-    setFileList(fileList);
-  };
-
   const handleFileSelect = (e) => {
-    const files = [...e.target.files];
-    processItems(files);
+    const files = Array.from(e.target.files);
+    const fileList = [];
+    const selectedFiles = [];
+
+    files.forEach(file => {
+      // Pour les fichiers sélectionnés directement
+      const path = file.webkitRelativePath || file.name;
+      fileList.push({
+        name: file.name,
+        path: path,
+        size: file.size
+      });
+      selectedFiles.push(file);
+    });
+
+    setSelectedFiles(prevFiles => [...prevFiles, ...selectedFiles]);
+    setFileList(prevList => [...prevList, ...fileList]);
   };
 
   const handleSubmit = async (e) => {
@@ -92,40 +113,51 @@ function App() {
     formData.append('email', recipientEmail);
     formData.append('sender_email', senderEmail);
     
-    // Ajout de tous les fichiers sélectionnés
     selectedFiles.forEach((file, index) => {
       formData.append('files[]', file);
       formData.append('paths[]', fileList[index].path);
     });
 
     try {
-      console.log('Fichiers à envoyer :', fileList.map(f => f.path));
-      console.log('Email du destinataire :', recipientEmail);
-      console.log('Email de l\'expéditeur :', senderEmail);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${process.env.REACT_APP_API_URL || 'http://localhost:5500'}/upload`, true);
 
-      const response = await fetch(`${backendUrl}/upload`, {
-        method: 'POST',
-        body: formData,
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentCompleted = Math.round((event.loaded * 100) / event.total);
           setUploadProgress(percentCompleted);
-        },
-      });
+        }
+      };
 
-      if (response.ok) {
-        setMessage('Fichiers envoyés avec succès !');
-        setSelectedFiles([]);
-        setFileList([]);
+      xhr.onload = () => {
+        if (xhr.status === 201 || xhr.status === 200) {
+          const response = JSON.parse(xhr.responseText);
+          setMessage(response.message);
+          if (response.warning) {
+            setMessage(response.warning);
+          }
+          setSelectedFiles([]);
+          setFileList([]);
+        } else {
+          const error = JSON.parse(xhr.responseText);
+          setMessage(error.error || 'Erreur lors de l\'upload');
+        }
+        setIsUploading(false);
         setUploadProgress(0);
-      } else {
-        const error = await response.json();
-        setMessage(error.error || 'Erreur lors de l\'upload');
-      }
+      };
+
+      xhr.onerror = () => {
+        setMessage('Erreur lors de l\'upload. Veuillez réessayer.');
+        setIsUploading(false);
+        setUploadProgress(0);
+      };
+
+      xhr.send(formData);
     } catch (error) {
       console.error('Erreur:', error);
       setMessage('Erreur lors de l\'upload. Veuillez vérifier que les emails sont valides et réessayer.');
-    } finally {
       setIsUploading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -222,6 +254,7 @@ function App() {
         }}
         onDragEnter={() => setDragActive(true)}
         onDragLeave={() => setDragActive(false)}
+        onClick={() => document.getElementById('file-upload').click()}
         style={{
           border: '2px dashed var(--clr-surface-a30)',
           borderRadius: '8px',
@@ -237,8 +270,6 @@ function App() {
           type="file"
           onChange={handleFileSelect}
           multiple
-          webkitdirectory=""
-          directory=""
           style={{ display: 'none' }}
           id="file-upload"
         />
@@ -248,18 +279,7 @@ function App() {
             color: 'var(--clr-text)',
             fontSize: 'clamp(0.875rem, 2vw, 1rem)'
           }}>
-            Glissez-déposez vos fichiers ou dossiers ici ou
-            <label 
-              htmlFor="file-upload" 
-              style={{ 
-                color: 'var(--clr-primary)',
-                cursor: 'pointer',
-                marginLeft: '0.5rem',
-                textDecoration: 'underline'
-              }}
-            >
-              parcourez
-            </label>
+            Glissez-déposez vos fichiers ou dossiers ici ou cliquez n'importe où dans cette zone
           </p>
           {fileList.length > 0 && (
             <div style={{ 

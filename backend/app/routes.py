@@ -168,35 +168,34 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
             except Exception as e:
                 app.logger.error(f"Erreur lors de la fermeture de la connexion SMTP : {str(e)}")
 
-def send_recipient_notification(to_email, file_id, filename, smtp_config, file_list=""):
-    """Envoie une notification au destinataire avec le lien de téléchargement"""
-    
-    app.logger.info(f"Préparation de la notification pour le destinataire : {to_email}")
-    backend_url = get_backend_url()
-    
-    message = f"""
-    Bonjour,
-
-    Un fichier zip contenant les éléments suivants vous a été envoyé via iTransfer :
-
-    {file_list}
-
-    Pour le télécharger, cliquez sur le lien suivant :
-    {backend_url}/download/{file_id}
-
-    Ce lien est valable jusqu'au premier téléchargement du fichier.
-
-    Cordialement,
-    L'équipe iTransfer
-    """
-    
-    success = send_notification_email(to_email, "iTransfer - Nouveau fichier partagé", message, smtp_config)
-    if not success:
-        app.logger.error(f"Échec de l'envoi de la notification au destinataire : {to_email}")
-    return success
+def cleanup_expired_files():
+    """Supprime les fichiers expirés (plus de 5 jours)"""
+    try:
+        # Calcul de la date limite (5 jours avant aujourd'hui)
+        expiration_date = datetime.utcnow() - timedelta(days=5)
+        
+        # Recherche des fichiers expirés
+        expired_files = FileUpload.query.filter(FileUpload.created_at <= expiration_date).all()
+        
+        for file in expired_files:
+            # Suppression du fichier physique
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file.id}_{file.filename}")
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            
+            # Suppression de l'entrée en base
+            db.session.delete(file)
+        
+        db.session.commit()
+        app.logger.info(f"Nettoyage terminé : {len(expired_files)} fichiers supprimés")
+    except Exception as e:
+        app.logger.error(f"Erreur lors du nettoyage des fichiers expirés : {str(e)}")
 
 def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config, file_list=""):
     """Envoie une confirmation à l'expéditeur après l'upload"""
+    
+    backend_url = get_backend_url()
+    download_link = f"{backend_url}/download/{file_id}"
     
     message = f"""
     Bonjour,
@@ -205,8 +204,13 @@ def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config, fi
 
     {file_list}
 
-    Le destinataire recevra un email contenant le lien de téléchargement.
+    Vous pouvez télécharger votre fichier ici :
+    {download_link}
+
+    Le destinataire recevra un email contenant ce même lien de téléchargement.
     Vous serez notifié lorsque le fichier aura été téléchargé.
+
+    Note : Le fichier sera automatiquement supprimé après 5 jours.
 
     Cordialement,
     L'équipe iTransfer
@@ -217,29 +221,37 @@ def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config, fi
         app.logger.error(f"Échec de l'envoi de la confirmation à l'expéditeur : {to_email}")
     return success
 
-def send_sender_download_notification(to_email, filename, smtp_config):
-    """Envoie une notification à l'expéditeur quand le fichier est téléchargé"""
-    app.logger.info(f"Préparation de la notification pour l'expéditeur : {to_email}")
+def send_recipient_notification(to_email, file_id, filename, smtp_config, file_list=""):
+    """Envoie une notification au destinataire avec le lien de téléchargement"""
+    
+    backend_url = get_backend_url()
+    download_link = f"{backend_url}/download/{file_id}"
     
     message = f"""
     Bonjour,
 
-    Le fichier que vous avez partagé via iTransfer a été téléchargé par le destinataire.
-    
-    Fichier : {filename}
-    Date de téléchargement : {formatdate(localtime=True)}
-    
-    Cette notification vous est envoyée à titre informatif.
-    
+    Un fichier zip contenant les éléments suivants vous a été envoyé via iTransfer :
+
+    {file_list}
+
+    Pour le télécharger, cliquez sur le lien suivant :
+    {download_link}
+
+    Note : Ce lien expirera dans 5 jours.
+
     Cordialement,
     L'équipe iTransfer
     """
     
-    app.logger.info("Envoi de la notification à l'expéditeur")
-    success = send_notification_email(to_email, "iTransfer - Fichier téléchargé", message, smtp_config)
+    success = send_notification_email(to_email, "iTransfer - Nouveau fichier partagé", message, smtp_config)
     if not success:
-        app.logger.error(f"Échec de l'envoi de la notification à l'expéditeur : {to_email}")
+        app.logger.error(f"Échec de l'envoi de la notification au destinataire : {to_email}")
     return success
+
+@app.before_request
+def before_request():
+    """Nettoie les fichiers expirés avant chaque requête"""
+    cleanup_expired_files()
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
@@ -538,3 +550,12 @@ Si vous recevez cet email, la configuration est correcte."""
         response = jsonify({"success": False, "error": str(e)})
         response.headers.add("Access-Control-Allow-Origin", '*')
         return response, 500
+
+class FileUpload(db.Model):
+    id = db.Column(db.String(36), primary_key=True)
+    filename = db.Column(db.String(255), nullable=False)
+    email = db.Column(db.String(255), nullable=False)
+    sender_email = db.Column(db.String(255), nullable=False)
+    encrypted_data = db.Column(db.String(255), nullable=False)
+    downloaded = db.Column(db.Boolean, default=False)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow)
