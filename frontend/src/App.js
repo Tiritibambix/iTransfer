@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-function App({ backendUrl }) {
+function App() {
   const navigate = useNavigate();
   const [progress, setProgress] = useState(0);
   const [recipientEmail, setRecipientEmail] = useState('');
@@ -9,6 +9,7 @@ function App({ backendUrl }) {
   const [dragActive, setDragActive] = useState(false);
   const xhrRef = useRef(null);
   const fileInputRef = useRef(null);
+  const backendUrl = window.BACKEND_URL;
 
   const handleFileUpload = (event) => {
     const file = event.target.files[0];

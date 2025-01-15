@@ -22,6 +22,10 @@ FROM nginx:alpine
 # Copier les fichiers construits depuis l'étape de build
 COPY --from=builder /app/build /usr/share/nginx/html
 
+# Copier le script d'environnement
+COPY env.sh /docker-entrypoint.d/40-env.sh
+RUN chmod +x /docker-entrypoint.d/40-env.sh
+
 # Configuration Nginx pour SPA
 RUN echo 'server { \
     listen 80; \

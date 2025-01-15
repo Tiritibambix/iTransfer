@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const SMTPSettings = ({ backendUrl }) => {
+const SMTPSettings = () => {
   const navigate = useNavigate();
   const [smtpServer, setSmtpServer] = useState('');
   const [smtpPort, setSmtpPort] = useState('');
@@ -11,6 +11,7 @@ const SMTPSettings = ({ backendUrl }) => {
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const backendUrl = window.BACKEND_URL;
 
   const handleSave = async () => {
     setIsLoading(true);
