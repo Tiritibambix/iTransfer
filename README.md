@@ -69,8 +69,6 @@ CREATE TABLE IF NOT EXISTS file_upload (
 3. Create your `docker-compose.yml` for local development:
 
 ```yaml
-version: '3.8'
-
 services:
   frontend:
     image: tiritibambix/itransfer-frontend
@@ -147,8 +145,6 @@ docker-compose up -d
 For production deployment behind a reverse proxy, use this `docker-compose.yml`:
 
 ```yaml
-version: '3.8'
-
 services:
   frontend:
     image: tiritibambix/itransfer-frontend

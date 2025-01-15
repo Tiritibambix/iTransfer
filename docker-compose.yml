@@ -1,8 +1,6 @@
 # Docker Compose configuration for iTransfer
 # This file defines all the services needed to run the application
 
-version: '3.8'
-
 services:
   # Frontend service: React application
   frontend:
