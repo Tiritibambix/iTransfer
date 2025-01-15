@@ -19,7 +19,7 @@ services:
     environment:
       # URL publique du backend (avec https:// si derrière reverse proxy)
       # Exemple local : http://localhost:5500
-      # Exemple proxy : https://api.itransfer.domain.com
+      # Exemple proxy : https://api.itransfer.domain.tld
       # Backend URL must match the host_port defined in backend service
       # If you change backend's host_port from 5500 to another value,
       # update this URL accordingly: http://localhost:your_backend_port
@@ -44,7 +44,7 @@ services:
     environment:
       # URL publique du frontend (avec https:// si derrière reverse proxy)
       # Exemple local : http://localhost:3500
-      # Exemple proxy : https://itransfer.domain.com
+      # Exemple proxy : https://itransfer.domain.tld
       # Frontend URL must match the host_port defined in frontend service
       # If you change frontend's host_port from 3500 to another value,
       # update this URL accordingly: http://localhost:your_frontend_port

@@ -69,92 +69,74 @@ CREATE TABLE IF NOT EXISTS file_upload (
 3. Create your `docker-compose.yml` for local development:
 
 ```yaml
-# Docker Compose configuration for iTransfer - Development Environment
 version: '3.8'
 
 services:
-  # Frontend service: React application
   frontend:
-    build: 
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: tiritibambix/itransfer-frontend
     ports:
       # Port mapping format: "host_port:container_port"
       # - host_port: Can be changed to any available port on your system (default: 3500)
       # - container_port: Must remain 80 (React default port)
       - "3500:80"
+    environment:
+      # URL publique du backend
+      # Exemple local : http://localhost:5500
+      # Exemple proxy : https://api.itransfer.domain.tld
+      - BACKEND_URL=http://localhost:5500  # Change 5500 if you modified backend port
     depends_on:
       - backend
     networks:
       - itransfer-network
-    environment:
-      # Backend URL must match the host_port defined in backend service
-      - REACT_APP_API_URL=http://localhost:5500
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
 
-  # Backend service: Flask application
   backend:
-    build: 
-      context: ./backend
-      dockerfile: Dockerfile
+    image: tiritibambix/itransfer-backend
     ports:
       # Port mapping format: "host_port:container_port"
       # - host_port: Can be changed to any available port on your system (default: 5500)
       # - container_port: Must remain 5000 (Flask default port)
       - "5500:5000"
+    environment:
+      # URL publique du frontend
+      # Exemple local : http://localhost:3500
+      # Exemple proxy : https://itransfer.domain.tld
+      - FRONTEND_URL=http://localhost:3500  # Change 3500 if you modified frontend port
+      - ADMIN_USERNAME=admin  # Change these credentials
+      - ADMIN_PASSWORD=admin
+      - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
+    volumes:
+      - ./backend/data:/app/data
+      - ./backend/uploads:/app/uploads
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     networks:
       - itransfer-network
-    environment:
-      # Database configuration
-      - DATABASE_URL=mysql+mysqldb://itransfer:password@db/itransfer
-      
-      # SMTP configuration
-      - SMTP_CONFIG_PATH=/app/data/smtp_config.json
-      
-      # Security settings (change these!)
-      - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=password
-      
-      # URLs must match the ports defined above
-      - FRONTEND_URL=http://localhost:3500
-      - BACKEND_URL=http://localhost:5500
-      
-      # Development settings
-      - FLASK_ENV=development
-      - FORCE_HTTPS=false
-    volumes:
-      - ./backend:/app
-      - uploads:/app/uploads
-      - data:/app/data
 
-  # Database service: MySQL
   db:
-    image: mysql:8.0
-    command: --default-authentication-plugin=mysql_native_password
-    restart: always
+    image: mariadb
+    environment:
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: mariadb_db
+      MYSQL_USER: mariadb_user
+      MYSQL_PASSWORD: mariadb_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - ./db_data:/var/lib/mysql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD || echo 'Healthcheck failed' >> /var/log/healthcheck.log"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     networks:
       - itransfer-network
-    environment:
-      - MYSQL_DATABASE=itransfer
-      - MYSQL_USER=itransfer
-      - MYSQL_PASSWORD=password
-      - MYSQL_ROOT_PASSWORD=root
-    volumes:
-      - mysql_data:/var/lib/mysql
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
 
 networks:
   itransfer-network:
     driver: bridge
-
-volumes:
-  mysql_data:
-  uploads:
-  data:
 ```
 
 4. Start the application:
@@ -171,86 +153,73 @@ docker-compose up -d
 For production deployment behind a reverse proxy, use this `docker-compose.yml`:
 
 ```yaml
-# Docker Compose configuration for iTransfer - Production Environment
 version: '3.8'
 
 services:
-  # Frontend service: React application
   frontend:
-    build: 
-      context: ./frontend
-      dockerfile: Dockerfile
+    image: tiritibambix/itransfer-frontend
     ports:
+      # Port mapping format: "host_port:container_port"
+      # - host_port: Can be changed to any available port on your system (default: 3500)
+      # - container_port: Must remain 80 (React default port)
       - "3500:80"
+    environment:
+      # URL publique du backend (avec https:// si derrière reverse proxy)
+      # Exemple proxy : https://api.itransfer.domain.tld
+      - BACKEND_URL=https://api.itransfer.domain.tld
     depends_on:
       - backend
     networks:
       - itransfer-network
-    environment:
-      # Production backend URL (with HTTPS)
-      - REACT_APP_API_URL=https://api.yourdomain.com
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
 
-  # Backend service: Flask application
   backend:
-    build: 
-      context: ./backend
-      dockerfile: Dockerfile
+    image: tiritibambix/itransfer-backend
     ports:
+      # Port mapping format: "host_port:container_port"
+      # - host_port: Can be changed to any available port on your system (default: 5500)
+      # - container_port: Must remain 5000 (Flask default port)
       - "5500:5000"
-    depends_on:
-      - db
-    networks:
-      - itransfer-network
     environment:
-      # Database configuration (use strong passwords)
-      - DATABASE_URL=mysql+mysqldb://itransfer:strong_password@db/itransfer
-      
-      # SMTP configuration
-      - SMTP_CONFIG_PATH=/app/data/smtp_config.json
-      
-      # Security settings (use strong credentials)
-      - ADMIN_USERNAME=secure_admin_username
-      - ADMIN_PASSWORD=secure_admin_password
-      
-      # Production URLs (with HTTPS)
-      - FRONTEND_URL=https://yourdomain.com
-      - BACKEND_URL=https://api.yourdomain.com
-      
-      # Production settings
-      - FLASK_ENV=production
+      # URL publique du frontend (avec https:// si derrière reverse proxy)
+      # Exemple proxy : https://itransfer.domain.tld
+      - FRONTEND_URL=https://itransfer.domain.tld
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin
+      - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
       - FORCE_HTTPS=true
     volumes:
-      - ./backend:/app
-      - uploads:/app/uploads
-      - data:/app/data
-
-  # Database service: MySQL
-  db:
-    image: mysql:8.0
-    command: --default-authentication-plugin=mysql_native_password
-    restart: always
+      - ./backend/data:/app/data
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - itransfer-network
+
+  db:
+    image: mariadb
     environment:
-      - MYSQL_DATABASE=itransfer
-      - MYSQL_USER=itransfer
-      - MYSQL_PASSWORD=strong_password
-      - MYSQL_ROOT_PASSWORD=strong_root_password
+      MYSQL_ROOT_PASSWORD: root_password
+      MYSQL_DATABASE: mariadb_db
+      MYSQL_USER: mariadb_user
+      MYSQL_PASSWORD: mariadb_pass
+    ports:
+      - "3306:3306"
     volumes:
-      - mysql_data:/var/lib/mysql
+      - ./db_data:/var/lib/mysql
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD || echo 'Healthcheck failed' >> /var/log/healthcheck.log"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - itransfer-network
 
 networks:
   itransfer-network:
     driver: bridge
-
-volumes:
-  mysql_data:
-  uploads:
-  data:
 ```
 
 Configure your reverse proxy (example for Nginx):
