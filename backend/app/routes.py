@@ -303,8 +303,10 @@ def upload_file():
         # Configuration SMTP
         smtp_config = None
         try:
-            with open('smtp_config.json', 'r') as f:
+            app.logger.info(f"Tentative de lecture de la configuration SMTP depuis {app.config['SMTP_CONFIG_PATH']}")
+            with open(app.config['SMTP_CONFIG_PATH'], 'r') as f:
                 smtp_config = json.load(f)
+                app.logger.info("Configuration SMTP chargée avec succès")
         except Exception as e:
             app.logger.error(f"Erreur lors de la lecture de la configuration SMTP : {str(e)}")
             return jsonify({

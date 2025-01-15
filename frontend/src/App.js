@@ -138,206 +138,230 @@ function App() {
   };
 
   return (
-    <div className="app-container" style={{
-      padding: 'clamp(1rem, 3vw, 2rem)',
+    <div className="container" style={{
       maxWidth: '800px',
-      width: '100%',
       margin: '0 auto',
-      boxSizing: 'border-box'
+      padding: 'clamp(1rem, 3vw, 2rem)',
+      backgroundColor: 'var(--clr-surface-a10)',
+      borderRadius: '12px',
+      boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
     }}>
-      <div className="header" style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 'clamp(1rem, 3vw, 2rem)',
-        flexWrap: 'wrap',
-        gap: '1rem'
+      <h1 style={{
+        fontSize: 'clamp(1.5rem, 4vw, 2rem)',
+        marginBottom: 'clamp(1.5rem, 4vw, 2rem)',
+        color: 'var(--clr-text)',
+        textAlign: 'center'
       }}>
-        <h1 style={{
-          fontSize: 'clamp(1.5rem, 5vw, 2.5rem)',
-          margin: 0,
-          background: 'linear-gradient(45deg, var(--clr-primary-a40), var(--clr-primary-a30))',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          flex: '1 1 auto'
-        }}>iTransfer</h1>
-        <button 
-          onClick={() => navigate('/smtp-settings')}
-          style={{
-            backgroundColor: 'var(--clr-surface-a20)',
-            color: 'var(--clr-primary-a50)',
-            transition: 'all 0.3s ease',
-            padding: 'clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 3vw, 1.5rem)',
-            fontSize: 'clamp(0.875rem, 2vw, 1rem)'
-          }}
-        >
-          Paramètres
-        </button>
-      </div>
+        iTransfer
+      </h1>
 
-      <div className="main-content" style={{
-        backgroundColor: 'var(--clr-surface-a10)',
-        padding: 'clamp(1rem, 3vw, 2rem)',
-        borderRadius: '12px',
-        boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)',
+      <div className="email-inputs" style={{
+        display: 'grid',
+        gap: 'clamp(1rem, 3vw, 1.5rem)',
+        marginBottom: 'clamp(1.5rem, 4vw, 2rem)'
       }}>
-        <div className="email-inputs" style={{
-          display: 'flex',
-          flexDirection: window.innerWidth <= 768 ? 'column' : 'row',
-          gap: 'clamp(0.5rem, 2vw, 1rem)',
-          marginBottom: 'clamp(1rem, 3vw, 2rem)'
-        }}>
-          <input 
-            type="email" 
-            placeholder="Email du destinataire"
+        <div>
+          <label htmlFor="recipientEmail" style={{
+            display: 'block',
+            marginBottom: '0.5rem',
+            color: 'var(--clr-text)',
+            fontSize: 'clamp(0.875rem, 2vw, 1rem)'
+          }}>
+            Email du destinataire
+          </label>
+          <input
+            type="email"
+            id="recipientEmail"
             value={recipientEmail}
             onChange={handleRecipientEmailChange}
             style={{
-              flex: 1,
-              padding: 'clamp(0.5rem, 2vw, 0.75rem)',
-              backgroundColor: 'var(--clr-surface-a20)',
-              color: 'var(--clr-primary-a50)',
-              border: '1px solid var(--clr-surface-a30)',
-              borderRadius: '6px',
-              fontSize: 'clamp(0.875rem, 2vw, 1rem)',
               width: '100%',
-              boxSizing: 'border-box'
+              padding: 'clamp(0.5rem, 2vw, 0.75rem)',
+              border: '1px solid var(--clr-surface-a30)',
+              borderRadius: '4px',
+              backgroundColor: 'var(--clr-surface-a20)',
+              color: 'var(--clr-text)',
+              fontSize: 'clamp(0.875rem, 2vw, 1rem)'
             }}
           />
-          <input 
+        </div>
+
+        <div>
+          <label htmlFor="senderEmail" style={{
+            display: 'block',
+            marginBottom: '0.5rem',
+            color: 'var(--clr-text)',
+            fontSize: 'clamp(0.875rem, 2vw, 1rem)'
+          }}>
+            Votre email
+          </label>
+          <input
             type="email"
-            placeholder="Votre email"
+            id="senderEmail"
             value={senderEmail}
             onChange={handleSenderEmailChange}
             style={{
-              flex: 1,
-              padding: 'clamp(0.5rem, 2vw, 0.75rem)',
-              backgroundColor: 'var(--clr-surface-a20)',
-              color: 'var(--clr-primary-a50)',
-              border: '1px solid var(--clr-surface-a30)',
-              borderRadius: '6px',
-              fontSize: 'clamp(0.875rem, 2vw, 1rem)',
               width: '100%',
-              boxSizing: 'border-box'
+              padding: 'clamp(0.5rem, 2vw, 0.75rem)',
+              border: '1px solid var(--clr-surface-a30)',
+              borderRadius: '4px',
+              backgroundColor: 'var(--clr-surface-a20)',
+              color: 'var(--clr-text)',
+              fontSize: 'clamp(0.875rem, 2vw, 1rem)'
             }}
           />
         </div>
-
-        <div 
-          className="drop-zone" 
-          onDrop={handleDrop}
-          onDragOver={(e) => {
-            e.preventDefault();
-            setDragActive(true);
-          }}
-          onDragEnter={() => setDragActive(true)}
-          onDragLeave={() => setDragActive(false)}
-          style={{
-            border: '2px dashed var(--clr-surface-a30)',
-            borderRadius: '8px',
-            padding: 'var(--spacing-xl)',
-            backgroundColor: dragActive ? 'var(--clr-surface-a30)' : 'var(--clr-surface-a20)',
-            cursor: 'pointer',
-            transition: 'all 0.3s ease'
-          }}
-        >
-          <input
-            type="file"
-            onChange={handleFileSelect}
-            multiple
-            webkitdirectory=""
-            directory=""
-            style={{ display: 'none' }}
-            id="file-upload"
-          />
-          <div style={{ textAlign: 'center' }}>
-            <p style={{ marginBottom: 'var(--spacing-md)' }}>
-              Glissez-déposez vos fichiers ou dossiers ici ou
-              <label 
-                htmlFor="file-upload" 
-                style={{ 
-                  color: 'var(--clr-primary-a40)',
-                  cursor: 'pointer',
-                  marginLeft: '0.5rem'
-                }}
-              >
-                parcourez
-              </label>
-            </p>
-            {fileList.length > 0 && (
-              <div style={{ 
-                marginTop: 'var(--spacing-md)',
-                textAlign: 'left',
-                maxHeight: '200px',
-                overflowY: 'auto',
-                padding: 'var(--spacing-sm)',
-                backgroundColor: 'var(--clr-surface-a10)',
-                borderRadius: '4px'
-              }}>
-                <h4 style={{ marginBottom: 'var(--spacing-sm)' }}>
-                  Fichiers sélectionnés ({fileList.length}):
-                </h4>
-                {fileList.map((file, index) => (
-                  <div key={index} style={{ 
-                    fontSize: 'var(--font-size-sm)',
-                    marginBottom: 'var(--spacing-xs)'
-                  }}>
-                    {file.path} ({(file.size / 1024 / 1024).toFixed(2)} MB)
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {isUploading && (
-          <div className="progress-container" style={{
-            marginBottom: 'clamp(1rem, 3vw, 2rem)'
-          }}>
-            <div className="progress-bar" style={{
-              height: '4px',
-              backgroundColor: 'var(--clr-surface-a30)',
-              borderRadius: '2px',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                width: `${uploadProgress}%`,
-                height: '100%',
-                backgroundColor: 'var(--clr-primary-a40)',
-                transition: 'width 0.3s ease'
-              }} />
-            </div>
-            <p style={{ 
-              margin: '0.5rem 0 0 0',
-              fontSize: 'clamp(0.875rem, 2vw, 1rem)'
-            }}>
-              {uploadProgress}% uploadé
-            </p>
-          </div>
-        )}
-
-        <button 
-          onClick={handleSubmit}
-          style={{
-            width: '100%',
-            padding: 'clamp(1rem, 3vw, 1.5rem)',
-            fontSize: 'clamp(1rem, 3vw, 1.25rem)',
-            backgroundColor: 'var(--clr-primary-a30)',
-            transition: 'all 0.3s ease'
-          }}
-        >
-          Envoyer le fichier
-        </button>
-        {message && (
-          <p style={{ 
-            marginTop: 'var(--spacing-md)',
-            fontSize: 'var(--font-size-sm)',
-            color: 'var(--clr-primary-a40)'
-          }}>
-            {message}
-          </p>
-        )}
       </div>
+
+      <div 
+        className="drop-zone" 
+        onDrop={handleDrop}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragActive(true);
+        }}
+        onDragEnter={() => setDragActive(true)}
+        onDragLeave={() => setDragActive(false)}
+        style={{
+          border: '2px dashed var(--clr-surface-a30)',
+          borderRadius: '8px',
+          padding: 'clamp(2rem, 6vw, 3rem)',
+          backgroundColor: dragActive ? 'var(--clr-surface-a30)' : 'var(--clr-surface-a20)',
+          cursor: 'pointer',
+          transition: 'all 0.3s ease',
+          marginBottom: 'clamp(1.5rem, 4vw, 2rem)',
+          textAlign: 'center'
+        }}
+      >
+        <input
+          type="file"
+          onChange={handleFileSelect}
+          multiple
+          webkitdirectory=""
+          directory=""
+          style={{ display: 'none' }}
+          id="file-upload"
+        />
+        <div>
+          <p style={{ 
+            marginBottom: 'clamp(1rem, 3vw, 1.5rem)',
+            color: 'var(--clr-text)',
+            fontSize: 'clamp(0.875rem, 2vw, 1rem)'
+          }}>
+            Glissez-déposez vos fichiers ou dossiers ici ou
+            <label 
+              htmlFor="file-upload" 
+              style={{ 
+                color: 'var(--clr-primary)',
+                cursor: 'pointer',
+                marginLeft: '0.5rem',
+                textDecoration: 'underline'
+              }}
+            >
+              parcourez
+            </label>
+          </p>
+          {fileList.length > 0 && (
+            <div style={{ 
+              marginTop: 'clamp(1rem, 3vw, 1.5rem)',
+              textAlign: 'left',
+              maxHeight: '200px',
+              overflowY: 'auto',
+              padding: 'clamp(1rem, 3vw, 1.5rem)',
+              backgroundColor: 'var(--clr-surface-a10)',
+              borderRadius: '4px',
+              border: '1px solid var(--clr-surface-a30)'
+            }}>
+              <h4 style={{ 
+                marginBottom: 'clamp(0.5rem, 2vw, 1rem)',
+                color: 'var(--clr-text)',
+                fontSize: 'clamp(0.875rem, 2vw, 1rem)',
+                fontWeight: '600'
+              }}>
+                Fichiers sélectionnés ({fileList.length}):
+              </h4>
+              {fileList.map((file, index) => (
+                <div key={index} style={{ 
+                  fontSize: 'clamp(0.75rem, 1.8vw, 0.875rem)',
+                  marginBottom: '0.5rem',
+                  color: 'var(--clr-text-secondary)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}>
+                  <span style={{ wordBreak: 'break-all', marginRight: '1rem' }}>{file.path}</span>
+                  <span style={{ whiteSpace: 'nowrap' }}>({(file.size / 1024 / 1024).toFixed(2)} MB)</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {isUploading && (
+        <div className="progress-container" style={{
+          marginBottom: 'clamp(1.5rem, 4vw, 2rem)'
+        }}>
+          <div style={{
+            width: '100%',
+            height: '8px',
+            backgroundColor: 'var(--clr-surface-a20)',
+            borderRadius: '4px',
+            overflow: 'hidden'
+          }}>
+            <div style={{
+              width: `${uploadProgress}%`,
+              height: '100%',
+              backgroundColor: 'var(--clr-primary)',
+              transition: 'width 0.3s ease'
+            }} />
+          </div>
+          <p style={{
+            margin: '0.5rem 0 0 0',
+            fontSize: 'clamp(0.875rem, 2vw, 1rem)',
+            color: 'var(--clr-text-secondary)',
+            textAlign: 'center'
+          }}>
+            {uploadProgress}% uploadé
+          </p>
+        </div>
+      )}
+
+      <button
+        onClick={handleSubmit}
+        disabled={!fileList.length || !recipientEmail || !senderEmail || isUploading}
+        style={{
+          width: '100%',
+          padding: 'clamp(0.75rem, 2.5vw, 1rem)',
+          backgroundColor: (!fileList.length || !recipientEmail || !senderEmail || isUploading) 
+            ? 'var(--clr-surface-a30)' 
+            : 'var(--clr-primary)',
+          color: (!fileList.length || !recipientEmail || !senderEmail || isUploading)
+            ? 'var(--clr-text-secondary)'
+            : 'white',
+          border: 'none',
+          borderRadius: '4px',
+          cursor: (!fileList.length || !recipientEmail || !senderEmail || isUploading)
+            ? 'not-allowed'
+            : 'pointer',
+          fontSize: 'clamp(0.875rem, 2vw, 1rem)',
+          fontWeight: '500',
+          transition: 'all 0.3s ease'
+        }}
+      >
+        {isUploading ? 'Envoi en cours...' : 'Envoyer les fichiers'}
+      </button>
+
+      {message && (
+        <p style={{ 
+          marginTop: 'clamp(1rem, 3vw, 1.5rem)',
+          textAlign: 'center',
+          color: message.includes('succès') ? 'var(--clr-success)' : 'var(--clr-error)',
+          fontSize: 'clamp(0.875rem, 2vw, 1rem)'
+        }}>
+          {message}
+        </p>
+      )}
     </div>
   );
 }

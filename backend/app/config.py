@@ -32,7 +32,7 @@ class Config:
     ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
     
     # Configuration SMTP
-    SMTP_CONFIG_PATH = os.environ.get('SMTP_CONFIG_PATH') or os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'smtp_config.json')
+    SMTP_CONFIG_PATH = os.environ.get('SMTP_CONFIG_PATH') or '/app/data/smtp_config.json'
     
     # Configuration de l'environnement
     ENVIRONMENT = os.environ.get('FLASK_ENV', 'production')  # 'development' ou 'production'
