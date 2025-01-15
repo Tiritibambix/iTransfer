@@ -66,142 +66,191 @@ CREATE TABLE IF NOT EXISTS file_upload (
 );
 ```
 
-3. Configure the application in `docker-compose.yml`. You can customize the ports to match your needs:
+3. Create your `docker-compose.yml` for local development:
+
 ```yaml
+# Docker Compose configuration for iTransfer - Development Environment
+version: '3.8'
+
 services:
+  # Frontend service: React application
   frontend:
-    # ... other settings ...
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
-      # Format: "host_port:container_port"
-      # Change 3500 to any port you want to use
+      # Port mapping format: "host_port:container_port"
+      # - host_port: Can be changed to any available port on your system (default: 3500)
+      # - container_port: Must remain 80 (React default port)
       - "3500:80"
+    depends_on:
+      - backend
+    networks:
+      - itransfer-network
     environment:
-      # Make sure BACKEND_URL port matches backend's host_port
-      - BACKEND_URL=http://localhost:5500  # Change 5500 if you modified backend port
-      
+      # Backend URL must match the host_port defined in backend service
+      - REACT_APP_API_URL=http://localhost:5500
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  # Backend service: Flask application
   backend:
-    # ... other settings ...
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
     ports:
-      # Format: "host_port:container_port"
-      # Change 5500 to any port you want to use
+      # Port mapping format: "host_port:container_port"
+      # - host_port: Can be changed to any available port on your system (default: 5500)
+      # - container_port: Must remain 5000 (Flask default port)
       - "5500:5000"
+    depends_on:
+      - db
+    networks:
+      - itransfer-network
     environment:
-      # Make sure FRONTEND_URL port matches frontend's host_port
-      - FRONTEND_URL=http://localhost:3500  # Change 3500 if you modified frontend port
-      - BACKEND_URL=http://localhost:5500   # Change 5500 if you modified backend port
+      # Database configuration
+      - DATABASE_URL=mysql+mysqldb://itransfer:password@db/itransfer
       
-      # Database settings
-      - DATABASE_URL=mysql+mysqldb://itransfer:your_db_password@db/itransfer
+      # SMTP configuration
+      - SMTP_CONFIG_PATH=/app/data/smtp_config.json
       
-      # Admin access (change these!)
-      - ADMIN_USERNAME=your_admin_username
-      - ADMIN_PASSWORD=your_admin_password
+      # Security settings (change these!)
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=password
       
+      # URLs must match the ports defined above
+      - FRONTEND_URL=http://localhost:3500
+      - BACKEND_URL=http://localhost:5500
+      
+      # Development settings
+      - FLASK_ENV=development
+      - FORCE_HTTPS=false
+    volumes:
+      - ./backend:/app
+      - uploads:/app/uploads
+      - data:/app/data
+
+  # Database service: MySQL
   db:
-    # ... other settings ...
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    networks:
+      - itransfer-network
     environment:
       - MYSQL_DATABASE=itransfer
       - MYSQL_USER=itransfer
-      - MYSQL_PASSWORD=your_db_password
-      - MYSQL_ROOT_PASSWORD=your_root_password
+      - MYSQL_PASSWORD=password
+      - MYSQL_ROOT_PASSWORD=root
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+networks:
+  itransfer-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  uploads:
+  data:
 ```
 
-### Port Configuration
-
-The application uses two main components that need port configuration:
-
-1. **Frontend (default: 3500)**
-   - In `docker-compose.yml`:
-     ```yaml
-     frontend:
-       ports:
-         - "3500:80"  # Format: "host_port:container_port"
-     ```
-   - You can change `3500` to any available port on your system
-   - The container port `80` should remain unchanged
-
-2. **Backend (default: 5500)**
-   - In `docker-compose.yml`:
-     ```yaml
-     backend:
-       ports:
-         - "5500:5000"  # Format: "host_port:container_port"
-     ```
-   - You can change `5500` to any available port on your system
-   - The container port `5000` should remain unchanged
-
-⚠️ **Important**: When changing ports, make sure to update the corresponding URLs in the environment variables:
-- If you change frontend port from 3500 to 8080:
-  ```yaml
-  backend:
-    environment:
-      - FRONTEND_URL=http://localhost:8080
-  ```
-- If you change backend port from 5500 to 9090:
-  ```yaml
-  frontend:
-    environment:
-      - BACKEND_URL=http://localhost:9090
-  ```
-
-3. Start the application:
+4. Start the application:
 ```bash
 docker-compose up -d
 ```
 
-4. Access the application:
+5. Access the application:
 - Frontend: http://localhost:[your_frontend_port] (default: 3500)
 - Backend API: http://localhost:[your_backend_port] (default: 5500)
 
-### SMTP Configuration
-
-1. Log in to the admin interface at http://localhost:3500/admin
-2. Configure your SMTP settings:
-   - SMTP Server (e.g., smtp.gmail.com)
-   - SMTP Port (587 for STARTTLS, 465 for SSL)
-   - SMTP Username
-   - SMTP Password
-   - Sender Email
-
-The application will automatically detect the correct protocol based on the port:
-- Port 465: Uses SSL
-- Port 587 (or others): Uses STARTTLS
-
 ### Production Deployment
 
-For production deployment behind a reverse proxy, update your `docker-compose.yml`:
+For production deployment behind a reverse proxy, use this `docker-compose.yml`:
 
 ```yaml
+# Docker Compose configuration for iTransfer - Production Environment
+version: '3.8'
+
 services:
+  # Frontend service: React application
   frontend:
-    # ... other settings ...
+    build: 
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3500:80"
+    depends_on:
+      - backend
+    networks:
+      - itransfer-network
     environment:
-      # Production URL (with https)
-      - BACKEND_URL=https://api.yourdomain.com
-      
+      # Production backend URL (with HTTPS)
+      - REACT_APP_API_URL=https://api.yourdomain.com
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+
+  # Backend service: Flask application
   backend:
-    # ... other settings ...
+    build: 
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5500:5000"
+    depends_on:
+      - db
+    networks:
+      - itransfer-network
     environment:
-      # Production settings
-      - FRONTEND_URL=https://yourdomain.com
-      - BACKEND_URL=https://api.yourdomain.com
-      - FORCE_HTTPS=true
-      - PROXY_COUNT=1  # Number of reverse proxies
+      # Database configuration (use strong passwords)
+      - DATABASE_URL=mysql+mysqldb://itransfer:strong_password@db/itransfer
       
-      # Security (change these!)
+      # SMTP configuration
+      - SMTP_CONFIG_PATH=/app/data/smtp_config.json
+      
+      # Security settings (use strong credentials)
       - ADMIN_USERNAME=secure_admin_username
       - ADMIN_PASSWORD=secure_admin_password
       
-      # Database (use strong passwords)
-      - DATABASE_URL=mysql+mysqldb://itransfer:strong_db_password@db/itransfer
+      # Production URLs (with HTTPS)
+      - FRONTEND_URL=https://yourdomain.com
+      - BACKEND_URL=https://api.yourdomain.com
       
+      # Production settings
+      - FLASK_ENV=production
+      - FORCE_HTTPS=true
+    volumes:
+      - ./backend:/app
+      - uploads:/app/uploads
+      - data:/app/data
+
+  # Database service: MySQL
   db:
-    # ... other settings ...
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    restart: always
+    networks:
+      - itransfer-network
     environment:
       - MYSQL_DATABASE=itransfer
       - MYSQL_USER=itransfer
-      - MYSQL_PASSWORD=strong_db_password
+      - MYSQL_PASSWORD=strong_password
       - MYSQL_ROOT_PASSWORD=strong_root_password
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
+
+networks:
+  itransfer-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  uploads:
+  data:
 ```
 
 Configure your reverse proxy (example for Nginx):

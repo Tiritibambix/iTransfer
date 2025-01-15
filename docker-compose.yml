@@ -56,7 +56,6 @@ services:
       - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
       # Configuration HTTPS
       - FORCE_HTTPS=true
-      - PROXY_COUNT=1
       # Public URL of the backend
       # Backend URL should match the host_port defined above in ports section
       # If you change the host_port from 5500 to another value,
