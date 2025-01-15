@@ -37,6 +37,7 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
     server = None
     try:
         backend_url = get_backend_url()
+        app.logger.info(f"URL backend pour l'email : {backend_url}")
         
         # Configurer le message
         email_message = f"""From: {smtp_config['smtp_sender_email']}
@@ -46,12 +47,18 @@ Content-Type: text/plain; charset=utf-8
 
 {message_content}"""
 
+        app.logger.info(f"Configuration du serveur SMTP : {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
         # Utiliser SMTP_SSL pour le port 465
         server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
+        app.logger.info("Connexion SMTP établie")
+
+        app.logger.info(f"Tentative de connexion avec l'utilisateur : {smtp_config['smtp_user']}")
         server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'].strip())
+        app.logger.info("Connexion SMTP réussie")
 
         # Envoyer l'email
         app.logger.info(f"Envoi de l'email à {to_email}")
+        app.logger.info(f"Contenu de l'email :\n{email_message}")
         server.sendmail(
             smtp_config['smtp_sender_email'],
             to_email,
@@ -61,14 +68,25 @@ Content-Type: text/plain; charset=utf-8
         return True
     except Exception as e:
         app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+        app.logger.error(f"Type d'erreur : {type(e).__name__}")
+        if hasattr(e, 'smtp_error'):
+            app.logger.error(f"Erreur SMTP : {e.smtp_error}")
+        if hasattr(e, 'smtp_code'):
+            app.logger.error(f"Code SMTP : {e.smtp_code}")
         return False
     finally:
         if server:
-            server.quit()
+            try:
+                server.quit()
+                app.logger.info("Connexion SMTP fermée")
+            except Exception as e:
+                app.logger.error(f"Erreur lors de la fermeture de la connexion SMTP : {str(e)}")
 
 def send_recipient_notification(to_email, file_id, filename, smtp_config):
+    app.logger.info(f"Préparation de la notification pour le destinataire : {to_email}")
     backend_url = get_backend_url()
     download_link = f"{backend_url}/download/{file_id}"
+    app.logger.info(f"Lien de téléchargement généré : {download_link}")
     
     message = f"""
     Bonjour,
@@ -84,11 +102,15 @@ def send_recipient_notification(to_email, file_id, filename, smtp_config):
     L'équipe iTransfer
     """
     
-    return send_notification_email(to_email, "iTransfer - Nouveau fichier partagé", message, smtp_config)
+    app.logger.info("Envoi de la notification au destinataire")
+    success = send_notification_email(to_email, "iTransfer - Nouveau fichier partagé", message, smtp_config)
+    if not success:
+        app.logger.error(f"Échec de l'envoi de la notification au destinataire : {to_email}")
+    return success
 
 def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config):
+    app.logger.info(f"Préparation de la confirmation pour l'expéditeur : {to_email}")
     backend_url = get_backend_url()
-    download_link = f"{backend_url}/download/{file_id}"
     
     message = f"""
     Bonjour,
@@ -96,17 +118,22 @@ def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config):
     Votre fichier a été uploadé avec succès sur iTransfer.
     
     Fichier : {filename}
-    Lien de téléchargement : {download_link}
+    ID : {file_id}
     
-    Vous recevrez une notification lorsque le destinataire aura téléchargé le fichier.
+    Le destinataire recevra un email avec le lien de téléchargement.
     
     Cordialement,
     L'équipe iTransfer
     """
     
-    return send_notification_email(to_email, "iTransfer - Upload réussi", message, smtp_config)
+    app.logger.info("Envoi de la confirmation à l'expéditeur")
+    success = send_notification_email(to_email, "iTransfer - Upload réussi", message, smtp_config)
+    if not success:
+        app.logger.error(f"Échec de l'envoi de la confirmation à l'expéditeur : {to_email}")
+    return success
 
 def send_sender_download_notification(to_email, filename, smtp_config):
+    app.logger.info(f"Préparation de la notification pour l'expéditeur : {to_email}")
     message = f"""
     Bonjour,
 
@@ -118,7 +145,11 @@ def send_sender_download_notification(to_email, filename, smtp_config):
     L'équipe iTransfer
     """
     
-    return send_notification_email(to_email, "iTransfer - Fichier téléchargé", message, smtp_config)
+    app.logger.info("Envoi de la notification à l'expéditeur")
+    success = send_notification_email(to_email, "iTransfer - Fichier téléchargé", message, smtp_config)
+    if not success:
+        app.logger.error(f"Échec de l'envoi de la notification à l'expéditeur : {to_email}")
+    return success
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
