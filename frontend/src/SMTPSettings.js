@@ -1,5 +1,40 @@
-import React, { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { useNavigate } from 'react-router-dom';
+
+const InputField = memo(({ label, type = "text", value, onChange, placeholder, id }) => (
+  <div className="form-group" style={{
+    marginBottom: '1.5rem',
+  }}>
+    <label 
+      htmlFor={id}
+      style={{
+        display: 'block',
+        marginBottom: '0.5rem',
+        color: 'var(--clr-primary-a40)',
+        fontSize: '0.9rem'
+      }}
+    >
+      {label}
+    </label>
+    <input 
+      id={id}
+      type={type}
+      value={value}
+      onChange={onChange}
+      placeholder={placeholder}
+      style={{
+        width: '100%',
+        padding: '12px',
+        backgroundColor: 'var(--clr-surface-a20)',
+        color: 'var(--clr-primary-a50)',
+        border: '1px solid var(--clr-surface-a30)',
+        borderRadius: '6px',
+        fontSize: '1rem',
+        transition: 'all 0.3s ease'
+      }}
+    />
+  </div>
+));
 
 const SMTPSettings = () => {
   const navigate = useNavigate();
@@ -77,37 +112,6 @@ const SMTPSettings = () => {
     }
   };
 
-  const InputField = ({ label, type = "text", value, onChange, placeholder }) => (
-    <div className="form-group" style={{
-      marginBottom: '1.5rem',
-    }}>
-      <label style={{
-        display: 'block',
-        marginBottom: '0.5rem',
-        color: 'var(--clr-primary-a40)',
-        fontSize: '0.9rem'
-      }}>
-        {label}
-      </label>
-      <input 
-        type={type}
-        value={value}
-        onChange={onChange}
-        placeholder={placeholder}
-        style={{
-          width: '100%',
-          padding: '12px',
-          backgroundColor: 'var(--clr-surface-a20)',
-          color: 'var(--clr-primary-a50)',
-          border: '1px solid var(--clr-surface-a30)',
-          borderRadius: '6px',
-          fontSize: '1rem',
-          transition: 'all 0.3s ease'
-        }}
-      />
-    </div>
-  );
-
   return (
     <div className="settings-container" style={{
       padding: '2rem',
@@ -170,6 +174,7 @@ const SMTPSettings = () => {
         boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)'
       }}>
         <InputField 
+          id="smtp-server"
           label="Serveur SMTP"
           value={smtpServer}
           onChange={(e) => setSmtpServer(e.target.value)}
@@ -177,6 +182,7 @@ const SMTPSettings = () => {
         />
         
         <InputField 
+          id="smtp-port"
           label="Port SMTP"
           value={smtpPort}
           onChange={(e) => setSmtpPort(e.target.value)}
@@ -184,13 +190,15 @@ const SMTPSettings = () => {
         />
         
         <InputField 
+          id="smtp-user"
           label="Utilisateur SMTP"
           value={smtpUser}
           onChange={(e) => setSmtpUser(e.target.value)}
-          placeholder="Votre nom d'utilisateur"
+          placeholder="ex: user@domain.com"
         />
         
         <InputField 
+          id="smtp-password"
           label="Mot de passe SMTP"
           type="password"
           value={smtpPassword}
@@ -199,11 +207,11 @@ const SMTPSettings = () => {
         />
         
         <InputField 
-          label="Email d'envoi"
-          type="email"
+          id="smtp-sender"
+          label="Email expéditeur"
           value={smtpSenderEmail}
           onChange={(e) => setSmtpSenderEmail(e.target.value)}
-          placeholder="email@exemple.com"
+          placeholder="ex: no-reply@domain.com"
         />
 
         <div className="button-group" style={{
