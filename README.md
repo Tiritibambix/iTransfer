@@ -47,12 +47,12 @@ All emails are sent using a professional HTML template with both HTML and plain 
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/iTransfer.git
+git clone https://github.com/tiritibambix/iTransfer.git
 cd iTransfer
 ```
 
 2. Set up the database initialization file:
-   - Either download [init.sql](https://github.com/yourusername/iTransfer/blob/main/backend/init.sql) and place it in `backend/init.sql`
+   - Either download [init.sql](https://github.com/tiritibambix/iTransfer/blob/main/backend/init.sql) and place it in `backend/init.sql`
    - Or create the file manually at `backend/init.sql` with the following content:
 ```sql
 CREATE TABLE IF NOT EXISTS file_upload (
