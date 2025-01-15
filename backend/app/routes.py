@@ -22,6 +22,9 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
     server = None
     try:
         backend_url = get_backend_url()
+        app.logger.info(f"Backend URL utilisée : {backend_url}")
+        app.logger.info(f"Envoi d'email à {to_email} avec le sujet : {subject}")
+        app.logger.info(f"Configuration SMTP : serveur={smtp_config['smtp_server']}, port={smtp_config['smtp_port']}, user={smtp_config['smtp_user']}, sender={smtp_config['smtp_sender_email']}")
         
         # Configurer le message
         email_message = f"""From: {smtp_config['smtp_sender_email']}
@@ -31,9 +34,14 @@ Content-Type: text/plain; charset=utf-8
 
 {message_content}"""
 
+        app.logger.info("Message email configuré, tentative de connexion SMTP...")
+
         # Utiliser SMTP_SSL pour le port 465
         server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
+        app.logger.info("Connexion SMTP établie")
+        
         server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'].strip())
+        app.logger.info("Login SMTP réussi")
 
         # Envoyer l'email
         app.logger.info(f"Envoi de l'email à {to_email}")
@@ -45,11 +53,13 @@ Content-Type: text/plain; charset=utf-8
         app.logger.info("Email envoyé avec succès")
         return True
     except Exception as e:
-        app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+        app.logger.error(f"Erreur détaillée lors de l'envoi de l'email : {str(e)}")
+        app.logger.error(f"Type d'erreur : {type(e)}")
         return False
     finally:
         if server:
             server.quit()
+            app.logger.info("Connexion SMTP fermée")
 
 def send_recipient_notification(to_email, file_id, filename, smtp_config):
     backend_url = get_backend_url()
