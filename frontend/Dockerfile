@@ -23,11 +23,8 @@ FROM nginx:alpine
 COPY --from=builder /app/build /usr/share/nginx/html
 
 # Créer le script d'entrypoint personnalisé
-RUN echo '#!/bin/sh\n\
-# Remplacer la configuration dans le HTML\n\
+RUN printf '#!/bin/sh\n\
 sed -i "s|window.BACKEND_URL = .*|window.BACKEND_URL = '\''$BACKEND_URL'\''|g" /usr/share/nginx/html/index.html\n\
-\n\
-# Démarrer nginx\n\
 exec nginx -g '\''daemon off;'\''\n\
 ' > /docker-entrypoint.sh \
 && chmod +x /docker-entrypoint.sh
