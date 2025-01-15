@@ -7,6 +7,9 @@ from flask import request, jsonify, send_file
 from werkzeug.utils import secure_filename
 from . import app, db
 from .models import FileUpload
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from email.utils import formatdate, make_msgid
 
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
 def get_backend_url():
@@ -14,9 +17,15 @@ def get_backend_url():
     Génère l'URL du backend en se basant sur la variable d'environnement BACKEND_URL
     ou sur la requête entrante en développement
     """
-    # Utiliser BACKEND_URL s'il est défini
+    # Utiliser BACKEND_URL s'il est défini (environnement de production)
     backend_url = os.environ.get('BACKEND_URL')
     if backend_url:
+        # Force HTTPS en production
+        if backend_url.startswith('http://'):
+            backend_url = 'https://' + backend_url[7:]
+        elif not backend_url.startswith('https://'):
+            backend_url = 'https://' + backend_url
+            
         app.logger.info(f"Utilisation de l'URL backend depuis l'environnement : {backend_url}")
         return backend_url
     
@@ -24,6 +33,7 @@ def get_backend_url():
     if not request:
         return 'http://localhost:5500'
     
+    # En développement, on garde le protocole de la requête
     protocol = request.scheme
     host = request.headers.get('Host', 'localhost:5500')
     generated_url = f"{protocol}://{host}"
@@ -39,41 +49,60 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         backend_url = get_backend_url()
         app.logger.info(f"URL backend pour l'email : {backend_url}")
         
-        # Configurer le message
-        email_message = f"""From: {smtp_config['smtp_sender_email']}
-To: {to_email}
-Subject: {subject}
-Content-Type: text/plain; charset=utf-8
-
-{message_content}"""
+        # Créer un message MIME multipart
+        msg = MIMEMultipart('alternative')
+        
+        # Ajouter les en-têtes standards
+        msg['From'] = smtp_config['smtp_sender_email']
+        msg['To'] = to_email
+        msg['Subject'] = subject
+        msg['Date'] = formatdate(localtime=True)
+        msg['Message-ID'] = make_msgid(domain=smtp_config['smtp_sender_email'].split('@')[1])
+        
+        # Ajouter les en-têtes pour améliorer la délivrabilité
+        msg['Return-Path'] = smtp_config['smtp_sender_email']
+        msg['X-Mailer'] = 'iTransfer Mailer'
+        msg['X-Priority'] = '3'  # Normal
+        
+        # Ajouter le contenu en texte brut
+        text_part = MIMEText(message_content, 'plain', 'utf-8')
+        msg.attach(text_part)
+        
+        # Ajouter le contenu en HTML (version plus jolie du message)
+        html_content = f"""
+        <html>
+          <head></head>
+          <body>
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              {message_content.replace('\n', '<br>')}
+            </div>
+          </body>
+        </html>
+        """
+        html_part = MIMEText(html_content, 'html', 'utf-8')
+        msg.attach(html_part)
 
         app.logger.info(f"Configuration du serveur SMTP : {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
+        
         # Utiliser SMTP_SSL pour le port 465
-        server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
+        server = smtplib.SMTP_SSL(smtp_config['smtp_server'], smtp_config['smtp_port'])
         app.logger.info("Connexion SMTP établie")
-
+        
         app.logger.info(f"Tentative de connexion avec l'utilisateur : {smtp_config['smtp_user']}")
-        server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'].strip())
+        server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
         app.logger.info("Connexion SMTP réussie")
-
-        # Envoyer l'email
+        
         app.logger.info(f"Envoi de l'email à {to_email}")
-        app.logger.info(f"Contenu de l'email :\n{email_message}")
-        server.sendmail(
-            smtp_config['smtp_sender_email'],
-            to_email,
-            email_message.encode('utf-8')
-        )
+        app.logger.info(f"Contenu de l'email :\n{msg.as_string()}")
+        
+        server.send_message(msg)
         app.logger.info("Email envoyé avec succès")
         return True
+        
     except Exception as e:
         app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
-        app.logger.error(f"Type d'erreur : {type(e).__name__}")
-        if hasattr(e, 'smtp_error'):
-            app.logger.error(f"Erreur SMTP : {e.smtp_error}")
-        if hasattr(e, 'smtp_code'):
-            app.logger.error(f"Code SMTP : {e.smtp_code}")
         return False
+        
     finally:
         if server:
             try:
