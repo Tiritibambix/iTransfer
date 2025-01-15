@@ -11,9 +11,21 @@ from .models import FileUpload
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
 def get_backend_url():
     """
-    Génère l'URL du backend en se basant sur la variable d'environnement
+    Génère l'URL du backend en se basant sur la requête entrante
     """
-    return os.environ.get('BACKEND_URL', 'http://localhost:5000')
+    if not request:
+        return os.environ.get('BACKEND_URL', 'http://localhost:5000')
+    
+    # Récupérer le protocole (http ou https)
+    protocol = request.scheme
+    
+    # Récupérer l'hôte complet (hostname:port)
+    host = request.headers.get('Host')
+    if not host:
+        # Fallback sur l'environnement ou la valeur par défaut
+        return os.environ.get('BACKEND_URL', 'http://localhost:5000')
+    
+    return f"{protocol}://{host}"
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
@@ -22,9 +34,6 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
     server = None
     try:
         backend_url = get_backend_url()
-        app.logger.info(f"Backend URL utilisée : {backend_url}")
-        app.logger.info(f"Envoi d'email à {to_email} avec le sujet : {subject}")
-        app.logger.info(f"Configuration SMTP : serveur={smtp_config['smtp_server']}, port={smtp_config['smtp_port']}, user={smtp_config['smtp_user']}, sender={smtp_config['smtp_sender_email']}")
         
         # Configurer le message
         email_message = f"""From: {smtp_config['smtp_sender_email']}
@@ -34,14 +43,9 @@ Content-Type: text/plain; charset=utf-8
 
 {message_content}"""
 
-        app.logger.info("Message email configuré, tentative de connexion SMTP...")
-
         # Utiliser SMTP_SSL pour le port 465
         server = smtplib.SMTP_SSL(smtp_config['smtp_server'], int(smtp_config['smtp_port']))
-        app.logger.info("Connexion SMTP établie")
-        
         server.login(smtp_config['smtp_user'].strip(), smtp_config['smtp_password'].strip())
-        app.logger.info("Login SMTP réussi")
 
         # Envoyer l'email
         app.logger.info(f"Envoi de l'email à {to_email}")
@@ -53,13 +57,11 @@ Content-Type: text/plain; charset=utf-8
         app.logger.info("Email envoyé avec succès")
         return True
     except Exception as e:
-        app.logger.error(f"Erreur détaillée lors de l'envoi de l'email : {str(e)}")
-        app.logger.error(f"Type d'erreur : {type(e)}")
+        app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
         return False
     finally:
         if server:
             server.quit()
-            app.logger.info("Connexion SMTP fermée")
 
 def send_recipient_notification(to_email, file_id, filename, smtp_config):
     backend_url = get_backend_url()
@@ -129,8 +131,6 @@ def upload_file():
         email = request.form.get('email')
         sender_email = request.form.get('sender_email')
 
-        app.logger.info(f"Début upload - email destinataire: {email}, email expéditeur: {sender_email}")
-
         if not file or not email or not sender_email:
             return jsonify({'error': 'Fichier ou email manquant'}), 400
         
@@ -143,8 +143,6 @@ def upload_file():
         encrypted_data = hashlib.sha256(file_content).hexdigest()
         safe_filename = secure_filename(file.filename)
         
-        app.logger.info(f"Fichier reçu: {safe_filename}, ID: {file_id}")
-        
         # Création du chemin de fichier unique
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_id}_{safe_filename}")
         
@@ -153,7 +151,6 @@ def upload_file():
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             with open(file_path, 'wb') as f:
                 f.write(file_content)
-            app.logger.info("Fichier sauvegardé avec succès")
         except Exception as e:
             app.logger.error(f"Erreur lors de la sauvegarde du fichier: {str(e)}")
             return jsonify({'error': 'Erreur lors de la sauvegarde du fichier'}), 500
@@ -170,7 +167,6 @@ def upload_file():
             )
             db.session.add(new_file)
             db.session.commit()
-            app.logger.info("Entrée créée dans la base de données")
         except Exception as db_error:
             app.logger.error(f"Erreur base de données: {str(db_error)}")
             if os.path.exists(file_path):
@@ -179,22 +175,17 @@ def upload_file():
 
         # Chargement de la configuration SMTP
         try:
-            app.logger.info("Chargement de la configuration SMTP...")
             with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
                 smtp_config = json.load(config_file)
-            app.logger.info("Configuration SMTP chargée avec succès")
         except Exception as e:
             app.logger.error(f"Erreur lors du chargement de la configuration SMTP: {str(e)}")
             return jsonify({'warning': 'Fichier uploadé mais impossible d\'envoyer les notifications'}), 200
 
         # Envoi des notifications
-        app.logger.info("Début de l'envoi des notifications...")
         notification_errors = []
         if not send_recipient_notification(email, file_id, safe_filename, smtp_config):
-            app.logger.error("Échec de l'envoi de la notification au destinataire")
             notification_errors.append("destinataire")
         if not send_sender_upload_confirmation(sender_email, file_id, safe_filename, smtp_config):
-            app.logger.error("Échec de l'envoi de la notification à l'expéditeur")
             notification_errors.append("expéditeur")
 
         response_data = {
@@ -204,10 +195,7 @@ def upload_file():
         }
 
         if notification_errors:
-            app.logger.warning(f"Notifications non envoyées pour: {', '.join(notification_errors)}")
             response_data['warning'] = f"Impossible d'envoyer les notifications aux destinataires suivants: {', '.join(notification_errors)}"
-        else:
-            app.logger.info("Toutes les notifications ont été envoyées avec succès")
 
         return jsonify(response_data), 200
 

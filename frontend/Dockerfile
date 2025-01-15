@@ -22,10 +22,6 @@ FROM nginx:alpine
 # Copier les fichiers construits depuis l'étape de build
 COPY --from=builder /app/build /usr/share/nginx/html
 
-# Copier le script d'entrée
-COPY frontend/docker-entrypoint.sh /docker-entrypoint.sh
-RUN chmod +x /docker-entrypoint.sh
-
 # Configuration Nginx pour SPA
 RUN echo 'server { \
     listen 80; \
@@ -40,6 +36,5 @@ RUN echo 'server { \
 # Exposer le port utilisé par Nginx
 EXPOSE 80
 
-# Utiliser notre script comme point d'entrée
-ENTRYPOINT ["/docker-entrypoint.sh"]
+# Commande pour démarrer Nginx
 CMD ["nginx", "-g", "daemon off;"]
