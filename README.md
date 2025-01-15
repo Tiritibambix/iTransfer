@@ -98,6 +98,7 @@ services:
       - ADMIN_USERNAME=admin  # Change these credentials
       - ADMIN_PASSWORD=admin  # Change these credentials
       - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-$(openssl rand -base64 32)}  # Secret key for JWT tokens
     volumes:
       - ./backend/data:/app/data
       - ./backend/uploads:/app/uploads
@@ -181,6 +182,7 @@ services:
       - ADMIN_PASSWORD=admin  # Change these credentials
       - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
       - FORCE_HTTPS=true
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-$(openssl rand -base64 32)}  # Secret key for JWT tokens
     volumes:
       - ./backend/data:/app/data
       - ./backend/uploads:/app/uploads
