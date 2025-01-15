@@ -86,19 +86,28 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         text_part = MIMEText(message_content, 'plain', 'utf-8')
         msg.attach(text_part)
         
+        # Préparer le contenu du message pour HTML
+        formatted_content = (
+            message_content.replace("Bonjour,", "<p>Bonjour,</p>")
+            .replace("Cordialement,", "<p>Cordialement,</p>")
+            .replace("L'équipe iTransfer", "<strong>L'équipe iTransfer</strong>")
+            .replace('\n\n', '</p><p>')
+            .replace('\n', '<br>')
+        )
+        
         # Créer une version HTML plus professionnelle
-        html_content = f'''
+        html_template = '''
         <!DOCTYPE html>
         <html>
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>{subject}</title>
+            <title>{title}</title>
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
             <div style="background-color: #f8f9fa; border-radius: 5px; padding: 20px; margin-bottom: 20px;">
-                <h2 style="color: #2c3e50; margin-top: 0;">{subject}</h2>
-                {message_content.replace("Bonjour,", "<p>Bonjour,</p>").replace("Cordialement,", "<p>Cordialement,</p>").replace("L'équipe iTransfer", "<strong>L'équipe iTransfer</strong>").replace('\n\n', '</p><p>').replace('\n', '<br>')}
+                <h2 style="color: #2c3e50; margin-top: 0;">{title}</h2>
+                {content}
             </div>
             <div style="font-size: 12px; color: #666; text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
                 <p>Cet email a été envoyé automatiquement par iTransfer. Merci de ne pas y répondre.</p>
@@ -106,6 +115,12 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         </body>
         </html>
         '''
+        
+        html_content = html_template.format(
+            title=subject,
+            content=formatted_content
+        )
+        
         html_part = MIMEText(html_content, 'html', 'utf-8')
         msg.attach(html_part)
 
