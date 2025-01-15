@@ -31,6 +31,9 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-adminuserpassword}
       # Configuration base de données
       - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
+      # Configuration HTTPS
+      - FORCE_HTTPS=true
+      - PROXY_COUNT=1
     volumes:
       - ./backend/data:/app/data
       - ./backend/uploads:/app/uploads

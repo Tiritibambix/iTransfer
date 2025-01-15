@@ -9,7 +9,7 @@ from . import app, db
 from .models import FileUpload
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from email.utils import formatdate, make_msgid
+from email.utils import formatdate, make_msgid, formataddr
 
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
 def get_backend_url():
@@ -20,22 +20,29 @@ def get_backend_url():
     # Utiliser BACKEND_URL s'il est défini (environnement de production)
     backend_url = os.environ.get('BACKEND_URL')
     if backend_url:
-        # Force HTTPS en production
-        if backend_url.startswith('http://'):
-            backend_url = 'https://' + backend_url[7:]
-        elif not backend_url.startswith('https://'):
-            backend_url = 'https://' + backend_url
+        # Forcer HTTPS si configuré
+        if app.config['FORCE_HTTPS']:
+            if backend_url.startswith('http://'):
+                backend_url = 'https://' + backend_url[7:]
+            elif not backend_url.startswith('https://'):
+                backend_url = 'https://' + backend_url
             
         app.logger.info(f"Utilisation de l'URL backend depuis l'environnement : {backend_url}")
         return backend_url
     
     # Sinon, construire l'URL à partir de la requête (pour le développement)
     if not request:
-        return 'http://localhost:5500'
+        protocol = 'https' if app.config['FORCE_HTTPS'] else 'http'
+        return f'{protocol}://localhost:5500'
     
-    # En développement, on garde le protocole de la requête
-    protocol = request.scheme
+    # En développement, on utilise le protocole configuré
+    protocol = 'https' if app.config['FORCE_HTTPS'] else request.scheme
     host = request.headers.get('Host', 'localhost:5500')
+    
+    # Si on est derrière un proxy, on vérifie le X-Forwarded-Proto
+    if app.config['PROXY_COUNT'] > 0 and request.headers.get('X-Forwarded-Proto'):
+        protocol = request.headers.get('X-Forwarded-Proto')
+    
     generated_url = f"{protocol}://{host}"
     app.logger.info(f"URL backend générée depuis la requête : {generated_url}")
     return generated_url
@@ -49,36 +56,56 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         backend_url = get_backend_url()
         app.logger.info(f"URL backend pour l'email : {backend_url}")
         
+        from email.mime.text import MIMEText
+        from email.mime.multipart import MIMEMultipart
+        from email.utils import formatdate, make_msgid, formataddr
+        
         # Créer un message MIME multipart
         msg = MIMEMultipart('alternative')
         
-        # Ajouter les en-têtes standards
-        msg['From'] = smtp_config['smtp_sender_email']
+        # Utiliser un nom d'affichage professionnel
+        sender_name = "iTransfer"
+        sender_email = smtp_config['smtp_sender_email']
+        
+        # Ajouter les en-têtes standards avec un format plus professionnel
+        msg['From'] = formataddr((sender_name, sender_email))
         msg['To'] = to_email
         msg['Subject'] = subject
         msg['Date'] = formatdate(localtime=True)
-        msg['Message-ID'] = make_msgid(domain=smtp_config['smtp_sender_email'].split('@')[1])
+        msg['Message-ID'] = make_msgid(domain=sender_email.split('@')[1])
         
-        # Ajouter les en-têtes pour améliorer la délivrabilité
-        msg['Return-Path'] = smtp_config['smtp_sender_email']
-        msg['X-Mailer'] = 'iTransfer Mailer'
-        msg['X-Priority'] = '3'  # Normal
+        # En-têtes supplémentaires pour améliorer la délivrabilité
+        msg['Return-Path'] = sender_email
+        msg['X-Mailer'] = 'iTransfer Secure File Transfer System'
+        msg['X-Priority'] = '3'
+        msg['List-Unsubscribe'] = f'<mailto:{sender_email}?subject=unsubscribe>'
+        msg['Precedence'] = 'bulk'
+        msg['Auto-Submitted'] = 'auto-generated'
         
         # Ajouter le contenu en texte brut
         text_part = MIMEText(message_content, 'plain', 'utf-8')
         msg.attach(text_part)
         
-        # Ajouter le contenu en HTML (version plus jolie du message)
-        html_content = (
-            '<html>'
-            '<head></head>'
-            '<body>'
-            '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">'
-            + message_content.replace('\n', '<br>') +
-            '</div>'
-            '</body>'
-            '</html>'
-        )
+        # Créer une version HTML plus professionnelle
+        html_content = f'''
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>{subject}</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+            <div style="background-color: #f8f9fa; border-radius: 5px; padding: 20px; margin-bottom: 20px;">
+                <h2 style="color: #2c3e50; margin-top: 0;">{subject}</h2>
+                {message_content.replace("Bonjour,", "<p>Bonjour,</p>").replace("Cordialement,", "<p>Cordialement,</p>").replace("L'équipe iTransfer", "<strong>L'équipe iTransfer</strong>").replace('\n\n', '</p><p>').replace('\n', '<br>')}
+            </div>
+            <div style="font-size: 12px; color: #666; text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
+                <p>Cet email a été envoyé automatiquement par iTransfer. Merci de ne pas y répondre.</p>
+            </div>
+        </body>
+        </html>
+        '''
         html_part = MIMEText(html_content, 'html', 'utf-8')
         msg.attach(html_part)
 

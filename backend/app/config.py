@@ -34,6 +34,14 @@ class Config:
     # Configuration SMTP
     SMTP_CONFIG_PATH = os.environ.get('SMTP_CONFIG_PATH') or os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data', 'smtp_config.json')
     
+    # Configuration de l'environnement
+    ENVIRONMENT = os.environ.get('FLASK_ENV', 'production')  # 'development' ou 'production'
+    FORCE_HTTPS = os.environ.get('FORCE_HTTPS', 'true').lower() == 'true'  # Force HTTPS en production
+    
+    # Configuration du proxy
+    PROXY_COUNT = int(os.environ.get('PROXY_COUNT', '1'))  # Nombre de proxies devant l'application
+    PREFERRED_URL_SCHEME = 'https' if FORCE_HTTPS else 'http'
+    
     @staticmethod
     def init_app(app):
         """Initialize application configuration"""
