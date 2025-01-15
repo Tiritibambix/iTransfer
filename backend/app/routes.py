@@ -85,6 +85,7 @@ Content-Type: text/plain; charset=utf-8
 def send_recipient_notification(to_email, file_id, filename, smtp_config):
     app.logger.info(f"Préparation de la notification pour le destinataire : {to_email}")
     backend_url = get_backend_url()
+    app.logger.info(f"URL backend : {backend_url}")
     download_link = f"{backend_url}/download/{file_id}"
     app.logger.info(f"Lien de téléchargement généré : {download_link}")
     
@@ -111,6 +112,9 @@ def send_recipient_notification(to_email, file_id, filename, smtp_config):
 def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config):
     app.logger.info(f"Préparation de la confirmation pour l'expéditeur : {to_email}")
     backend_url = get_backend_url()
+    app.logger.info(f"URL backend : {backend_url}")
+    download_link = f"{backend_url}/download/{file_id}"
+    app.logger.info(f"Lien de téléchargement généré : {download_link}")
     
     message = f"""
     Bonjour,
@@ -119,8 +123,9 @@ def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config):
     
     Fichier : {filename}
     ID : {file_id}
+    Lien de téléchargement : {download_link}
     
-    Le destinataire recevra un email avec le lien de téléchargement.
+    Une notification a été envoyée au destinataire avec ce même lien.
     
     Cordialement,
     L'équipe iTransfer
@@ -157,6 +162,7 @@ def upload_file():
         return jsonify({'message': 'CORS preflight success'}), 200
 
     try:
+        app.logger.info("Début du traitement de l'upload")
         # Vérification des données requises
         if 'file' not in request.files:
             return jsonify({'error': 'Aucun fichier envoyé'}), 400
@@ -164,6 +170,10 @@ def upload_file():
         file = request.files['file']
         email = request.form.get('email')
         sender_email = request.form.get('sender_email')
+
+        app.logger.info(f"Fichier reçu : {file.filename}")
+        app.logger.info(f"Email destinataire : {email}")
+        app.logger.info(f"Email expéditeur : {sender_email}")
 
         if not file or not email or not sender_email:
             return jsonify({'error': 'Fichier ou email manquant'}), 400
@@ -177,6 +187,9 @@ def upload_file():
         encrypted_data = hashlib.sha256(file_content).hexdigest()
         safe_filename = secure_filename(file.filename)
         
+        app.logger.info(f"ID généré : {file_id}")
+        app.logger.info(f"Nom de fichier sécurisé : {safe_filename}")
+        
         # Création du chemin de fichier unique
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_id}_{safe_filename}")
         
@@ -185,6 +198,7 @@ def upload_file():
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             with open(file_path, 'wb') as f:
                 f.write(file_content)
+            app.logger.info(f"Fichier sauvegardé : {file_path}")
         except Exception as e:
             app.logger.error(f"Erreur lors de la sauvegarde du fichier: {str(e)}")
             return jsonify({'error': 'Erreur lors de la sauvegarde du fichier'}), 500
@@ -201,6 +215,7 @@ def upload_file():
             )
             db.session.add(new_file)
             db.session.commit()
+            app.logger.info("Entrée créée dans la base de données")
         except Exception as db_error:
             app.logger.error(f"Erreur base de données: {str(db_error)}")
             if os.path.exists(file_path):
@@ -209,17 +224,27 @@ def upload_file():
 
         # Chargement de la configuration SMTP
         try:
+            app.logger.info("Chargement de la configuration SMTP")
             with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
                 smtp_config = json.load(config_file)
+            app.logger.info("Configuration SMTP chargée avec succès")
         except Exception as e:
             app.logger.error(f"Erreur lors du chargement de la configuration SMTP: {str(e)}")
             return jsonify({'warning': 'Fichier uploadé mais impossible d\'envoyer les notifications'}), 200
 
         # Envoi des notifications
         notification_errors = []
+        
+        # Envoi au destinataire
+        app.logger.info("Tentative d'envoi de la notification au destinataire")
         if not send_recipient_notification(email, file_id, safe_filename, smtp_config):
+            app.logger.error("Échec de l'envoi au destinataire")
             notification_errors.append("destinataire")
+        
+        # Envoi à l'expéditeur
+        app.logger.info("Tentative d'envoi de la confirmation à l'expéditeur")
         if not send_sender_upload_confirmation(sender_email, file_id, safe_filename, smtp_config):
+            app.logger.error("Échec de l'envoi à l'expéditeur")
             notification_errors.append("expéditeur")
 
         response_data = {
@@ -231,6 +256,7 @@ def upload_file():
         if notification_errors:
             response_data['warning'] = f"Impossible d'envoyer les notifications aux destinataires suivants: {', '.join(notification_errors)}"
 
+        app.logger.info("Upload terminé avec succès")
         return jsonify(response_data), 200
 
     except Exception as e:
