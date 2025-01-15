@@ -80,9 +80,6 @@ services:
       # - container_port: Must remain 80 (React default port)
       - "3500:80"
     environment:
-      # URL publique du backend
-      # Exemple local : http://localhost:5500
-      # Exemple proxy : https://api.itransfer.domain.tld
       - BACKEND_URL=http://localhost:5500  # Change 5500 if you modified backend port
     depends_on:
       - backend
@@ -97,12 +94,9 @@ services:
       # - container_port: Must remain 5000 (Flask default port)
       - "5500:5000"
     environment:
-      # URL publique du frontend
-      # Exemple local : http://localhost:3500
-      # Exemple proxy : https://itransfer.domain.tld
       - FRONTEND_URL=http://localhost:3500  # Change 3500 if you modified frontend port
       - ADMIN_USERNAME=admin  # Change these credentials
-      - ADMIN_PASSWORD=admin
+      - ADMIN_PASSWORD=admin  # Change these credentials
       - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
     volumes:
       - ./backend/data:/app/data
@@ -164,8 +158,8 @@ services:
       # - container_port: Must remain 80 (React default port)
       - "3500:80"
     environment:
-      # URL publique du backend (avec https:// si derrière reverse proxy)
-      # Exemple proxy : https://api.itransfer.domain.tld
+      # Public backend URL (with https:// if behind reverse proxy)
+      # Proxy example: https://api.itransfer.domain.tld
       - BACKEND_URL=https://api.itransfer.domain.tld
     depends_on:
       - backend
@@ -180,11 +174,11 @@ services:
       # - container_port: Must remain 5000 (Flask default port)
       - "5500:5000"
     environment:
-      # URL publique du frontend (avec https:// si derrière reverse proxy)
-      # Exemple proxy : https://itransfer.domain.tld
+      # Public frontend URL (with https:// if behind reverse proxy)
+      # Proxy example: https://itransfer.domain.tld
       - FRONTEND_URL=https://itransfer.domain.tld
-      - ADMIN_USERNAME=admin
-      - ADMIN_PASSWORD=admin
+      - ADMIN_USERNAME=admin  # Change these credentials
+      - ADMIN_PASSWORD=admin  # Change these credentials
       - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
       - FORCE_HTTPS=true
     volumes:
