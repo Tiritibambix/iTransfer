@@ -129,6 +129,8 @@ def upload_file():
         email = request.form.get('email')
         sender_email = request.form.get('sender_email')
 
+        app.logger.info(f"Début upload - email destinataire: {email}, email expéditeur: {sender_email}")
+
         if not file or not email or not sender_email:
             return jsonify({'error': 'Fichier ou email manquant'}), 400
         
@@ -141,6 +143,8 @@ def upload_file():
         encrypted_data = hashlib.sha256(file_content).hexdigest()
         safe_filename = secure_filename(file.filename)
         
+        app.logger.info(f"Fichier reçu: {safe_filename}, ID: {file_id}")
+        
         # Création du chemin de fichier unique
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_id}_{safe_filename}")
         
@@ -149,6 +153,7 @@ def upload_file():
             os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
             with open(file_path, 'wb') as f:
                 f.write(file_content)
+            app.logger.info("Fichier sauvegardé avec succès")
         except Exception as e:
             app.logger.error(f"Erreur lors de la sauvegarde du fichier: {str(e)}")
             return jsonify({'error': 'Erreur lors de la sauvegarde du fichier'}), 500
@@ -165,6 +170,7 @@ def upload_file():
             )
             db.session.add(new_file)
             db.session.commit()
+            app.logger.info("Entrée créée dans la base de données")
         except Exception as db_error:
             app.logger.error(f"Erreur base de données: {str(db_error)}")
             if os.path.exists(file_path):
@@ -173,17 +179,22 @@ def upload_file():
 
         # Chargement de la configuration SMTP
         try:
+            app.logger.info("Chargement de la configuration SMTP...")
             with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
                 smtp_config = json.load(config_file)
+            app.logger.info("Configuration SMTP chargée avec succès")
         except Exception as e:
             app.logger.error(f"Erreur lors du chargement de la configuration SMTP: {str(e)}")
             return jsonify({'warning': 'Fichier uploadé mais impossible d\'envoyer les notifications'}), 200
 
         # Envoi des notifications
+        app.logger.info("Début de l'envoi des notifications...")
         notification_errors = []
         if not send_recipient_notification(email, file_id, safe_filename, smtp_config):
+            app.logger.error("Échec de l'envoi de la notification au destinataire")
             notification_errors.append("destinataire")
         if not send_sender_upload_confirmation(sender_email, file_id, safe_filename, smtp_config):
+            app.logger.error("Échec de l'envoi de la notification à l'expéditeur")
             notification_errors.append("expéditeur")
 
         response_data = {
@@ -193,7 +204,10 @@ def upload_file():
         }
 
         if notification_errors:
+            app.logger.warning(f"Notifications non envoyées pour: {', '.join(notification_errors)}")
             response_data['warning'] = f"Impossible d'envoyer les notifications aux destinataires suivants: {', '.join(notification_errors)}"
+        else:
+            app.logger.info("Toutes les notifications ont été envoyées avec succès")
 
         return jsonify(response_data), 200
 
