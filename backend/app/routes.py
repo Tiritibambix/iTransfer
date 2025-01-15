@@ -11,6 +11,8 @@ from email.utils import formatdate, make_msgid, formataddr
 from . import app, db
 from .models import FileUpload
 from email.utils import formatdate
+import jwt
+from datetime import datetime, timedelta
 
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
 def get_backend_url():
@@ -50,6 +52,7 @@ def get_backend_url():
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
+JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
 
 def send_notification_email(to_email, subject, message_content, smtp_config):
     server = None
@@ -418,7 +421,15 @@ def login():
     password = data.get('password')
 
     if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
-        token = "fake_jwt_token_for_demo_purposes"
+        # Création d'un token JWT valide pour 24h
+        token = jwt.encode(
+            {
+                'user': username,
+                'exp': datetime.utcnow() + timedelta(days=1)
+            },
+            JWT_SECRET_KEY,
+            algorithm='HS256'
+        )
         response = jsonify({"message": "Login réussi", "token": token})
         response.headers.add("Access-Control-Allow-Origin", frontend_url)
         return response, 200

@@ -49,6 +49,9 @@ services:
       # If you change frontend's host_port from 3500 to another value,
       # update this URL accordingly: http://localhost:your_frontend_port
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3500}
+      # Clé secrète pour la génération des JWT tokens
+      # Par défaut, une valeur aléatoire sera générée au démarrage si non définie
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-$(openssl rand -base64 32)}
       # Identifiants administrateur
       - ADMIN_USERNAME=${ADMIN_USERNAME:-adminuser}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-adminuserpassword}
