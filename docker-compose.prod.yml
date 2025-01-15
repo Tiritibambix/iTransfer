@@ -36,7 +36,12 @@ services:
       MYSQL_DATABASE: mariadb_db
       MYSQL_USER: mariadb_user
       MYSQL_PASSWORD: mariadb_pass
-      MYSQL_ROOT_HOST: '%'          # Permettre à root de se connecter depuis n'importe où
+      MYSQL_ROOT_HOST: '%'  # Permet les connexions depuis n'importe quel hôte
+    command: 
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --bind-address=0.0.0.0
     volumes:
       - ./db_data:/var/lib/mysql
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
