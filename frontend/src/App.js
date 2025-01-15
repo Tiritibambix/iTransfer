@@ -102,7 +102,7 @@ function App() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!selectedFiles.length || !recipientEmail || !senderEmail) {
-      alert('Veuillez sélectionner au moins un fichier et remplir les adresses email');
+      setMessage('Veuillez sélectionner au moins un fichier et remplir les adresses email');
       return;
     }
 
@@ -113,6 +113,7 @@ function App() {
     formData.append('email', recipientEmail);
     formData.append('sender_email', senderEmail);
     
+    console.log('Fichiers à envoyer:', selectedFiles);
     selectedFiles.forEach((file, index) => {
       formData.append('files[]', file);
       formData.append('paths[]', fileList[index].path);
@@ -126,32 +127,38 @@ function App() {
         if (event.lengthComputable) {
           const percentCompleted = Math.round((event.loaded * 100) / event.total);
           setUploadProgress(percentCompleted);
+          console.log('Progress:', percentCompleted + '%');
         }
       };
 
       xhr.onload = () => {
+        const response = JSON.parse(xhr.responseText);
+        console.log('Réponse du serveur:', response);
+        
         if (xhr.status === 201 || xhr.status === 200) {
-          const response = JSON.parse(xhr.responseText);
           setMessage(response.message);
           if (response.warning) {
-            setMessage(response.warning);
+            console.warn('Warning:', response.warning);
+            setMessage(prev => `${prev}\n${response.warning}`);
           }
           setSelectedFiles([]);
           setFileList([]);
         } else {
-          const error = JSON.parse(xhr.responseText);
-          setMessage(error.error || 'Erreur lors de l\'upload');
+          console.error('Erreur:', response.error);
+          setMessage(response.error || 'Erreur lors de l\'upload');
         }
         setIsUploading(false);
         setUploadProgress(0);
       };
 
-      xhr.onerror = () => {
-        setMessage('Erreur lors de l\'upload. Veuillez réessayer.');
+      xhr.onerror = (error) => {
+        console.error('Erreur de connexion:', error);
+        setMessage('Erreur de connexion au serveur. Veuillez réessayer.');
         setIsUploading(false);
         setUploadProgress(0);
       };
 
+      console.log('Envoi de la requête...');
       xhr.send(formData);
     } catch (error) {
       console.error('Erreur:', error);
