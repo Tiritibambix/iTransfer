@@ -550,12 +550,3 @@ Si vous recevez cet email, la configuration est correcte."""
         response = jsonify({"success": False, "error": str(e)})
         response.headers.add("Access-Control-Allow-Origin", '*')
         return response, 500
-
-class FileUpload(db.Model):
-    id = db.Column(db.String(36), primary_key=True)
-    filename = db.Column(db.String(255), nullable=False)
-    email = db.Column(db.String(255), nullable=False)
-    sender_email = db.Column(db.String(255), nullable=False)
-    encrypted_data = db.Column(db.String(255), nullable=False)
-    downloaded = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
