@@ -5,6 +5,7 @@ from .config import Config
 from .database import init_db
 import os
 import time
+import logging
 from werkzeug.utils import secure_filename
 from sqlalchemy import exc
 
@@ -29,6 +30,10 @@ def wait_for_db(max_retries=5, delay=2):
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+    
+    # Configuration du logging
+    logging.basicConfig(level=logging.INFO)
+    app.logger.setLevel(logging.INFO)
     
     # Configuration CORS centralisée
     CORS(app, resources={
