@@ -490,7 +490,7 @@ Subject: Test de configuration SMTP iTransfer
 Content-Type: text/plain; charset=utf-8
 
 Ceci est un email de test pour vérifier la configuration SMTP d'iTransfer.
-Si vous recevez cet email, la configuration est correcte."""
+Si vous recevez cet email, la configuration est correcte :)"""
 
         app.logger.info(f"Tentative d'envoi de l'email de test à {smtp_config['smtp_sender_email']}")
         server.sendmail(
