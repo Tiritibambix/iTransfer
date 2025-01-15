@@ -24,21 +24,25 @@ COPY --from=builder /app/build /usr/share/nginx/html
 
 # Créer le script d'entrypoint personnalisé
 RUN printf '#!/bin/sh\n\
-sed -i "s|window.BACKEND_URL = .*|window.BACKEND_URL = '\''$BACKEND_URL'\''|g" /usr/share/nginx/html/index.html\n\
-exec nginx -g '\''daemon off;'\''\n\
-' > /docker-entrypoint.sh \
-&& chmod +x /docker-entrypoint.sh
+echo "BACKEND_URL=$BACKEND_URL"\n\
+echo "Content before replacement:"\n\
+cat /usr/share/nginx/html/index.html\n\
+sed -i "s|TO_BE_REPLACED_BY_ENTRYPOINT|$BACKEND_URL|g" /usr/share/nginx/html/index.html\n\
+echo "Content after replacement:"\n\
+cat /usr/share/nginx/html/index.html\n\
+exec nginx -g "daemon off;"\n' > /docker-entrypoint.sh && \
+    chmod +x /docker-entrypoint.sh
 
 # Configuration Nginx pour SPA
-RUN echo 'server { \
-    listen 80; \
-    root /usr/share/nginx/html; \
-    index index.html; \
-    location / { \
-        try_files $uri /index.html; \
-    } \
-    error_page 404 /index.html; \
-}' > /etc/nginx/conf.d/default.conf
+RUN printf 'server {\n\
+    listen 80;\n\
+    root /usr/share/nginx/html;\n\
+    index index.html;\n\
+    location / {\n\
+        try_files $uri /index.html;\n\
+    }\n\
+    error_page 404 /index.html;\n\
+}\n' > /etc/nginx/conf.d/default.conf
 
 # Exposer le port utilisé par Nginx
 EXPOSE 80
