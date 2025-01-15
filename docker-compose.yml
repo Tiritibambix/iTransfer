@@ -8,6 +8,9 @@ services:
   frontend:
     image: tiritibambix/itransfer-frontend
     ports:
+      # Port mapping format: "host_port:container_port"
+      # - host_port: Can be changed to any available port on your system (default: 3500)
+      # - container_port: Must remain 80 (React default port)
       - "3500:80"  # Map container port 80 to host port 3500
     depends_on:
       - backend  # Ensure backend starts first
@@ -17,6 +20,9 @@ services:
       # URL publique du backend (avec https:// si derrière reverse proxy)
       # Exemple local : http://localhost:5500
       # Exemple proxy : https://api.itransfer.domain.com
+      # Backend URL must match the host_port defined in backend service
+      # If you change backend's host_port from 5500 to another value,
+      # update this URL accordingly: http://localhost:your_backend_port
       - BACKEND_URL=${BACKEND_URL:-http://localhost:5500}
     # Mount the source code for development
     volumes:
@@ -27,6 +33,9 @@ services:
   backend:
     image: tiritibambix/itransfer-backend
     ports:
+      # Port mapping format: "host_port:container_port"
+      # - host_port: Can be changed to any available port on your system (default: 5500)
+      # - container_port: Must remain 5000 (Flask default port)
       - "5500:5000"  # Map container port 5000 to host port 5500
     depends_on:
       - db  # Ensure database starts first
@@ -36,6 +45,9 @@ services:
       # URL publique du frontend (avec https:// si derrière reverse proxy)
       # Exemple local : http://localhost:3500
       # Exemple proxy : https://itransfer.domain.com
+      # Frontend URL must match the host_port defined in frontend service
+      # If you change frontend's host_port from 3500 to another value,
+      # update this URL accordingly: http://localhost:your_frontend_port
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3500}
       # Identifiants administrateur
       - ADMIN_USERNAME=${ADMIN_USERNAME:-adminuser}
@@ -46,6 +58,9 @@ services:
       - FORCE_HTTPS=true
       - PROXY_COUNT=1
       # Public URL of the backend
+      # Backend URL should match the host_port defined above in ports section
+      # If you change the host_port from 5500 to another value,
+      # update this URL accordingly: http://localhost:your_backend_port
       - BACKEND_URL=${BACKEND_URL:-http://localhost:5500}
     volumes:
       # Persist uploads and configuration
@@ -63,6 +78,9 @@ services:
       MYSQL_USER: mariadb_user
       MYSQL_PASSWORD: mariadb_pass
     ports:
+      # Port mapping format: "host_port:container_port"
+      # - host_port: Can be changed to any available port on your system (default: 3306)
+      # - container_port: Must remain 3306 (MySQL default port)
       - "3306:3306"
     volumes:
       # Persist database data

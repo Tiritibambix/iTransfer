@@ -11,6 +11,7 @@ iTransfer is a secure file transfer system that allows users to share files and 
 - ⚙️ Configurable SMTP settings
 - 🌐 Support for reverse proxy deployment
 - 🔐 HTTPS enforcement in production
+- 🔌 Flexible port configuration
 
 ## Email Notifications
 
@@ -50,28 +51,36 @@ git clone https://github.com/yourusername/iTransfer.git
 cd iTransfer
 ```
 
-2. Configure the application in `docker-compose.yml`:
+2. Configure the application in `docker-compose.yml`. You can customize the ports to match your needs:
 ```yaml
 services:
   frontend:
     # ... other settings ...
+    ports:
+      # Format: "host_port:container_port"
+      # Change 3500 to any port you want to use
+      - "3500:80"
     environment:
-      # Local development
-      - BACKEND_URL=http://localhost:5500
+      # Make sure BACKEND_URL port matches backend's host_port
+      - BACKEND_URL=http://localhost:5500  # Change 5500 if you modified backend port
       
   backend:
     # ... other settings ...
+    ports:
+      # Format: "host_port:container_port"
+      # Change 5500 to any port you want to use
+      - "5500:5000"
     environment:
+      # Make sure FRONTEND_URL port matches frontend's host_port
+      - FRONTEND_URL=http://localhost:3500  # Change 3500 if you modified frontend port
+      - BACKEND_URL=http://localhost:5500   # Change 5500 if you modified backend port
+      
       # Database settings
       - DATABASE_URL=mysql+mysqldb://itransfer:your_db_password@db/itransfer
       
       # Admin access (change these!)
       - ADMIN_USERNAME=your_admin_username
       - ADMIN_PASSWORD=your_admin_password
-      
-      # Local development
-      - FRONTEND_URL=http://localhost:3500
-      - BACKEND_URL=http://localhost:5500
       
   db:
     # ... other settings ...
@@ -82,14 +91,52 @@ services:
       - MYSQL_ROOT_PASSWORD=your_root_password
 ```
 
+### Port Configuration
+
+The application uses two main components that need port configuration:
+
+1. **Frontend (default: 3500)**
+   - In `docker-compose.yml`:
+     ```yaml
+     frontend:
+       ports:
+         - "3500:80"  # Format: "host_port:container_port"
+     ```
+   - You can change `3500` to any available port on your system
+   - The container port `80` should remain unchanged
+
+2. **Backend (default: 5500)**
+   - In `docker-compose.yml`:
+     ```yaml
+     backend:
+       ports:
+         - "5500:5000"  # Format: "host_port:container_port"
+     ```
+   - You can change `5500` to any available port on your system
+   - The container port `5000` should remain unchanged
+
+⚠️ **Important**: When changing ports, make sure to update the corresponding URLs in the environment variables:
+- If you change frontend port from 3500 to 8080:
+  ```yaml
+  backend:
+    environment:
+      - FRONTEND_URL=http://localhost:8080
+  ```
+- If you change backend port from 5500 to 9090:
+  ```yaml
+  frontend:
+    environment:
+      - BACKEND_URL=http://localhost:9090
+  ```
+
 3. Start the application:
 ```bash
 docker-compose up -d
 ```
 
 4. Access the application:
-- Frontend: http://localhost:3500
-- Backend API: http://localhost:5500
+- Frontend: http://localhost:[your_frontend_port] (default: 3500)
+- Backend API: http://localhost:[your_backend_port] (default: 5500)
 
 ### SMTP Configuration
 
