@@ -1,192 +1,166 @@
-# iTransfer
+# iTransfer - Secure File Transfer System
 
-A simple file transfer application with web interface, secure backend, and email notifications.
-
-JUST FOR LOCAL USE FOR NOW. Will work on reverse proxying soon.
+iTransfer is a secure file transfer system that allows users to share files and receive email notifications when files are uploaded and downloaded.
 
 ## Features
 
-- Responsive user interface
-- File upload with progress bar
-- Automatic email notifications for both sender and recipient
-- Secure admin interface
-- REST API backend
-- Easy deployment with Docker
-- File management with MariaDB database
+- 🚀 Easy file upload and download
+- 📧 Email notifications for both sender and recipient
+- 🔒 Secure file storage
+- 💼 Professional email templates
+- ⚙️ Configurable SMTP settings
+- 🌐 Support for reverse proxy deployment
+- 🔐 HTTPS enforcement in production
 
-## Prerequisites
+## Email Notifications
 
-- Docker
-- Docker Compose
+The system sends three types of email notifications:
+1. To the recipient when a file is uploaded
+2. To the sender when their file is uploaded
+3. To the sender when their file is downloaded
+
+All emails are sent using a professional HTML template with both HTML and plain text versions for maximum compatibility.
+
+### Email Delivery Features
+
+- Support for multiple SMTP configurations:
+  - Gmail (ports 587 and 465)
+  - Office 365 (port 587)
+  - OVH (port 465)
+  - Custom SMTP servers
+- Automatic protocol selection (STARTTLS or SSL)
+- Enhanced email headers for better deliverability
+- Professional HTML templates
+- Multipart emails (HTML + plain text)
+- Anti-spam measures
 
 ## Installation
 
+### Prerequisites
+
+- Docker
+- Docker Compose
+- Git
+
+### Quick Start
+
 1. Clone the repository:
 ```bash
-git clone https://github.com/tiritibambix/iTransfer.git
+git clone https://github.com/yourusername/iTransfer.git
 cd iTransfer
 ```
 
-2. Set up the database initialization file:
-   - Either download [init.sql](https://github.com/tiritibambix/iTransfer/blob/main/backend/init.sql) and place it in `backend/init.sql`
-   - Or create the file manually at `backend/init.sql` with the following content:
-```sql
-CREATE TABLE IF NOT EXISTS file_upload (
-    id VARCHAR(36) PRIMARY KEY,
-    filename VARCHAR(256) NOT NULL,
-    email VARCHAR(256) NOT NULL,
-    sender_email VARCHAR(256) NOT NULL,
-    encrypted_data VARCHAR(256) NOT NULL,
-    downloaded BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
+2. Create a .env file (optional):
+```bash
+# Database
+DB_PASSWORD=your_db_password
+DB_ROOT_PASSWORD=your_root_password
+
+# Admin access
+ADMIN_USERNAME=your_admin_username
+ADMIN_PASSWORD=your_admin_password
+
+# Deployment
+BACKEND_URL=https://api.yourdomain.com  # If behind reverse proxy
+FRONTEND_URL=https://yourdomain.com     # If behind reverse proxy
+FORCE_HTTPS=true                        # Force HTTPS in production
+PROXY_COUNT=1                           # Number of reverse proxies
 ```
 
-3. Start the containers:
+3. Start the application:
 ```bash
 docker-compose up -d
 ```
-## [docker-compose.yml](https://github.com/tiritibambix/iTransfer/blob/main/docker-compose.yml)
 
-Set up the database initialization file:
-   - Either download [init.sql](https://github.com/tiritibambix/iTransfer/blob/main/backend/init.sql) and place it in `backend/init.sql`
-   - Or create the file manually at `backend/init.sql`
+4. Access the application:
+- Frontend: http://localhost:3500
+- Backend API: http://localhost:5500
 
-Then
-```yaml
-services:
-  frontend:
-    image: tiritibambix/itransfer-frontend
-    ports:
-      - "3500:80"
-    depends_on:
-      - backend
-    networks:
-      - itransfer-network
+### SMTP Configuration
 
-  backend:
-    image: tiritibambix/itransfer-backend
-    ports:
-      - "5500:5000"
-    environment:
-      - FRONTEND_URL=http://localhost:3500
-      - ADMIN_USERNAME=adminuser
-      - ADMIN_PASSWORD=adminuserpassword
-      - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
-    volumes:
-      - ./backend/data:/app/data
-      - ./backend/uploads:/app/uploads
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - itransfer-network
+1. Log in to the admin interface at http://localhost:3500/admin
+2. Configure your SMTP settings:
+   - SMTP Server (e.g., smtp.gmail.com)
+   - SMTP Port (587 for STARTTLS, 465 for SSL)
+   - SMTP Username
+   - SMTP Password
+   - Sender Email
 
-  db:
-    image: mariadb
-    environment:
-      MYSQL_ROOT_PASSWORD: root_password
-      MYSQL_DATABASE: mariadb_db
-      MYSQL_USER: mariadb_user
-      MYSQL_PASSWORD: mariadb_pass
-    ports:
-      - "3306:3306"
-    volumes:
-      - ./db_data:/var/lib/mysql
-      - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD || echo 'Healthcheck failed' >> /var/log/healthcheck.log"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 30s
-    networks:
-      - itransfer-network
+The application will automatically detect the correct protocol based on the port:
+- Port 465: Uses SSL
+- Port 587 (or others): Uses STARTTLS
 
-networks:
-  itransfer-network:
-    driver: bridge
+### Production Deployment
+
+For production deployment behind a reverse proxy:
+
+1. Set environment variables in .env:
+```bash
+BACKEND_URL=https://api.yourdomain.com
+FRONTEND_URL=https://yourdomain.com
+FORCE_HTTPS=true
+PROXY_COUNT=1  # Adjust based on your setup
 ```
 
-## Configuration
+2. Configure your reverse proxy (example for Nginx):
+```nginx
+# Frontend
+server {
+    listen 443 ssl;
+    server_name yourdomain.com;
+    
+    location / {
+        proxy_pass http://localhost:3500;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}
 
-### Environment Variables
+# Backend
+server {
+    listen 443 ssl;
+    server_name api.yourdomain.com;
+    
+    location / {
+        proxy_pass http://localhost:5500;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
 
-The project uses several environment variables configurable in `docker-compose.yml`:
+3. Start the application:
+```bash
+docker-compose up -d
+```
 
-#### Backend
-- `FRONTEND_URL`: Frontend URL (default: http://localhost:3500)
-- `ADMIN_USERNAME`: Admin username
-- `ADMIN_PASSWORD`: Admin password
-- `DATABASE_URL`: Database connection URL (using mysql+mysqldb driver)
+## Development
 
-#### Database
-- `MYSQL_ROOT_PASSWORD`: MariaDB root password
-- `MYSQL_DATABASE`: Database name
-- `MYSQL_USER`: MariaDB user
-- `MYSQL_PASSWORD`: MariaDB user password
-
-## Usage
-
-1. Access the web interface: http://localhost:3500
-2. To upload a file:
-   - Drag and drop or select a file
-   - Enter the recipient's email address
-   - Enter your email address (sender)
-   - Click "Send"
-3. Both you and the recipient will receive email notifications:
-   - Recipient gets a download link
-   - You get a confirmation of upload
-   - You'll be notified when the recipient downloads the file
-
-## Administration
-
-1. Access the admin interface: http://localhost:3500/admin
-2. Log in with the configured credentials
-3. Configure your SMTP settings to enable email notifications
-
-## Project Structure
+### Project Structure
 
 ```
 iTransfer/
-├── LICENSE
-├── README.md
-├── backend
-|     ├── Dockerfile
-|     ├── app
-|     |     ├── __init__.py
-|     |     ├── app.py
-|     |     ├── config.py
-|     |     ├── models.py
-|     |     ├── routes.py
-|     ├── entrypoint.sh
-|     ├── init.sql
-|     ├── run.py
-├── docker-compose.yml
-├── frontend
-|     ├── Dockerfile
-|     ├── package.json
-|     ├── public
-|     |     ├── index.html
-|     ├── src
-|     |     ├── App.js
-|     |     ├── Login.js
-|     |     ├── PrivateRoute.js
-|     |     ├── SMTPSettings.js
-|     |     ├── index.css
-|     |     ├── index.js
-├── requirements.txt
+├── frontend/          # React frontend application
+├── backend/           # Flask backend application
+│   ├── app/          # Application code
+│   ├── uploads/      # Uploaded files
+│   └── data/         # Configuration files
+└── docker-compose.yml # Docker configuration
 ```
 
-## Troubleshooting
+### Local Development
 
-### Database Connection Issues
-If you encounter database connection errors, ensure:
-1. The database service is running: `docker-compose ps`
-2. The database URL in `docker-compose.yml` uses the correct format:
-   ```yaml
-   DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
-   ```
+1. Start the services:
+```bash
+docker-compose up -d
+```
+
+2. Watch logs:
+```bash
+docker-compose logs -f
+```
 
 ## Contributing
 
@@ -194,8 +168,8 @@ If you encounter database connection errors, ensure:
 2. Create your feature branch
 3. Commit your changes
 4. Push to the branch
-5. Create a new Pull Request
+5. Create a Pull Request
 
 ## License
 
-This project is licensed under The GNU General Public License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT License - see the LICENSE file for details.

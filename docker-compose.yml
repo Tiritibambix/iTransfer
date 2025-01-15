@@ -1,26 +1,37 @@
-# Configuration pour iTransfer
-# Pour un usage local : pas besoin de modifier les valeurs par défaut
-# Pour un usage avec reverse proxy : définir FRONTEND_URL et BACKEND_URL avec les URLs publiques
+# Docker Compose configuration for iTransfer
+# This file defines all the services needed to run the application
+
+version: '3.8'
 
 services:
+  # Frontend service: React application
   frontend:
     image: tiritibambix/itransfer-frontend
     ports:
-      - "3500:80"
+      - "3500:80"  # Map container port 80 to host port 3500
+    depends_on:
+      - backend  # Ensure backend starts first
+    networks:
+      - itransfer-network  # Connect to our custom network
     environment:
       # URL publique du backend (avec https:// si derrière reverse proxy)
       # Exemple local : http://localhost:5500
       # Exemple proxy : https://api.itransfer.domain.com
       - BACKEND_URL=${BACKEND_URL:-http://localhost:5500}
-    depends_on:
-      - backend
-    networks:
-      - itransfer-network
+    # Mount the source code for development
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
 
+  # Backend service: Flask application
   backend:
     image: tiritibambix/itransfer-backend
     ports:
-      - "5500:5000"
+      - "5500:5000"  # Map container port 5000 to host port 5500
+    depends_on:
+      - db  # Ensure database starts first
+    networks:
+      - itransfer-network  # Connect to our custom network
     environment:
       # URL publique du frontend (avec https:// si derrière reverse proxy)
       # Exemple local : http://localhost:3500
@@ -34,15 +45,16 @@ services:
       # Configuration HTTPS
       - FORCE_HTTPS=true
       - PROXY_COUNT=1
+      # Public URL of the backend
+      - BACKEND_URL=${BACKEND_URL:-http://localhost:5500}
     volumes:
+      # Persist uploads and configuration
       - ./backend/data:/app/data
       - ./backend/uploads:/app/uploads
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - itransfer-network
+      - uploads:/app/uploads  # Store uploaded files
+      - data:/app/data  # Store application data (SMTP config, etc.)
 
+  # Database service: MySQL
   db:
     image: mariadb
     environment:
@@ -53,7 +65,9 @@ services:
     ports:
       - "3306:3306"
     volumes:
+      # Persist database data
       - ./db_data:/var/lib/mysql
+      # Mount initialization scripts
       - ./backend/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u root --password=$MYSQL_ROOT_PASSWORD || echo 'Healthcheck failed' >> /var/log/healthcheck.log"]
@@ -62,8 +76,16 @@ services:
       retries: 3
       start_period: 30s
     networks:
-      - itransfer-network
+      - itransfer-network  # Connect to our custom network
+    restart: always  # Automatically restart if it crashes
 
+# Custom network for inter-service communication
 networks:
   itransfer-network:
-    driver: bridge
+    driver: bridge  # Use bridge network driver
+
+# Define named volumes for data persistence
+volumes:
+  mysql_data:  # Stores MySQL database files
+  uploads:     # Stores uploaded files
+  data:        # Stores application data (SMTP config, etc.)
