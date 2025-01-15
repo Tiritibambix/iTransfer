@@ -260,8 +260,13 @@ def upload_file():
             return jsonify({'error': 'Aucun fichier envoyé'}), 400
         
         file = request.files['file']
+        # Normalisation des emails en minuscules et suppression des espaces
         email = request.form.get('email')
         sender_email = request.form.get('sender_email')
+        if email:
+            email = email.lower().strip()
+        if sender_email:
+            sender_email = sender_email.lower().strip()
 
         app.logger.info(f"Fichier reçu : {file.filename}")
         app.logger.info(f"Email destinataire : {email}")
