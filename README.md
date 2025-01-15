@@ -51,7 +51,22 @@ git clone https://github.com/yourusername/iTransfer.git
 cd iTransfer
 ```
 
-2. Configure the application in `docker-compose.yml`. You can customize the ports to match your needs:
+2. Set up the database initialization file:
+   - Either download [init.sql](https://github.com/yourusername/iTransfer/blob/main/backend/init.sql) and place it in `backend/init.sql`
+   - Or create the file manually at `backend/init.sql` with the following content:
+```sql
+CREATE TABLE IF NOT EXISTS file_upload (
+    id VARCHAR(36) PRIMARY KEY,
+    filename VARCHAR(256) NOT NULL,
+    email VARCHAR(256) NOT NULL,
+    sender_email VARCHAR(256) NOT NULL,
+    encrypted_data VARCHAR(256) NOT NULL,
+    downloaded BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+3. Configure the application in `docker-compose.yml`. You can customize the ports to match your needs:
 ```yaml
 services:
   frontend:
@@ -233,7 +248,8 @@ iTransfer/
 ├── backend/           # Flask backend application
 │   ├── app/          # Application code
 │   ├── uploads/      # Uploaded files
-│   └── data/         # Configuration files
+│   ├── data/         # Configuration files
+│   └── init.sql      # Database initialization script
 └── docker-compose.yml # Docker configuration
 ```
 
@@ -248,6 +264,31 @@ docker-compose up -d
 ```bash
 docker-compose logs -f
 ```
+
+### Troubleshooting
+
+#### Database Issues
+
+If you encounter database-related issues:
+
+1. Verify that `backend/init.sql` exists and contains the correct table definition:
+```sql
+CREATE TABLE IF NOT EXISTS file_upload (
+    id VARCHAR(36) PRIMARY KEY,
+    filename VARCHAR(256) NOT NULL,
+    email VARCHAR(256) NOT NULL,
+    sender_email VARCHAR(256) NOT NULL,
+    encrypted_data VARCHAR(256) NOT NULL,
+    downloaded BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+2. If the file is missing or incorrect:
+   - Stop the containers: `docker-compose down`
+   - Create or fix the `init.sql` file
+   - Remove the database volume: `docker-compose down -v`
+   - Start the containers again: `docker-compose up -d`
 
 ## Contributing
 
