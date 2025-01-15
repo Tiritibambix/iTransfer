@@ -3,7 +3,6 @@ import uuid
 import hashlib
 import smtplib
 import json
-import zipfile
 from flask import request, jsonify, send_file
 from werkzeug.utils import secure_filename
 from email.mime.text import MIMEText
@@ -14,9 +13,6 @@ from .models import FileUpload
 from email.utils import formatdate
 import jwt
 from datetime import datetime, timedelta
-import tempfile
-import shutil
-from cryptography.fernet import Fernet
 
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
 def get_backend_url():
@@ -53,18 +49,6 @@ def get_backend_url():
     generated_url = f"{protocol}://{host}"
     app.logger.info(f"URL backend générée depuis la requête : {generated_url}")
     return generated_url
-
-def get_fernet():
-    """Récupère ou crée une instance Fernet pour le chiffrement"""
-    key = os.environ.get('ENCRYPTION_KEY')
-    if not key:
-        # Générer une clé si elle n'existe pas
-        key = Fernet.generate_key()
-        os.environ['ENCRYPTION_KEY'] = key.decode()
-    elif isinstance(key, str):
-        # Si la clé est une chaîne, la convertir en bytes
-        key = key.encode()
-    return Fernet(key)
 
 ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
@@ -183,210 +167,200 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
             except Exception as e:
                 app.logger.error(f"Erreur lors de la fermeture de la connexion SMTP : {str(e)}")
 
-def cleanup_expired_files():
-    """Supprime les fichiers expirés (plus de 5 jours)"""
-    try:
-        # Calcul de la date limite (5 jours avant aujourd'hui)
-        expiration_date = datetime.utcnow() - timedelta(days=5)
-        
-        # Recherche des fichiers expirés
-        expired_files = FileUpload.query.filter(FileUpload.created_at <= expiration_date).all()
-        
-        for file in expired_files:
-            # Suppression du fichier physique
-            file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file.id}_{file.filename}")
-            if os.path.exists(file_path):
-                os.remove(file_path)
-            
-            # Suppression de l'entrée en base
-            db.session.delete(file)
-        
-        db.session.commit()
-        app.logger.info(f"Nettoyage terminé : {len(expired_files)} fichiers supprimés")
-    except Exception as e:
-        app.logger.error(f"Erreur lors du nettoyage des fichiers expirés : {str(e)}")
-
-def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config, file_list=""):
-    """Envoie une confirmation à l'expéditeur après l'upload"""
-    
-    backend_url = get_backend_url()
-    download_link = f"{backend_url}/download/{file_id}"
-    
-    message = f"""
-    Bonjour,
-
-    Votre fichier zip contenant les éléments suivants a été uploadé avec succès :
-
-    {file_list}
-
-    Vous pouvez télécharger votre fichier ici :
-    {download_link}
-
-    Le destinataire recevra un email contenant ce même lien de téléchargement.
-    Vous serez notifié lorsque le fichier aura été téléchargé.
-
-    Note : Le fichier sera automatiquement supprimé après 5 jours.
-
-    Cordialement,
-    L'équipe iTransfer
-    """
-    
-    success = send_notification_email(to_email, "iTransfer - Fichiers envoyés avec succès", message, smtp_config)
-    if not success:
-        app.logger.error(f"Échec de l'envoi de la confirmation à l'expéditeur : {to_email}")
-    return success
-
-def send_recipient_notification(to_email, file_id, filename, smtp_config, file_list=""):
+def send_recipient_notification(to_email, file_id, filename, smtp_config):
     """Envoie une notification au destinataire avec le lien de téléchargement"""
-    
+    app.logger.info(f"Préparation de la notification pour le destinataire : {to_email}")
     backend_url = get_backend_url()
+    app.logger.info(f"URL backend : {backend_url}")
     download_link = f"{backend_url}/download/{file_id}"
+    app.logger.info(f"Lien de téléchargement généré : {download_link}")
     
     message = f"""
     Bonjour,
 
-    Un fichier zip contenant les éléments suivants vous a été envoyé via iTransfer :
-
-    {file_list}
-
-    Pour le télécharger, cliquez sur le lien suivant :
-    {download_link}
-
-    Note : Ce lien expirera dans 5 jours.
-
+    Un fichier a été partagé avec vous via iTransfer.
+    
+    Fichier : {filename}
+    Lien de téléchargement : {download_link}
+    
+    Ce lien expirera dans 7 jours.
+    
     Cordialement,
     L'équipe iTransfer
     """
     
+    app.logger.info("Envoi de la notification au destinataire")
     success = send_notification_email(to_email, "iTransfer - Nouveau fichier partagé", message, smtp_config)
     if not success:
         app.logger.error(f"Échec de l'envoi de la notification au destinataire : {to_email}")
     return success
 
-@app.before_request
-def before_request():
-    """Nettoie les fichiers expirés avant chaque requête"""
-    cleanup_expired_files()
+def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config):
+    """Envoie une confirmation à l'expéditeur après l'upload"""
+    app.logger.info(f"Préparation de la confirmation pour l'expéditeur : {to_email}")
+    backend_url = get_backend_url()
+    app.logger.info(f"URL backend : {backend_url}")
+    download_link = f"{backend_url}/download/{file_id}"
+    app.logger.info(f"Lien de téléchargement généré : {download_link}")
+    
+    message = f"""
+    Bonjour,
+
+    Votre fichier a été uploadé avec succès sur iTransfer.
+    
+    Fichier : {filename}
+    ID : {file_id}
+    Lien de téléchargement : {download_link}
+    
+    Une notification a été envoyée au destinataire avec ce même lien.
+    
+    Cordialement,
+    L'équipe iTransfer
+    """
+    
+    app.logger.info("Envoi de la confirmation à l'expéditeur")
+    success = send_notification_email(to_email, "iTransfer - Upload réussi", message, smtp_config)
+    if not success:
+        app.logger.error(f"Échec de l'envoi de la confirmation à l'expéditeur : {to_email}")
+    return success
+
+def send_sender_download_notification(to_email, filename, smtp_config):
+    """Envoie une notification à l'expéditeur quand le fichier est téléchargé"""
+    app.logger.info(f"Préparation de la notification pour l'expéditeur : {to_email}")
+    
+    message = f"""
+    Bonjour,
+
+    Le fichier que vous avez partagé via iTransfer a été téléchargé par le destinataire.
+    
+    Fichier : {filename}
+    Date de téléchargement : {formatdate(localtime=True)}
+    
+    Cette notification vous est envoyée à titre informatif.
+    
+    Cordialement,
+    L'équipe iTransfer
+    """
+    
+    app.logger.info("Envoi de la notification à l'expéditeur")
+    success = send_notification_email(to_email, "iTransfer - Fichier téléchargé", message, smtp_config)
+    if not success:
+        app.logger.error(f"Échec de l'envoi de la notification à l'expéditeur : {to_email}")
+    return success
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
-    """
-    Gère l'upload de fichiers
-    """
     if request.method == 'OPTIONS':
-        response = make_response()
-        response.headers.add('Access-Control-Allow-Origin', '*')
-        response.headers.add('Access-Control-Allow-Headers', '*')
-        response.headers.add('Access-Control-Allow-Methods', '*')
-        return response
+        return jsonify({'message': 'CORS preflight success'}), 200
 
     try:
-        app.logger.info("Début de l'upload")
+        app.logger.info("Début du traitement de l'upload")
+        # Vérification des données requises
+        if 'file' not in request.files:
+            return jsonify({'error': 'Aucun fichier envoyé'}), 400
         
-        # Vérification des fichiers
-        if 'files[]' not in request.files:
-            app.logger.error("Aucun fichier dans la requête")
-            return jsonify({"error": "Aucun fichier n'a été uploadé"}), 400
-        
-        files = request.files.getlist('files[]')
-        if not files:
-            app.logger.error("Liste de fichiers vide")
-            return jsonify({"error": "Liste de fichiers vide"}), 400
-
-        # Récupération des emails
+        file = request.files['file']
+        # Normalisation des emails en minuscules et suppression des espaces
         email = request.form.get('email')
         sender_email = request.form.get('sender_email')
+        if email:
+            email = email.lower().strip()
+        if sender_email:
+            sender_email = sender_email.lower().strip()
+
+        app.logger.info(f"Fichier reçu : {file.filename}")
+        app.logger.info(f"Email destinataire : {email}")
+        app.logger.info(f"Email expéditeur : {sender_email}")
+
+        if not file or not email or not sender_email:
+            return jsonify({'error': 'Fichier ou email manquant'}), 400
         
-        if not email or not sender_email:
-            app.logger.error("Email manquant")
-            return jsonify({"error": "Email du destinataire ou de l'expéditeur manquant"}), 400
+        if not file.filename:
+            return jsonify({'error': 'Nom de fichier invalide'}), 400
 
-        app.logger.info(f"Upload pour : {email} de : {sender_email}")
-        app.logger.info(f"Nombre de fichiers : {len(files)}")
-
-        # Création du dossier temporaire
-        temp_dir = tempfile.mkdtemp()
-        app.logger.info(f"Dossier temporaire créé : {temp_dir}")
+        # Génération d'un ID unique et sécurisation du nom de fichier
+        file_id = str(uuid.uuid4())
+        file_content = file.read()
+        encrypted_data = hashlib.sha256(file_content).hexdigest()
+        safe_filename = secure_filename(file.filename)
+        
+        app.logger.info(f"ID généré : {file_id}")
+        app.logger.info(f"Nom de fichier sécurisé : {safe_filename}")
+        
+        # Création du chemin de fichier unique
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_id}_{safe_filename}")
+        
+        try:
+            # Sauvegarde du fichier
+            os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
+            with open(file_path, 'wb') as f:
+                f.write(file_content)
+            app.logger.info(f"Fichier sauvegardé : {file_path}")
+        except Exception as e:
+            app.logger.error(f"Erreur lors de la sauvegarde du fichier: {str(e)}")
+            return jsonify({'error': 'Erreur lors de la sauvegarde du fichier'}), 500
 
         try:
-            # Sauvegarde des fichiers avec leur structure
-            paths = request.form.getlist('paths[]')
-            app.logger.info(f"Chemins reçus : {paths}")
+            # Création de l'entrée dans la base de données
+            new_file = FileUpload(
+                id=file_id,
+                filename=safe_filename,
+                email=email,
+                sender_email=sender_email,
+                encrypted_data=encrypted_data,
+                downloaded=False
+            )
+            db.session.add(new_file)
+            db.session.commit()
+            app.logger.info("Entrée créée dans la base de données")
+        except Exception as db_error:
+            app.logger.error(f"Erreur base de données: {str(db_error)}")
+            if os.path.exists(file_path):
+                os.remove(file_path)
+            return jsonify({'error': 'Erreur lors de l\'enregistrement en base de données'}), 500
 
-            for file, path in zip(files, paths):
-                if not file.filename:
-                    continue
-                    
-                # Création du chemin complet
-                full_path = os.path.join(temp_dir, path)
-                os.makedirs(os.path.dirname(full_path), exist_ok=True)
-                
-                app.logger.info(f"Sauvegarde de {file.filename} vers {full_path}")
-                file.save(full_path)
-
-            # Création du zip
-            zip_filename = f"iTransfer_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip"
-            zip_path = os.path.join(app.config['UPLOAD_FOLDER'], zip_filename)
-            
-            app.logger.info(f"Création du zip : {zip_path}")
-            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for root, _, files in os.walk(temp_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        arcname = os.path.relpath(file_path, temp_dir)
-                        app.logger.info(f"Ajout au zip : {arcname}")
-                        zipf.write(file_path, arcname)
-
-        finally:
-            # Nettoyage du dossier temporaire
-            shutil.rmtree(temp_dir)
-            app.logger.info("Dossier temporaire supprimé")
-
-        # Génération de l'ID unique
-        file_id = str(uuid.uuid4())
-        app.logger.info(f"ID généré : {file_id}")
-
-        # Création de l'entrée en base (sans chiffrement du nom de fichier)
-        file_upload = FileUpload(
-            id=file_id,
-            filename=zip_filename,
-            email=email,
-            sender_email=sender_email,
-            encrypted_data=zip_filename  # On stocke simplement le nom du fichier
-        )
-        
-        db.session.add(file_upload)
-        db.session.commit()
-        app.logger.info("Entrée créée en base de données")
+        # Chargement de la configuration SMTP
+        try:
+            app.logger.info("Chargement de la configuration SMTP")
+            with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
+                smtp_config = json.load(config_file)
+            app.logger.info("Configuration SMTP chargée avec succès")
+        except Exception as e:
+            app.logger.error(f"Erreur lors du chargement de la configuration SMTP: {str(e)}")
+            return jsonify({'warning': 'Fichier uploadé mais impossible d\'envoyer les notifications'}), 200
 
         # Envoi des notifications
-        app.logger.info("Lecture de la configuration SMTP")
-        with open(app.config['SMTP_CONFIG_PATH'], 'r') as f:
-            smtp_config = json.load(f)
-
-        # Création de la liste des fichiers pour l'email
-        file_list_str = "\n".join(f"- {p}" for p in paths)
+        notification_errors = []
         
-        app.logger.info("Envoi des notifications par email")
-        recipient_notif = send_recipient_notification(email, file_id, zip_filename, smtp_config, file_list_str)
-        sender_notif = send_sender_upload_confirmation(sender_email, file_id, zip_filename, smtp_config, file_list_str)
+        # Envoi au destinataire
+        app.logger.info("Tentative d'envoi de la notification au destinataire")
+        if not send_recipient_notification(email, file_id, safe_filename, smtp_config):
+            app.logger.error("Échec de l'envoi au destinataire")
+            notification_errors.append("destinataire")
+        
+        # Envoi à l'expéditeur
+        app.logger.info("Tentative d'envoi de la confirmation à l'expéditeur")
+        if not send_sender_upload_confirmation(sender_email, file_id, safe_filename, smtp_config):
+            app.logger.error("Échec de l'envoi à l'expéditeur")
+            notification_errors.append("expéditeur")
 
-        if not recipient_notif or not sender_notif:
-            app.logger.warning("Certaines notifications n'ont pas pu être envoyées")
-            return jsonify({
-                "message": "Fichiers uploadés avec succès",
-                "warning": "Certaines notifications par email n'ont pas pu être envoyées"
-            }), 201
+        response_data = {
+            'success': True,
+            'file_id': file_id,
+            'message': 'Fichier uploadé avec succès'
+        }
+
+        if notification_errors:
+            response_data['warning'] = f"Impossible d'envoyer les notifications aux destinataires suivants: {', '.join(notification_errors)}"
 
         app.logger.info("Upload terminé avec succès")
-        return jsonify({"message": "Fichiers uploadés avec succès"}), 201
+        return jsonify(response_data), 200
 
     except Exception as e:
-        app.logger.error(f"Erreur lors de l'upload : {str(e)}")
-        if 'temp_dir' in locals():
-            shutil.rmtree(temp_dir)
-            app.logger.info("Nettoyage du dossier temporaire après erreur")
-        return jsonify({"error": f"Erreur lors de l'upload : {str(e)}"}), 500
+        app.logger.error(f"Erreur lors de l'upload: {str(e)}")
+        if 'file_path' in locals() and os.path.exists(file_path):
+            os.remove(file_path)
+        return jsonify({'error': 'Une erreur interne est survenue'}), 500
 
 @app.route('/api/save-smtp-settings', methods=['POST', 'OPTIONS'])
 def save_smtp_settings():
@@ -529,7 +503,7 @@ def test_smtp():
 
         # Tenter d'envoyer un email de test
         app.logger.info(f"Tentative de connexion à {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
-
+        
         # Choisir le type de connexion en fonction du port
         port = int(smtp_config['smtp_port'])
         if port == 465:
