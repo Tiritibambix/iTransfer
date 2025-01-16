@@ -9,6 +9,10 @@ function App() {
   const [dragActive, setDragActive] = useState(false);
   const [uploadedItems, setUploadedItems] = useState([]);
   const [draggedFiles, setDraggedFiles] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
+  const [warning, setWarning] = useState(null);
   const xhrRef = useRef(null);
   const fileInputRef = useRef(null);
   const backendUrl = window.BACKEND_URL;
@@ -77,16 +81,19 @@ function App() {
     
     const processItems = async (items) => {
       const files = [];
-      const processEntry = async (entry, path = '') => {
+      const processEntry = async (entry, basePath = '') => {
         if (entry.isFile) {
           return new Promise((resolve, reject) => {
             entry.file(file => {
-              const relativePath = path ? `/${path}/${file.name}` : `/${file.name}`;
+              // Si le fichier est dans un dossier, on garde le chemin complet
+              const relativePath = basePath ? `/${basePath}/${file.name}` : `/${file.name}`;
               files.push({
                 name: file.name,
                 path: relativePath,
                 size: file.size,
-                file: file
+                file: file,
+                // Ajouter le dossier parent pour une meilleure organisation
+                parentFolder: basePath.split('/')[0] || ''
               });
               resolve();
             }, reject);
@@ -100,7 +107,8 @@ function App() {
                   resolve();
                 } else {
                   const promises = entries.map(entry => {
-                    const newPath = path ? `${path}/${entry.name}` : entry.name;
+                    // Pour les dossiers, on construit le chemin en ajoutant le nom du dossier actuel
+                    const newPath = basePath ? `${basePath}/${entry.name}` : entry.name;
                     return processEntry(entry, newPath);
                   });
                   await Promise.all(promises);
@@ -113,13 +121,14 @@ function App() {
         }
       };
 
-      // Traiter tous les éléments déposés
       const promises = [];
       for (const item of items) {
         if (item.kind === 'file') {
           const entry = item.webkitGetAsEntry();
           if (entry) {
-            promises.push(processEntry(entry));
+            // Si c'est un dossier, on utilise son nom comme basePath
+            const basePath = entry.isDirectory ? entry.name : '';
+            promises.push(processEntry(entry, basePath));
           } else {
             const file = item.getAsFile();
             if (file) {
@@ -127,16 +136,30 @@ function App() {
                 name: file.name,
                 path: `/${file.name}`,
                 size: file.size,
-                file: file
+                file: file,
+                parentFolder: ''
               });
             }
           }
         }
       }
       
-      // Attendre que tous les éléments soient traités
       await Promise.all(promises);
-      return files;
+
+      // Grouper les fichiers par dossier parent
+      const groupedFiles = files.reduce((acc, file) => {
+        const key = file.parentFolder || 'root';
+        if (!acc[key]) {
+          acc[key] = [];
+        }
+        acc[key].push(file);
+        return acc;
+      }, {});
+
+      // Aplatir la structure en conservant l'organisation des dossiers
+      const organizedFiles = Object.values(groupedFiles).flat();
+      
+      return organizedFiles;
     };
 
     try {
@@ -148,12 +171,17 @@ function App() {
           name: file.name,
           path: `/${file.name}`,
           size: file.size,
-          file: file
+          file: file,
+          parentFolder: ''
         }));
       }
       
       if (files.length > 0) {
-        console.log('Fichiers à uploader:', files); // Pour le débogage
+        console.log('Structure des fichiers:', files.map(f => ({ 
+          name: f.name, 
+          path: f.path, 
+          parentFolder: f.parentFolder 
+        })));
         setUploadedItems(prevItems => [...prevItems, ...files]);
       }
     } catch (error) {
@@ -219,66 +247,73 @@ function App() {
     }
   };
 
-  const handleUpload = () => {
+  const handleUpload = async () => {
     if (uploadedItems.length === 0) {
-      alert('Veuillez sélectionner au moins un fichier');
+      setError("Veuillez sélectionner au moins un fichier");
       return;
     }
 
     if (!recipientEmail || !senderEmail) {
-      alert('Veuillez remplir les adresses email du destinataire et de l\'expéditeur');
+      setError("Veuillez remplir tous les champs");
       return;
     }
 
-    const formData = new FormData();
-    uploadedItems.forEach(item => {
-      // Utiliser le fichier original stocké dans l'item
-      if (item.file) {
-        formData.append('files[]', item.file);
-        formData.append('paths[]', item.path);
-      }
-    });
-    formData.append('email', recipientEmail);
-    formData.append('sender_email', senderEmail);
+    setUploading(true);
+    setError(null);
+    setProgress(0);
 
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${backendUrl}/upload`, true);
+    try {
+      const formData = new FormData();
+      formData.append('email', recipientEmail);
+      formData.append('sender_email', senderEmail);
 
-    xhr.upload.onprogress = (event) => {
-      if (event.lengthComputable) {
-        const percent = Math.round((event.loaded / event.total) * 100);
-        setProgress(percent);
-      }
-    };
-
-    xhr.onload = () => {
-      if (xhr.status === 201 || xhr.status === 200) {
-        const response = JSON.parse(xhr.responseText);
-        console.log('Upload réussi');
-        if (response.warning) {
-          alert('Les fichiers ont été uploadés mais il y a eu un problème avec l\'envoi des notifications.');
-        } else {
-          alert('Les fichiers ont été uploadés et les notifications ont été envoyées.');
+      // Organiser les fichiers par dossier
+      const filesByFolder = uploadedItems.reduce((acc, item) => {
+        const folder = item.parentFolder || '';
+        if (!acc[folder]) {
+          acc[folder] = [];
         }
-        setUploadedItems([]);
-        setDraggedFiles(null);
-        setProgress(0);
-      } else {
-        console.error('Erreur lors de l\'upload :', xhr.status, xhr.statusText);
-        alert('Erreur lors de l\'upload. Veuillez vérifier que les emails sont valides et réessayer.');
-        setProgress(0);
+        acc[folder].push(item);
+        return acc;
+      }, {});
+
+      // Ajouter les fichiers en préservant la structure
+      uploadedItems.forEach((item) => {
+        const file = item.file;
+        formData.append('files[]', file);
+        // Utiliser le chemin relatif complet pour préserver la structure
+        const path = item.path;
+        formData.append('paths[]', path);
+      });
+
+      const response = await fetch(`${backendUrl}/upload`, {
+        method: 'POST',
+        body: formData,
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setProgress(percentCompleted);
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Erreur lors de l\'upload');
       }
-    };
 
-    xhr.onerror = () => {
-      console.error('Erreur réseau lors de l\'upload');
-      alert('Erreur réseau lors de l\'upload. Veuillez vérifier votre connexion et réessayer.');
-      setProgress(0);
-    };
-
-    xhr.setRequestHeader('Accept', 'application/json');
-    xhr.send(formData);
-    xhrRef.current = xhr;
+      const data = await response.json();
+      if (data.warning) {
+        setWarning(data.warning);
+      }
+      
+      setSuccess(true);
+      setUploadedItems([]);
+      setRecipientEmail('');
+      setSenderEmail('');
+    } catch (error) {
+      console.error('Erreur:', error);
+      setError("Une erreur est survenue lors de l'upload");
+    } finally {
+      setUploading(false);
+    }
   };
 
   const formatFileSize = (bytes) => {

@@ -62,10 +62,6 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         backend_url = get_backend_url()
         app.logger.info(f"URL backend pour l'email : {backend_url}")
         
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-        from email.utils import formatdate, make_msgid, formataddr
-        
         # Créer un message MIME multipart
         msg = MIMEMultipart('alternative')
         
@@ -80,26 +76,17 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid(domain=sender_email.split('@')[1])
         
-        # En-têtes supplémentaires pour améliorer la délivrabilité
-        msg['Return-Path'] = sender_email
-        msg['X-Mailer'] = 'iTransfer Secure File Transfer System'
-        msg['X-Priority'] = '3'
-        msg['List-Unsubscribe'] = f'<mailto:{sender_email}?subject=unsubscribe>'
-        msg['Precedence'] = 'bulk'
-        msg['Auto-Submitted'] = 'auto-generated'
+        # En-têtes anti-spam supplémentaires
+        msg.add_header('List-Unsubscribe', f'<mailto:{sender_email}?subject=unsubscribe>')
+        msg.add_header('Precedence', 'bulk')
+        msg.add_header('Auto-Submitted', 'auto-generated')
+        msg.add_header('X-Auto-Response-Suppress', 'OOF, DR, RN, NRN, AutoReply')
+        msg.add_header('Feedback-ID', 'iTransfer:FileTransfer')
+        msg.add_header('X-Report-Abuse', f'Please report abuse to {sender_email}')
         
         # Ajouter le contenu en texte brut
         text_part = MIMEText(message_content, 'plain', 'utf-8')
         msg.attach(text_part)
-        
-        # Préparer le contenu du message pour HTML
-        formatted_content = (
-            message_content.replace("Bonjour,", "<p>Bonjour,</p>")
-            .replace("Cordialement,", "<p>Cordialement,</p>")
-            .replace("L'équipe iTransfer", "<strong>L'équipe iTransfer</strong>")
-            .replace('\n\n', '</p><p>')
-            .replace('\n', '<br>')
-        )
         
         # Créer une version HTML plus professionnelle
         html_template = '''
@@ -109,52 +96,67 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
             <title>{title}</title>
+            <style>
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
+                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
+                .header {{ background-color: #f8f9fa; padding: 20px; border-radius: 5px 5px 0 0; }}
+                .content {{ background-color: #ffffff; padding: 20px; border-radius: 0 0 5px 5px; }}
+                .footer {{ text-align: center; margin-top: 20px; font-size: 12px; color: #666; }}
+                .file-list {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; }}
+                .button {{ display: inline-block; padding: 10px 20px; background-color: #007bff; color: #ffffff; 
+                          text-decoration: none; border-radius: 5px; margin: 10px 0; }}
+                .button:hover {{ background-color: #0056b3; }}
+            </style>
         </head>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background-color: #f8f9fa; border-radius: 5px; padding: 20px; margin-bottom: 20px;">
-                <h2 style="color: #2c3e50; margin-top: 0;">{title}</h2>
-                {content}
-            </div>
-            <div style="font-size: 12px; color: #666; text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #eee;">
-                <p>Cet email a été envoyé automatiquement par iTransfer. Merci de ne pas y répondre.</p>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h2 style="margin: 0; color: #2c3e50;">{title}</h2>
+                </div>
+                <div class="content">
+                    {content}
+                </div>
+                <div class="footer">
+                    <p>Cet email a été envoyé automatiquement par iTransfer. Merci de ne pas y répondre.</p>
+                </div>
             </div>
         </body>
         </html>
         '''
         
+        # Convertir le contenu en HTML
+        content_html = message_content.replace('\n\n', '</p><p>')
+        if 'Liste des fichiers :' in content_html:
+            # Formater la liste des fichiers de manière plus compacte
+            parts = content_html.split('Liste des fichiers :')
+            files_list = parts[1].strip().split('\n')
+            if len(files_list) > 10:
+                # Si plus de 10 fichiers, ne montrer que les 5 premiers et derniers
+                formatted_files = '<div class="file-list">'
+                formatted_files += '<br>'.join(files_list[:5])
+                formatted_files += f'<br>... et {len(files_list) - 10} autres fichiers ...<br>'
+                formatted_files += '<br>'.join(files_list[-5:])
+                formatted_files += '</div>'
+                content_html = parts[0] + 'Liste des fichiers :' + formatted_files
+        
         html_content = html_template.format(
             title=subject,
-            content=formatted_content
+            content=content_html
         )
         
         html_part = MIMEText(html_content, 'html', 'utf-8')
         msg.attach(html_part)
-
-        app.logger.info(f"Configuration du serveur SMTP : {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
         
-        # Choisir le type de connexion en fonction du port
+        # Configuration et envoi de l'email
         port = int(smtp_config['smtp_port'])
         if port == 465:
-            # Port 465 : SMTP_SSL
-            app.logger.info("Utilisation de SMTP_SSL (port 465)")
             server = smtplib.SMTP_SSL(smtp_config['smtp_server'], port)
         else:
-            # Port 587 ou autre : SMTP + STARTTLS
-            app.logger.info(f"Utilisation de SMTP + STARTTLS (port {port})")
             server = smtplib.SMTP(smtp_config['smtp_server'], port)
             server.starttls()
         
-        app.logger.info("Connexion SMTP établie")
-        
-        app.logger.info(f"Tentative de connexion avec l'utilisateur : {smtp_config['smtp_user']}")
         server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
-        app.logger.info("Connexion SMTP réussie")
-        
-        app.logger.info(f"Envoi de l'email à {to_email}")
-        app.logger.info(f"Contenu de l'email :\n{msg.as_string()}")
-        
         server.send_message(msg)
-        app.logger.info("Email envoyé avec succès")
         return True
         
     except Exception as e:
@@ -165,7 +167,6 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         if server:
             try:
                 server.quit()
-                app.logger.info("Connexion SMTP fermée")
             except Exception as e:
                 app.logger.error(f"Erreur lors de la fermeture de la connexion SMTP : {str(e)}")
 
@@ -284,19 +285,33 @@ def upload_file():
         total_size = 0
         
         try:
+            # Créer un dictionnaire pour organiser les fichiers par dossier
+            folders = {}
             for file, path in zip(files, paths):
                 if file.filename:
-                    relative_path = path.lstrip('/')
-                    full_path = os.path.join(temp_dir, relative_path)
-                    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                    # Nettoyer le chemin et extraire le dossier parent
+                    clean_path = path.lstrip('/')
+                    parent_folder = os.path.dirname(clean_path) if '/' in clean_path else ''
                     
+                    if parent_folder not in folders:
+                        folders[parent_folder] = []
+                    
+                    # Sauvegarder le fichier
+                    full_path = os.path.join(temp_dir, clean_path)
+                    os.makedirs(os.path.dirname(full_path), exist_ok=True)
                     file.save(full_path)
+                    
                     file_size = os.path.getsize(full_path)
                     total_size += file_size
-                    file_list.append({
-                        'name': relative_path,
-                        'size': file_size
-                    })
+                    
+                    # Ajouter à la liste des fichiers avec la structure correcte
+                    file_info = {
+                        'name': clean_path,
+                        'size': file_size,
+                        'folder': parent_folder
+                    }
+                    folders[parent_folder].append(file_info)
+                    file_list.append(file_info)
             
             zip_filename = f"transfer_{file_id}.zip"
             zip_path = os.path.join(app.config['UPLOAD_FOLDER'], zip_filename)
@@ -305,6 +320,7 @@ def upload_file():
                 for root, _, files in os.walk(temp_dir):
                     for file in files:
                         file_path = os.path.join(root, file)
+                        # Préserver la structure exacte des dossiers
                         arcname = os.path.relpath(file_path, temp_dir)
                         zipf.write(file_path, arcname)
             
@@ -321,7 +337,6 @@ def upload_file():
             )
             db.session.add(new_file)
             db.session.commit()
-            app.logger.info("Entrée créée dans la base de données")
             
         except Exception as e:
             app.logger.error(f"Erreur lors du traitement des fichiers: {str(e)}")
@@ -334,22 +349,27 @@ def upload_file():
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
 
+        # Préparer un résumé des fichiers organisé par dossier
+        files_summary = []
+        for folder, files in folders.items():
+            if folder:
+                files_summary.append(f"\nDossier {folder}:")
+            for f in files:
+                prefix = "  " if folder else ""
+                files_summary.append(f"{prefix}- {os.path.basename(f['name'])} ({format_size(f['size'])})")
+        
+        files_summary = "\n".join(files_summary)
+        total_size_formatted = format_size(total_size)
+
         with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
             smtp_config = json.load(config_file)
-        
-        files_summary = "\n".join([f"- {f['name']} ({format_size(f['size'])})" for f in file_list])
-        total_size_formatted = format_size(total_size)
 
         notification_errors = []
         
-        app.logger.info("Tentative d'envoi de la notification au destinataire")
         if not send_recipient_notification_with_files(email, file_id, zip_filename, files_summary, total_size_formatted, smtp_config):
-            app.logger.error("Échec de l'envoi au destinataire")
             notification_errors.append("destinataire")
         
-        app.logger.info("Tentative d'envoi de la confirmation à l'expéditeur")
         if not send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filename, files_summary, total_size_formatted, smtp_config):
-            app.logger.error("Échec de l'envoi à l'expéditeur")
             notification_errors.append("expéditeur")
 
         response_data = {
@@ -361,7 +381,6 @@ def upload_file():
         if notification_errors:
             response_data['warning'] = f"Impossible d'envoyer les notifications aux destinataires suivants: {', '.join(notification_errors)}"
 
-        app.logger.info("Upload terminé avec succès")
         return jsonify(response_data), 200
 
     except Exception as e:
