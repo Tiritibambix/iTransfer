@@ -552,6 +552,6 @@ Si vous recevez cet email, la configuration est correcte."""
             app.logger.error(f"Erreur SMTP : {e.smtp_error}")
         if hasattr(e, 'smtp_code'):
             app.logger.error(f"Code SMTP : {e.smtp_code}")
-        response = jsonify({"success": False, "error": str(e)})
+        response = jsonify({"success": False, "error": "An internal error has occurred. Please try again later."})
         response.headers.add("Access-Control-Allow-Origin", '*')
         return response, 500
