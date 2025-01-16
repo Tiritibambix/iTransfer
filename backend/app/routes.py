@@ -94,131 +94,113 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         <html>
         <head>
             <meta charset="utf-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>iTransfer - Transfert de fichiers</title>
             <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
-                .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ 
-                    background-color: #007bff; 
-                    padding: 20px; 
-                    border-radius: 5px 5px 0 0;
-                    color: white;
+                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; }}
+                .container {{ max-width: 600px; margin: 0 auto; }}
+                .header {{ margin-bottom: 20px; }}
+                .info {{ margin-bottom: 20px; }}
+                .files {{ 
+                    background-color: #f5f5f5; 
+                    padding: 15px; 
+                    border-radius: 4px; 
+                    margin-bottom: 20px;
                 }}
-                .content {{ 
-                    background-color: #ffffff; 
-                    padding: 20px; 
-                    border: 1px solid #e9ecef;
-                    border-top: none;
-                    border-radius: 0 0 5px 5px;
+                .download-link {{ 
+                    display: inline-block; 
+                    background-color: #007bff; 
+                    color: white; 
+                    padding: 10px 20px; 
+                    text-decoration: none; 
+                    border-radius: 4px; 
+                    margin: 20px 0;
+                }}
+                .download-link:hover {{ background-color: #0056b3; }}
+                .expiry {{ 
+                    font-size: 0.9em; 
+                    color: #666; 
+                    font-style: italic; 
                 }}
                 .footer {{ 
-                    text-align: center; 
-                    margin-top: 20px; 
-                    font-size: 12px; 
-                    color: #666; 
-                    border-top: 1px solid #e9ecef;
-                    padding-top: 20px;
-                }}
-                .file-list {{ 
-                    background-color: #f8f9fa; 
-                    padding: 15px 20px; 
-                    border-radius: 5px; 
-                    margin: 15px 0;
-                    border: 1px solid #e9ecef;
-                }}
-                .file-list-header {{
-                    font-weight: bold;
-                    margin-bottom: 10px;
-                    color: #495057;
-                }}
-                .file-item {{
-                    padding: 3px 0;
-                    color: #495057;
-                }}
-                .folder-name {{
-                    font-weight: bold;
-                    color: #007bff;
-                    margin-top: 10px;
-                }}
-                .download-button {{ 
-                    display: inline-block; 
-                    padding: 12px 24px; 
-                    background-color: #007bff; 
-                    color: #ffffff !important; 
-                    text-decoration: none; 
-                    border-radius: 5px; 
-                    margin: 20px 0;
-                    font-weight: bold;
-                }}
-                .download-button:hover {{ 
-                    background-color: #0056b3; 
-                }}
-                .info-block {{
-                    background-color: #e9ecef;
-                    padding: 10px 15px;
-                    border-radius: 4px;
-                    margin: 10px 0;
-                    font-size: 14px;
-                    color: #495057;
+                    margin-top: 30px; 
+                    padding-top: 20px; 
+                    border-top: 1px solid #eee; 
+                    font-size: 0.9em; 
                 }}
             </style>
         </head>
         <body>
             <div class="container">
                 <div class="header">
-                    <h2 style="margin: 0;">iTransfer - Transfert de fichiers</h2>
+                    <p>Bonjour,</p>
+                    <p>Des fichiers ont été partagés avec vous via iTransfer.</p>
                 </div>
-                <div class="content">
-                    {content}
+                
+                <div class="info">
+                    <p><strong>Archive ZIP :</strong> {zip_filename}</p>
+                    <p><strong>Taille totale :</strong> {total_size}</p>
                 </div>
+                
+                <div class="files">
+                    <strong>Contenu de l'archive :</strong><br>
+                    {files}
+                </div>
+                
+                <a href="{download_url}" class="download-link">Télécharger les fichiers</a>
+                
+                <p class="expiry">Ce lien expirera dans 7 jours.</p>
+                
                 <div class="footer">
-                    <p>Cet email a été envoyé automatiquement par iTransfer.<br>Merci de ne pas y répondre.</p>
+                    <p>Cordialement,<br>L'équipe iTransfer</p>
                 </div>
             </div>
         </body>
         </html>
         '''
         
-        # Convertir le contenu en HTML
-        content_html = message_content
-        if 'Liste des fichiers :' in content_html:
-            # Formater la liste des fichiers de manière plus structurée
-            parts = content_html.split('Liste des fichiers :')
-            header = parts[0].replace('\n\n', '</p><p>').replace('\n', '<br>')
-            
-            # Ajouter le bouton de téléchargement si présent
-            if 'Lien de téléchargement :' in header:
-                header = header.replace(
-                    'Lien de téléchargement : ',
-                    '</p><p><a href="'
-                ).replace(
-                    '\n\nCe lien expirera',
-                    '" class="download-button">Télécharger les fichiers</a></p><p class="info-block">Ce lien expirera'
-                )
-            
-            files_list = parts[1].strip().split('\n')
-            formatted_files = '<div class="file-list">'
-            formatted_files += '<div class="file-list-header">Contenu du transfert :</div>'
-            
-            current_folder = None
-            for file_line in files_list:
-                if file_line.startswith('Dossier '):
-                    current_folder = file_line.replace('Dossier ', '')
-                    formatted_files += f'<div class="folder-name">{current_folder}</div>'
-                else:
-                    file_line = file_line.strip('- ').strip()
-                    if current_folder:
-                        formatted_files += f'<div class="file-item">└─ {file_line}</div>'
-                    else:
-                        formatted_files += f'<div class="file-item">• {file_line}</div>'
-            
-            formatted_files += '</div>'
-            content_html = header + formatted_files
+        # Créer le contenu du message
+        message_content = f"""
+Bonjour,
+
+Des fichiers ont été partagés avec vous via iTransfer.
+
+Archive ZIP : {zip_filename}
+Taille totale : {total_size_str}
+
+Contenu de l'archive :
+{file_list_str}
+
+Lien de téléchargement : {download_url}
+
+Ce lien expirera dans 7 jours.
+
+Cordialement,
+L'équipe iTransfer"""
+
+        # Formater la liste des fichiers pour HTML
+        files_html = []
+        current_folder = None
         
+        for line in file_list_str.split('\n'):
+            line = line.strip()
+            if not line:
+                continue
+                
+            if line.startswith('Dossier '):
+                current_folder = line.replace('Dossier ', '')
+                files_html.append(f'<div style="margin-top: 10px;"><strong>{current_folder}</strong></div>')
+            else:
+                file_info = line.strip('- ')
+                if current_folder:
+                    files_html.append(f'<div style="margin-left: 20px;">└─ {file_info}</div>')
+                else:
+                    files_html.append(f'<div>• {file_info}</div>')
+
+        # Créer le contenu HTML final
         html_content = html_template.format(
-            title="iTransfer - Transfert de fichiers",
-            content=content_html
+            zip_filename=zip_filename,
+            total_size=total_size_str,
+            files='\n'.join(files_html),
+            download_url=download_url
         )
         
         html_part = MIMEText(html_content, 'html', 'utf-8')
@@ -486,17 +468,17 @@ def send_recipient_notification_with_files(to_email, file_id, zip_filename, file
     Bonjour,
 
     Des fichiers ont été partagés avec vous via iTransfer.
-    
+
     Archive ZIP : {zip_filename}
     Taille totale : {total_size}
-    
+
     Contenu de l'archive :
     {files_summary}
-    
+
     Lien de téléchargement : {download_link}
-    
+
     Ce lien expirera dans 7 jours.
-    
+
     Cordialement,
     L'équipe iTransfer
     """
@@ -519,18 +501,18 @@ def send_sender_upload_confirmation_with_files(to_email, file_id, zip_filename, 
     Bonjour,
 
     Vos fichiers ont été uploadés avec succès sur iTransfer.
-    
+
     Archive ZIP : {zip_filename}
     Taille totale : {total_size}
-    
+
     Contenu de l'archive :
     {files_summary}
-    
+
     ID : {file_id}
     Lien de téléchargement : {download_link}
-    
+
     Une notification a été envoyée au destinataire avec ce même lien.
-    
+
     Cordialement,
     L'équipe iTransfer
     """

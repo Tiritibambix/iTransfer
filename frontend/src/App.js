@@ -249,12 +249,12 @@ function App() {
 
   const handleUpload = async () => {
     if (uploadedItems.length === 0) {
-      setError("Veuillez sélectionner au moins un fichier");
+      showNotification("Veuillez sélectionner au moins un fichier", "error");
       return;
     }
 
     if (!recipientEmail || !senderEmail) {
-      setError("Veuillez remplir les adresses email du destinataire et de l'expéditeur");
+      showNotification("Veuillez remplir les adresses email du destinataire et de l'expéditeur", "error");
       return;
     }
 
@@ -267,21 +267,9 @@ function App() {
       formData.append('email', recipientEmail);
       formData.append('sender_email', senderEmail);
 
-      // Organiser les fichiers par dossier
-      const filesByFolder = uploadedItems.reduce((acc, item) => {
-        const folder = item.parentFolder || '';
-        if (!acc[folder]) {
-          acc[folder] = [];
-        }
-        acc[folder].push(item);
-        return acc;
-      }, {});
-
-      // Ajouter les fichiers en préservant la structure
       uploadedItems.forEach((item) => {
         const file = item.file;
         formData.append('files[]', file);
-        // Utiliser le chemin relatif complet pour préserver la structure
         const path = item.path;
         formData.append('paths[]', path);
       });
@@ -300,21 +288,21 @@ function App() {
         if (xhr.status === 200) {
           const response = JSON.parse(xhr.responseText);
           if (response.warning) {
-            setWarning("Les fichiers ont été uploadés mais il y a eu un problème avec l'envoi des notifications.");
+            showNotification("Les fichiers ont été uploadés mais il y a eu un problème avec l'envoi des notifications.", "warning");
           } else {
-            setSuccess(true);
+            showNotification("Les fichiers ont été uploadés et les notifications ont été envoyées avec succès !", "success");
           }
           setUploadedItems([]);
           setRecipientEmail('');
           setSenderEmail('');
         } else {
-          setError("Une erreur est survenue lors de l'upload. Veuillez vérifier que les emails sont valides et réessayer.");
+          showNotification("Une erreur est survenue lors de l'upload. Veuillez vérifier que les emails sont valides et réessayer.", "error");
         }
         setUploading(false);
       };
 
       xhr.onerror = function() {
-        setError("Une erreur réseau est survenue. Veuillez vérifier votre connexion et réessayer.");
+        showNotification("Une erreur réseau est survenue. Veuillez vérifier votre connexion et réessayer.", "error");
         setUploading(false);
       };
 
@@ -322,8 +310,31 @@ function App() {
       xhrRef.current = xhr;
     } catch (error) {
       console.error('Erreur:', error);
-      setError("Une erreur est survenue lors de l'upload");
+      showNotification("Une erreur est survenue lors de l'upload", "error");
       setUploading(false);
+    }
+  };
+
+  const showNotification = (message, type = 'info') => {
+    if (!("Notification" in window)) {
+      console.log("Ce navigateur ne supporte pas les notifications desktop");
+      return;
+    }
+
+    if (Notification.permission === "granted") {
+      new Notification("iTransfer", {
+        body: message,
+        icon: "/logo192.png"
+      });
+    } else if (Notification.permission !== "denied") {
+      Notification.requestPermission().then(permission => {
+        if (permission === "granted") {
+          new Notification("iTransfer", {
+            body: message,
+            icon: "/logo192.png"
+          });
+        }
+      });
     }
   };
 
@@ -587,42 +598,6 @@ function App() {
             >
               Annuler
             </button>
-          </div>
-        )}
-
-        {error && (
-          <div style={{ 
-            padding: '10px', 
-            marginBottom: '20px', 
-            backgroundColor: '#ffebee', 
-            color: '#c62828',
-            borderRadius: '4px' 
-          }}>
-            {error}
-          </div>
-        )}
-        
-        {warning && (
-          <div style={{ 
-            padding: '10px', 
-            marginBottom: '20px', 
-            backgroundColor: '#fff3e0', 
-            color: '#ef6c00',
-            borderRadius: '4px' 
-          }}>
-            {warning}
-          </div>
-        )}
-
-        {success && (
-          <div style={{ 
-            padding: '10px', 
-            marginBottom: '20px', 
-            backgroundColor: '#e8f5e9', 
-            color: '#2e7d32',
-            borderRadius: '4px' 
-          }}>
-            Les fichiers ont été uploadés et les notifications ont été envoyées avec succès !
           </div>
         )}
 
