@@ -113,11 +113,13 @@ function App() {
         }
       };
 
+      // Traiter tous les éléments déposés
+      const promises = [];
       for (const item of items) {
         if (item.kind === 'file') {
           const entry = item.webkitGetAsEntry();
           if (entry) {
-            await processEntry(entry);
+            promises.push(processEntry(entry));
           } else {
             const file = item.getAsFile();
             if (file) {
@@ -131,6 +133,9 @@ function App() {
           }
         }
       }
+      
+      // Attendre que tous les éléments soient traités
+      await Promise.all(promises);
       return files;
     };
 
@@ -148,6 +153,7 @@ function App() {
       }
       
       if (files.length > 0) {
+        console.log('Fichiers à uploader:', files); // Pour le débogage
         setUploadedItems(prevItems => [...prevItems, ...files]);
       }
     } catch (error) {
