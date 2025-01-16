@@ -7,30 +7,97 @@ function App() {
   const [recipientEmail, setRecipientEmail] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
   const [dragActive, setDragActive] = useState(false);
+  const [uploadedItems, setUploadedItems] = useState([]);
   const xhrRef = useRef(null);
   const fileInputRef = useRef(null);
   const backendUrl = window.BACKEND_URL;
 
-  const handleFileUpload = (event) => {
-    const file = event.target.files[0];
-    if (!file) {
-      console.error('Aucun fichier sélectionné');
-      return;
-    }
+  const processFilesAndFolders = async (items) => {
+    const allFiles = [];
+    
+    const readEntry = async (entry) => {
+      return new Promise((resolve) => {
+        if (entry.isFile) {
+          entry.file(file => {
+            // Conserver le chemin relatif du fichier
+            file.relativePath = entry.fullPath;
+            allFiles.push(file);
+            resolve();
+          });
+        } else if (entry.isDirectory) {
+          const dirReader = entry.createReader();
+          dirReader.readEntries(async (entries) => {
+            const promises = entries.map(entry => readEntry(entry));
+            await Promise.all(promises);
+            resolve();
+          });
+        }
+      });
+    };
 
+    const promises = [];
+    for (let item of items) {
+      if (item.kind === 'file') {
+        const entry = item.webkitGetAsEntry();
+        if (entry) {
+          promises.push(readEntry(entry));
+        }
+      }
+    }
+    await Promise.all(promises);
+    return allFiles;
+  };
+
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    let files = [];
+    
+    if (e.dataTransfer.items) {
+      const items = Array.from(e.dataTransfer.items);
+      files = await processFilesAndFolders(items);
+    } else {
+      files = Array.from(e.dataTransfer.files);
+    }
+    
+    if (files.length > 0) {
+      handleUploadFiles(files);
+    }
+  };
+
+  const handleFileSelect = async (event) => {
+    const files = Array.from(event.target.files).map(file => {
+      // Pour les fichiers sélectionnés normalement, créer un chemin relatif basé sur le nom
+      file.relativePath = '/' + file.name;
+      return file;
+    });
+    if (files.length > 0) {
+      handleUploadFiles(files);
+    }
+  };
+
+  const handleUploadFiles = (files) => {
     if (!recipientEmail || !senderEmail) {
       alert('Veuillez remplir les adresses email du destinataire et de l\'expéditeur');
       return;
     }
 
     const formData = new FormData();
-    formData.append('file', file);
+    files.forEach(file => {
+      // Utiliser le chemin relatif pour préserver la structure des dossiers
+      formData.append('files[]', file);
+      formData.append('paths[]', file.relativePath);
+    });
     formData.append('email', recipientEmail);
     formData.append('sender_email', senderEmail);
 
-    console.log('Fichier à envoyer :', file);
-    console.log('Email du destinataire :', recipientEmail);
-    console.log('Email de l\'expéditeur :', senderEmail);
+    setUploadedItems(files.map(file => ({
+      name: file.name,
+      path: file.relativePath,
+      size: file.size
+    })));
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${backendUrl}/upload`, true);
@@ -47,10 +114,11 @@ function App() {
         const response = JSON.parse(xhr.responseText);
         console.log('Upload réussi');
         if (response.warning) {
-          alert('Le fichier a été uploadé mais il y a eu un problème avec l\'envoi des notifications.');
+          alert('Les fichiers ont été uploadés mais il y a eu un problème avec l\'envoi des notifications.');
         } else {
-          alert('Le fichier a été uploadé et les notifications ont été envoyées.');
+          alert('Les fichiers ont été uploadés et les notifications ont été envoyées.');
         }
+        setUploadedItems([]);
       } else {
         console.error('Erreur lors de l\'upload :', xhr.status, xhr.statusText);
         alert('Erreur lors de l\'upload. Veuillez vérifier que les emails sont valides et réessayer.');
@@ -62,6 +130,7 @@ function App() {
       console.error('Erreur réseau lors de l\'upload');
       alert('Erreur réseau lors de l\'upload. Veuillez vérifier votre connexion et réessayer.');
       setProgress(0);
+      setUploadedItems([]);
     };
 
     xhr.setRequestHeader('Accept', 'application/json');
@@ -69,12 +138,12 @@ function App() {
     xhrRef.current = xhr;
   };
 
-  const cancelUpload = () => {
-    if (xhrRef.current) {
-      xhrRef.current.abort();
-      console.log('Upload annulé');
-      setProgress(0);
-    }
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const handleRecipientEmailChange = (event) => {
@@ -88,7 +157,7 @@ function App() {
   const handleUpload = () => {
     const fileInput = document.querySelector('input[type="file"]');
     if (fileInput.files.length > 0) {
-      handleFileUpload({ target: fileInput });
+      handleFileSelect({ target: fileInput });
     } else {
       alert('Veuillez sélectionner un fichier');
     }
@@ -104,13 +173,11 @@ function App() {
     }
   };
 
-  const handleDrop = (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      handleFileUpload({ target: { files: [e.dataTransfer.files[0]] } });
+  const cancelUpload = () => {
+    if (xhrRef.current) {
+      xhrRef.current.abort();
+      console.log('Upload annulé');
+      setProgress(0);
     }
   };
 
@@ -220,17 +287,54 @@ function App() {
         >
           <div style={{ textAlign: 'center' }}>
             <p style={{ margin: '0 0 1rem 0' }}>
-              Glissez et déposez votre fichier ici<br />
+              Glissez et déposez vos fichiers et dossiers ici<br />
               ou cliquez pour sélectionner
             </p>
             <input
               ref={fileInputRef}
               type="file"
-              onChange={handleFileUpload}
+              onChange={handleFileSelect}
+              multiple
               style={{ display: 'none' }}
             />
           </div>
         </div>
+
+        {uploadedItems.length > 0 && (
+          <div style={{
+            backgroundColor: 'var(--clr-surface-a20)',
+            padding: 'clamp(1rem, 3vw, 1.5rem)',
+            borderRadius: '8px',
+            marginBottom: 'clamp(1rem, 3vw, 2rem)'
+          }}>
+            <h3 style={{
+              margin: '0 0 1rem 0',
+              fontSize: 'clamp(1rem, 2.5vw, 1.25rem)'
+            }}>
+              Fichiers sélectionnés :
+            </h3>
+            <div style={{
+              maxHeight: '200px',
+              overflowY: 'auto',
+              padding: '0.5rem'
+            }}>
+              {uploadedItems.map((item, index) => (
+                <div key={index} style={{
+                  padding: '0.5rem',
+                  borderBottom: index < uploadedItems.length - 1 ? '1px solid var(--clr-surface-a30)' : 'none'
+                }}>
+                  <div style={{ fontSize: '0.9rem' }}>{item.path}</div>
+                  <div style={{ 
+                    fontSize: '0.8rem',
+                    color: 'var(--clr-primary-a40)'
+                  }}>
+                    {formatFileSize(item.size)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {progress > 0 && (
           <div className="progress-container" style={{
