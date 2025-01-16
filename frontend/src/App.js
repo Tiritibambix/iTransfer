@@ -8,6 +8,7 @@ function App() {
   const [senderEmail, setSenderEmail] = useState('');
   const [dragActive, setDragActive] = useState(false);
   const [uploadedItems, setUploadedItems] = useState([]);
+  const [draggedFiles, setDraggedFiles] = useState(null);
   const xhrRef = useRef(null);
   const fileInputRef = useRef(null);
   const backendUrl = window.BACKEND_URL;
@@ -48,6 +49,189 @@ function App() {
     return allFiles;
   };
 
+  const handleClick = async () => {
+    if (supportsFileSystemAccess()) {
+      try {
+        // Solution moderne avec File System Access API
+        const handles = await window.showOpenFilePicker({
+          multiple: true,
+          types: [
+            {
+              description: 'Tous les fichiers',
+              accept: {'*/*': []}
+            }
+          ]
+        });
+
+        const files = [];
+        for (const handle of handles) {
+          if (handle.kind === 'directory') {
+            // Traiter le dossier récursivement
+            await processDirectory(handle, '', files);
+          } else {
+            // Traiter le fichier
+            const file = await handle.getFile();
+            files.push({
+              name: file.name,
+              path: '/' + file.name,
+              size: file.size,
+              file: file
+            });
+          }
+        }
+
+        setUploadedItems(prevItems => [...prevItems, ...files]);
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          console.error('Erreur lors de la sélection:', err);
+        }
+      }
+    } else {
+      // Solution de repli pour Firefox et Safari
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.multiple = true;
+      input.webkitdirectory = true;
+      input.directory = true;
+      input.style.display = 'none';
+      
+      input.addEventListener('change', handleLegacyFileSelect);
+      
+      // Créer un deuxième input pour les fichiers
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.multiple = true;
+      fileInput.style.display = 'none';
+      
+      fileInput.addEventListener('change', handleLegacyFileSelect);
+      
+      // Créer un conteneur pour les boutons
+      const dialogContainer = document.createElement('div');
+      dialogContainer.style.position = 'fixed';
+      dialogContainer.style.top = '50%';
+      dialogContainer.style.left = '50%';
+      dialogContainer.style.transform = 'translate(-50%, -50%)';
+      dialogContainer.style.backgroundColor = 'white';
+      dialogContainer.style.padding = '20px';
+      dialogContainer.style.borderRadius = '8px';
+      dialogContainer.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
+      dialogContainer.style.zIndex = '1000';
+      
+      // Créer les boutons
+      const fileButton = document.createElement('button');
+      fileButton.textContent = 'Sélectionner des fichiers';
+      fileButton.style.marginRight = '10px';
+      fileButton.style.padding = '10px 20px';
+      fileButton.style.border = 'none';
+      fileButton.style.borderRadius = '4px';
+      fileButton.style.backgroundColor = '#007bff';
+      fileButton.style.color = 'white';
+      fileButton.style.cursor = 'pointer';
+      
+      const folderButton = document.createElement('button');
+      folderButton.textContent = 'Sélectionner des dossiers';
+      folderButton.style.padding = '10px 20px';
+      folderButton.style.border = 'none';
+      folderButton.style.borderRadius = '4px';
+      folderButton.style.backgroundColor = '#007bff';
+      folderButton.style.color = 'white';
+      folderButton.style.cursor = 'pointer';
+      
+      // Ajouter les gestionnaires d'événements
+      fileButton.onclick = () => {
+        fileInput.click();
+        dialogContainer.remove();
+      };
+      
+      folderButton.onclick = () => {
+        input.click();
+        dialogContainer.remove();
+      };
+      
+      // Créer un bouton de fermeture
+      const closeButton = document.createElement('button');
+      closeButton.textContent = '×';
+      closeButton.style.position = 'absolute';
+      closeButton.style.top = '5px';
+      closeButton.style.right = '5px';
+      closeButton.style.border = 'none';
+      closeButton.style.background = 'none';
+      closeButton.style.fontSize = '20px';
+      closeButton.style.cursor = 'pointer';
+      closeButton.style.padding = '5px';
+      closeButton.style.color = '#666';
+      
+      closeButton.onclick = () => {
+        dialogContainer.remove();
+      };
+      
+      // Assembler le dialogue
+      dialogContainer.appendChild(closeButton);
+      dialogContainer.appendChild(fileButton);
+      dialogContainer.appendChild(folderButton);
+      
+      // Ajouter un fond semi-transparent
+      const overlay = document.createElement('div');
+      overlay.style.position = 'fixed';
+      overlay.style.top = '0';
+      overlay.style.left = '0';
+      overlay.style.right = '0';
+      overlay.style.bottom = '0';
+      overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+      overlay.style.zIndex = '999';
+      
+      overlay.onclick = () => {
+        overlay.remove();
+        dialogContainer.remove();
+      };
+      
+      // Ajouter les éléments au DOM
+      document.body.appendChild(overlay);
+      document.body.appendChild(dialogContainer);
+    }
+  };
+
+  const supportsFileSystemAccess = () => {
+    return 'showOpenFilePicker' in window;
+  };
+
+  const handleLegacyFileSelect = async (event) => {
+    event.preventDefault();
+    const files = Array.from(event.target.files);
+    
+    if (files.length > 0) {
+      const processedFiles = files.map(file => {
+        // Utiliser webkitRelativePath s'il existe (cas des dossiers), sinon utiliser le nom du fichier
+        const path = file.webkitRelativePath || ('/' + file.name);
+        return {
+          name: file.name,
+          path: path,
+          size: file.size,
+          file: file
+        };
+      });
+      setUploadedItems(prevItems => [...prevItems, ...processedFiles]);
+    }
+  };
+
+  const processDirectory = async (dirHandle, path, files) => {
+    for await (const entry of dirHandle.values()) {
+      const entryPath = path ? `${path}/${entry.name}` : entry.name;
+      
+      if (entry.kind === 'directory') {
+        await processDirectory(entry, entryPath, files);
+      } else {
+        const file = await entry.getFile();
+        files.push({
+          name: file.name,
+          path: '/' + entryPath,
+          size: file.size,
+          file: file
+        });
+      }
+    }
+  };
+
   const handleDrop = async (e) => {
     e.preventDefault();
     e.stopPropagation();
@@ -61,30 +245,38 @@ function App() {
       const processedFiles = files.map(file => ({
         name: file.name,
         path: file.relativePath || ('/' + file.name),
-        size: file.size
+        size: file.size,
+        file: file
       }));
-      setUploadedItems(processedFiles);
+      setDraggedFiles(files);
+      setUploadedItems(prevItems => [...prevItems, ...processedFiles]);
     } else {
       files = Array.from(e.dataTransfer.files);
       const processedFiles = files.map(file => ({
         name: file.name,
         path: '/' + file.name,
-        size: file.size
+        size: file.size,
+        file: file
       }));
-      setUploadedItems(processedFiles);
+      setDraggedFiles(files);
+      setUploadedItems(prevItems => [...prevItems, ...processedFiles]);
     }
   };
 
   const handleFileSelect = async (event) => {
     event.preventDefault();
     const files = Array.from(event.target.files);
+    
     if (files.length > 0) {
-      const processedFiles = files.map(file => ({
-        name: file.name,
-        path: '/' + file.name,
-        size: file.size
-      }));
-      setUploadedItems(processedFiles);
+      const processedFiles = files.map(file => {
+        return {
+          name: file.name,
+          path: '/' + file.name,
+          size: file.size,
+          file: file
+        };
+      });
+      setUploadedItems(prevItems => [...prevItems, ...processedFiles]);
     }
   };
 
@@ -101,10 +293,9 @@ function App() {
 
     const formData = new FormData();
     uploadedItems.forEach(item => {
-      // Récupérer le fichier original
-      const file = Array.from(fileInputRef.current.files).find(f => f.name === item.name);
-      if (file) {
-        formData.append('files[]', file);
+      // Utiliser le fichier original stocké dans l'item
+      if (item.file) {
+        formData.append('files[]', item.file);
         formData.append('paths[]', item.path);
       }
     });
@@ -131,6 +322,7 @@ function App() {
           alert('Les fichiers ont été uploadés et les notifications ont été envoyées.');
         }
         setUploadedItems([]);
+        setDraggedFiles(null);
         setProgress(0);
       } else {
         console.error('Erreur lors de l\'upload :', xhr.status, xhr.statusText);
@@ -276,7 +468,7 @@ function App() {
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
-          onClick={() => fileInputRef.current.click()}
+          onClick={handleClick}
           style={{
             padding: 'clamp(1.5rem, 4vw, 3rem)',
             border: '2px dashed var(--clr-surface-a30)',
@@ -291,17 +483,8 @@ function App() {
           <div style={{ textAlign: 'center' }}>
             <p style={{ margin: '0 0 1rem 0' }}>
               Glissez et déposez vos fichiers et dossiers ici<br />
-              ou cliquez pour sélectionner
+              ou cliquez pour sélectionner des fichiers et dossiers
             </p>
-            <input
-              ref={fileInputRef}
-              type="file"
-              onChange={handleFileSelect}
-              multiple
-              webkitdirectory=""
-              directory=""
-              style={{ display: 'none' }}
-            />
           </div>
         </div>
 
@@ -312,12 +495,36 @@ function App() {
             borderRadius: '8px',
             marginBottom: 'clamp(1rem, 3vw, 2rem)'
           }}>
-            <h3 style={{
-              margin: '0 0 1rem 0',
-              fontSize: 'clamp(1rem, 2.5vw, 1.25rem)'
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '1rem'
             }}>
-              Fichiers sélectionnés :
-            </h3>
+              <h3 style={{
+                margin: '0',
+                fontSize: 'clamp(1rem, 2.5vw, 1.25rem)'
+              }}>
+                Fichiers sélectionnés :
+              </h3>
+              <button
+                onClick={() => {
+                  setUploadedItems([]);
+                  setDraggedFiles(null);
+                }}
+                style={{
+                  padding: '0.5rem 1rem',
+                  backgroundColor: 'var(--clr-surface-a30)',
+                  border: 'none',
+                  borderRadius: '4px',
+                  cursor: 'pointer',
+                  color: 'var(--clr-text)',
+                  fontSize: '0.9rem'
+                }}
+              >
+                Effacer la sélection
+              </button>
+            </div>
             <div style={{
               maxHeight: '200px',
               overflowY: 'auto',
@@ -326,15 +533,35 @@ function App() {
               {uploadedItems.map((item, index) => (
                 <div key={index} style={{
                   padding: '0.5rem',
-                  borderBottom: index < uploadedItems.length - 1 ? '1px solid var(--clr-surface-a30)' : 'none'
+                  borderBottom: index < uploadedItems.length - 1 ? '1px solid var(--clr-surface-a30)' : 'none',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
                 }}>
-                  <div style={{ fontSize: '0.9rem' }}>{item.path}</div>
-                  <div style={{ 
-                    fontSize: '0.8rem',
-                    color: 'var(--clr-primary-a40)'
-                  }}>
-                    {formatFileSize(item.size)}
+                  <div>
+                    <div style={{ fontSize: '0.9rem' }}>{item.path}</div>
+                    <div style={{ 
+                      fontSize: '0.8rem',
+                      color: 'var(--clr-primary-a40)'
+                    }}>
+                      {formatFileSize(item.size)}
+                    </div>
                   </div>
+                  <button
+                    onClick={() => {
+                      setUploadedItems(prevItems => prevItems.filter((_, i) => i !== index));
+                    }}
+                    style={{
+                      padding: '0.25rem 0.5rem',
+                      backgroundColor: 'transparent',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--clr-text-a60)',
+                      fontSize: '0.8rem'
+                    }}
+                  >
+                    ✕
+                  </button>
                 </div>
               ))}
             </div>
