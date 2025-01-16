@@ -58,46 +58,58 @@ function App() {
     if (e.dataTransfer.items) {
       const items = Array.from(e.dataTransfer.items);
       files = await processFilesAndFolders(items);
+      const processedFiles = files.map(file => ({
+        name: file.name,
+        path: file.relativePath || ('/' + file.name),
+        size: file.size
+      }));
+      setUploadedItems(processedFiles);
     } else {
       files = Array.from(e.dataTransfer.files);
-    }
-    
-    if (files.length > 0) {
-      handleUploadFiles(files);
+      const processedFiles = files.map(file => ({
+        name: file.name,
+        path: '/' + file.name,
+        size: file.size
+      }));
+      setUploadedItems(processedFiles);
     }
   };
 
   const handleFileSelect = async (event) => {
-    const files = Array.from(event.target.files).map(file => {
-      // Pour les fichiers sélectionnés normalement, créer un chemin relatif basé sur le nom
-      file.relativePath = '/' + file.name;
-      return file;
-    });
+    event.preventDefault();
+    const files = Array.from(event.target.files);
     if (files.length > 0) {
-      handleUploadFiles(files);
+      const processedFiles = files.map(file => ({
+        name: file.name,
+        path: '/' + file.name,
+        size: file.size
+      }));
+      setUploadedItems(processedFiles);
     }
   };
 
-  const handleUploadFiles = (files) => {
+  const handleUpload = () => {
+    if (uploadedItems.length === 0) {
+      alert('Veuillez sélectionner au moins un fichier');
+      return;
+    }
+
     if (!recipientEmail || !senderEmail) {
       alert('Veuillez remplir les adresses email du destinataire et de l\'expéditeur');
       return;
     }
 
     const formData = new FormData();
-    files.forEach(file => {
-      // Utiliser le chemin relatif pour préserver la structure des dossiers
-      formData.append('files[]', file);
-      formData.append('paths[]', file.relativePath);
+    uploadedItems.forEach(item => {
+      // Récupérer le fichier original
+      const file = Array.from(fileInputRef.current.files).find(f => f.name === item.name);
+      if (file) {
+        formData.append('files[]', file);
+        formData.append('paths[]', item.path);
+      }
     });
     formData.append('email', recipientEmail);
     formData.append('sender_email', senderEmail);
-
-    setUploadedItems(files.map(file => ({
-      name: file.name,
-      path: file.relativePath,
-      size: file.size
-    })));
 
     const xhr = new XMLHttpRequest();
     xhr.open('POST', `${backendUrl}/upload`, true);
@@ -119,18 +131,18 @@ function App() {
           alert('Les fichiers ont été uploadés et les notifications ont été envoyées.');
         }
         setUploadedItems([]);
+        setProgress(0);
       } else {
         console.error('Erreur lors de l\'upload :', xhr.status, xhr.statusText);
         alert('Erreur lors de l\'upload. Veuillez vérifier que les emails sont valides et réessayer.');
+        setProgress(0);
       }
-      setProgress(0);
     };
 
     xhr.onerror = () => {
       console.error('Erreur réseau lors de l\'upload');
       alert('Erreur réseau lors de l\'upload. Veuillez vérifier votre connexion et réessayer.');
       setProgress(0);
-      setUploadedItems([]);
     };
 
     xhr.setRequestHeader('Accept', 'application/json');
@@ -152,15 +164,6 @@ function App() {
 
   const handleSenderEmailChange = (event) => {
     setSenderEmail(event.target.value);
-  };
-
-  const handleUpload = () => {
-    const fileInput = document.querySelector('input[type="file"]');
-    if (fileInput.files.length > 0) {
-      handleFileSelect({ target: fileInput });
-    } else {
-      alert('Veuillez sélectionner un fichier');
-    }
   };
 
   const handleDrag = (e) => {
@@ -295,6 +298,8 @@ function App() {
               type="file"
               onChange={handleFileSelect}
               multiple
+              webkitdirectory=""
+              directory=""
               style={{ display: 'none' }}
             />
           </div>

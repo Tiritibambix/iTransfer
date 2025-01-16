@@ -526,28 +526,30 @@ def download_file(file_id):
     try:
         file_upload = FileUpload.query.get_or_404(file_id)
         
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], f"{file_upload.id}_{file_upload.filename}")
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_upload.filename)
         if not os.path.exists(file_path):
             return jsonify({'error': 'Fichier non trouvé'}), 404
-
+        
         if not file_upload.downloaded:
             file_upload.downloaded = True
             db.session.commit()
             
-            with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
-                smtp_config = json.load(config_file)
-            send_sender_download_notification(file_upload.sender_email, file_upload.filename, smtp_config)
+            try:
+                with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
+                    smtp_config = json.load(config_file)
+                send_sender_download_notification(file_upload.sender_email, file_upload.filename, smtp_config)
+            except Exception as e:
+                app.logger.error(f"Erreur lors de l'envoi de la notification de téléchargement: {str(e)}")
 
         return send_file(
             file_path,
             as_attachment=True,
-            download_name=file_upload.filename,
-            mimetype='application/octet-stream'
+            download_name=file_upload.filename
         )
 
     except Exception as e:
-        app.logger.error(f"Erreur lors du téléchargement : {str(e)}")
-        return jsonify({'error': 'An internal error has occurred!'}), 500
+        app.logger.error(f"Erreur lors du téléchargement: {str(e)}")
+        return jsonify({'error': 'Erreur lors du téléchargement'}), 500
 
 @app.route('/api/test-smtp', methods=['POST', 'OPTIONS'])
 def test_smtp():
