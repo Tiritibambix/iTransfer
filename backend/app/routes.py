@@ -95,29 +95,85 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         <head>
             <meta charset="utf-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>{title}</title>
+            <title>iTransfer - Transfert de fichiers</title>
             <style>
                 body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
                 .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-                .header {{ background-color: #f8f9fa; padding: 20px; border-radius: 5px 5px 0 0; }}
-                .content {{ background-color: #ffffff; padding: 20px; border-radius: 0 0 5px 5px; }}
-                .footer {{ text-align: center; margin-top: 20px; font-size: 12px; color: #666; }}
-                .file-list {{ background-color: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; }}
-                .button {{ display: inline-block; padding: 10px 20px; background-color: #007bff; color: #ffffff; 
-                          text-decoration: none; border-radius: 5px; margin: 10px 0; }}
-                .button:hover {{ background-color: #0056b3; }}
+                .header {{ 
+                    background-color: #007bff; 
+                    padding: 20px; 
+                    border-radius: 5px 5px 0 0;
+                    color: white;
+                }}
+                .content {{ 
+                    background-color: #ffffff; 
+                    padding: 20px; 
+                    border: 1px solid #e9ecef;
+                    border-top: none;
+                    border-radius: 0 0 5px 5px;
+                }}
+                .footer {{ 
+                    text-align: center; 
+                    margin-top: 20px; 
+                    font-size: 12px; 
+                    color: #666; 
+                    border-top: 1px solid #e9ecef;
+                    padding-top: 20px;
+                }}
+                .file-list {{ 
+                    background-color: #f8f9fa; 
+                    padding: 15px 20px; 
+                    border-radius: 5px; 
+                    margin: 15px 0;
+                    border: 1px solid #e9ecef;
+                }}
+                .file-list-header {{
+                    font-weight: bold;
+                    margin-bottom: 10px;
+                    color: #495057;
+                }}
+                .file-item {{
+                    padding: 3px 0;
+                    color: #495057;
+                }}
+                .folder-name {{
+                    font-weight: bold;
+                    color: #007bff;
+                    margin-top: 10px;
+                }}
+                .download-button {{ 
+                    display: inline-block; 
+                    padding: 12px 24px; 
+                    background-color: #007bff; 
+                    color: #ffffff !important; 
+                    text-decoration: none; 
+                    border-radius: 5px; 
+                    margin: 20px 0;
+                    font-weight: bold;
+                }}
+                .download-button:hover {{ 
+                    background-color: #0056b3; 
+                }}
+                .info-block {{
+                    background-color: #e9ecef;
+                    padding: 10px 15px;
+                    border-radius: 4px;
+                    margin: 10px 0;
+                    font-size: 14px;
+                    color: #495057;
+                }}
             </style>
         </head>
         <body>
             <div class="container">
                 <div class="header">
-                    <h2 style="margin: 0; color: #2c3e50;">{title}</h2>
+                    <h2 style="margin: 0;">iTransfer - Transfert de fichiers</h2>
                 </div>
                 <div class="content">
                     {content}
                 </div>
                 <div class="footer">
-                    <p>Cet email a été envoyé automatiquement par iTransfer. Merci de ne pas y répondre.</p>
+                    <p>Cet email a été envoyé automatiquement par iTransfer.<br>Merci de ne pas y répondre.</p>
                 </div>
             </div>
         </body>
@@ -125,22 +181,43 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         '''
         
         # Convertir le contenu en HTML
-        content_html = message_content.replace('\n\n', '</p><p>')
+        content_html = message_content
         if 'Liste des fichiers :' in content_html:
-            # Formater la liste des fichiers de manière plus compacte
+            # Formater la liste des fichiers de manière plus structurée
             parts = content_html.split('Liste des fichiers :')
+            header = parts[0].replace('\n\n', '</p><p>').replace('\n', '<br>')
+            
+            # Ajouter le bouton de téléchargement si présent
+            if 'Lien de téléchargement :' in header:
+                header = header.replace(
+                    'Lien de téléchargement : ',
+                    '</p><p><a href="'
+                ).replace(
+                    '\n\nCe lien expirera',
+                    '" class="download-button">Télécharger les fichiers</a></p><p class="info-block">Ce lien expirera'
+                )
+            
             files_list = parts[1].strip().split('\n')
-            if len(files_list) > 10:
-                # Si plus de 10 fichiers, ne montrer que les 5 premiers et derniers
-                formatted_files = '<div class="file-list">'
-                formatted_files += '<br>'.join(files_list[:5])
-                formatted_files += f'<br>... et {len(files_list) - 10} autres fichiers ...<br>'
-                formatted_files += '<br>'.join(files_list[-5:])
-                formatted_files += '</div>'
-                content_html = parts[0] + 'Liste des fichiers :' + formatted_files
+            formatted_files = '<div class="file-list">'
+            formatted_files += '<div class="file-list-header">Contenu du transfert :</div>'
+            
+            current_folder = None
+            for file_line in files_list:
+                if file_line.startswith('Dossier '):
+                    current_folder = file_line.replace('Dossier ', '')
+                    formatted_files += f'<div class="folder-name">{current_folder}</div>'
+                else:
+                    file_line = file_line.strip('- ').strip()
+                    if current_folder:
+                        formatted_files += f'<div class="file-item">└─ {file_line}</div>'
+                    else:
+                        formatted_files += f'<div class="file-item">• {file_line}</div>'
+            
+            formatted_files += '</div>'
+            content_html = header + formatted_files
         
         html_content = html_template.format(
-            title=subject,
+            title="iTransfer - Transfert de fichiers",
             content=content_html
         )
         

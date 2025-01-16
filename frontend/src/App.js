@@ -148,7 +148,7 @@ function App() {
 
       // Grouper les fichiers par dossier parent
       const groupedFiles = files.reduce((acc, file) => {
-        const key = file.parentFolder || 'root';
+        const key = file.parentFolder || '';
         if (!acc[key]) {
           acc[key] = [];
         }
@@ -254,7 +254,7 @@ function App() {
     }
 
     if (!recipientEmail || !senderEmail) {
-      setError("Veuillez remplir tous les champs");
+      setError("Veuillez remplir les adresses email du destinataire et de l'expéditeur");
       return;
     }
 
@@ -286,32 +286,43 @@ function App() {
         formData.append('paths[]', path);
       });
 
-      const response = await fetch(`${backendUrl}/upload`, {
-        method: 'POST',
-        body: formData,
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `${backendUrl}/upload`, true);
+      
+      xhr.upload.onprogress = (event) => {
+        if (event.lengthComputable) {
+          const percentCompleted = Math.round((event.loaded * 100) / event.total);
           setProgress(percentCompleted);
         }
-      });
+      };
 
-      if (!response.ok) {
-        throw new Error('Erreur lors de l\'upload');
-      }
+      xhr.onload = function() {
+        if (xhr.status === 200) {
+          const response = JSON.parse(xhr.responseText);
+          if (response.warning) {
+            setWarning("Les fichiers ont été uploadés mais il y a eu un problème avec l'envoi des notifications.");
+          } else {
+            setSuccess(true);
+          }
+          setUploadedItems([]);
+          setRecipientEmail('');
+          setSenderEmail('');
+        } else {
+          setError("Une erreur est survenue lors de l'upload. Veuillez vérifier que les emails sont valides et réessayer.");
+        }
+        setUploading(false);
+      };
 
-      const data = await response.json();
-      if (data.warning) {
-        setWarning(data.warning);
-      }
-      
-      setSuccess(true);
-      setUploadedItems([]);
-      setRecipientEmail('');
-      setSenderEmail('');
+      xhr.onerror = function() {
+        setError("Une erreur réseau est survenue. Veuillez vérifier votre connexion et réessayer.");
+        setUploading(false);
+      };
+
+      xhr.send(formData);
+      xhrRef.current = xhr;
     } catch (error) {
       console.error('Erreur:', error);
       setError("Une erreur est survenue lors de l'upload");
-    } finally {
       setUploading(false);
     }
   };
@@ -345,9 +356,10 @@ function App() {
   const cancelUpload = () => {
     if (xhrRef.current) {
       xhrRef.current.abort();
-      console.log('Upload annulé');
-      setProgress(0);
+      xhrRef.current = null;
     }
+    setUploading(false);
+    setProgress(0);
   };
 
   return (
@@ -575,6 +587,42 @@ function App() {
             >
               Annuler
             </button>
+          </div>
+        )}
+
+        {error && (
+          <div style={{ 
+            padding: '10px', 
+            marginBottom: '20px', 
+            backgroundColor: '#ffebee', 
+            color: '#c62828',
+            borderRadius: '4px' 
+          }}>
+            {error}
+          </div>
+        )}
+        
+        {warning && (
+          <div style={{ 
+            padding: '10px', 
+            marginBottom: '20px', 
+            backgroundColor: '#fff3e0', 
+            color: '#ef6c00',
+            borderRadius: '4px' 
+          }}>
+            {warning}
+          </div>
+        )}
+
+        {success && (
+          <div style={{ 
+            padding: '10px', 
+            marginBottom: '20px', 
+            backgroundColor: '#e8f5e9', 
+            color: '#2e7d32',
+            borderRadius: '4px' 
+          }}>
+            Les fichiers ont été uploadés et les notifications ont été envoyées avec succès !
           </div>
         )}
 
