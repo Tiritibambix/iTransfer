@@ -136,16 +136,16 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
                 </div>
                 
                 <div class="info">
-                    <p><strong>Archive ZIP :</strong> {zip_filename}</p>
-                    <p><strong>Taille totale :</strong> {total_size}</p>
+                    <p><strong>Archive ZIP :</strong> {{zip_name}}</p>
+                    <p><strong>Taille totale :</strong> {{size}}</p>
                 </div>
                 
                 <div class="files">
                     <strong>Contenu de l'archive :</strong><br>
-                    {files}
+                    {{file_list}}
                 </div>
                 
-                <a href="{download_url}" class="download-link">Télécharger les fichiers</a>
+                <a href="{{download_link}}" class="download-link">Télécharger les fichiers</a>
                 
                 <p class="expiry">Ce lien expirera dans 7 jours.</p>
                 
@@ -197,10 +197,10 @@ L'équipe iTransfer"""
 
         # Créer le contenu HTML final
         html_content = html_template.format(
-            zip_filename=zip_filename,
-            total_size=total_size_str,
-            files='\n'.join(files_html),
-            download_url=download_url
+            zip_name=zip_filename,
+            size=total_size_str,
+            file_list='\n'.join(files_html),
+            download_link=download_url
         )
         
         html_part = MIMEText(html_content, 'html', 'utf-8')
