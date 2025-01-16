@@ -66,10 +66,8 @@ function App() {
         const files = [];
         for (const handle of handles) {
           if (handle.kind === 'directory') {
-            // Traiter le dossier récursivement
             await processDirectory(handle, '', files);
           } else {
-            // Traiter le fichier
             const file = await handle.getFile();
             files.push({
               name: file.name,
@@ -80,7 +78,9 @@ function App() {
           }
         }
 
-        setUploadedItems(prevItems => [...prevItems, ...files]);
+        if (files.length > 0) {
+          setUploadedItems(prevItems => [...prevItems, ...files]);
+        }
       } catch (err) {
         if (err.name !== 'AbortError') {
           console.error('Erreur lors de la sélection:', err);
@@ -88,106 +88,28 @@ function App() {
       }
     } else {
       // Solution de repli pour Firefox et Safari
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.multiple = true;
-      input.webkitdirectory = true;
-      input.directory = true;
-      input.style.display = 'none';
-      
-      input.addEventListener('change', handleLegacyFileSelect);
-      
-      // Créer un deuxième input pour les fichiers
       const fileInput = document.createElement('input');
       fileInput.type = 'file';
       fileInput.multiple = true;
       fileInput.style.display = 'none';
       
+      // Permettre la sélection de fichiers ET de dossiers
+      fileInput.webkitdirectory = '';
+      fileInput.directory = '';
+      fileInput.multiple = true;
+      
       fileInput.addEventListener('change', handleLegacyFileSelect);
       
-      // Créer un conteneur pour les boutons
-      const dialogContainer = document.createElement('div');
-      dialogContainer.style.position = 'fixed';
-      dialogContainer.style.top = '50%';
-      dialogContainer.style.left = '50%';
-      dialogContainer.style.transform = 'translate(-50%, -50%)';
-      dialogContainer.style.backgroundColor = 'white';
-      dialogContainer.style.padding = '20px';
-      dialogContainer.style.borderRadius = '8px';
-      dialogContainer.style.boxShadow = '0 2px 10px rgba(0, 0, 0, 0.1)';
-      dialogContainer.style.zIndex = '1000';
+      // Ajouter l'input au DOM temporairement
+      document.body.appendChild(fileInput);
       
-      // Créer les boutons
-      const fileButton = document.createElement('button');
-      fileButton.textContent = 'Sélectionner des fichiers';
-      fileButton.style.marginRight = '10px';
-      fileButton.style.padding = '10px 20px';
-      fileButton.style.border = 'none';
-      fileButton.style.borderRadius = '4px';
-      fileButton.style.backgroundColor = '#007bff';
-      fileButton.style.color = 'white';
-      fileButton.style.cursor = 'pointer';
+      // Déclencher le sélecteur de fichiers
+      fileInput.click();
       
-      const folderButton = document.createElement('button');
-      folderButton.textContent = 'Sélectionner des dossiers';
-      folderButton.style.padding = '10px 20px';
-      folderButton.style.border = 'none';
-      folderButton.style.borderRadius = '4px';
-      folderButton.style.backgroundColor = '#007bff';
-      folderButton.style.color = 'white';
-      folderButton.style.cursor = 'pointer';
-      
-      // Ajouter les gestionnaires d'événements
-      fileButton.onclick = () => {
-        fileInput.click();
-        dialogContainer.remove();
-      };
-      
-      folderButton.onclick = () => {
-        input.click();
-        dialogContainer.remove();
-      };
-      
-      // Créer un bouton de fermeture
-      const closeButton = document.createElement('button');
-      closeButton.textContent = '×';
-      closeButton.style.position = 'absolute';
-      closeButton.style.top = '5px';
-      closeButton.style.right = '5px';
-      closeButton.style.border = 'none';
-      closeButton.style.background = 'none';
-      closeButton.style.fontSize = '20px';
-      closeButton.style.cursor = 'pointer';
-      closeButton.style.padding = '5px';
-      closeButton.style.color = '#666';
-      
-      closeButton.onclick = () => {
-        dialogContainer.remove();
-      };
-      
-      // Assembler le dialogue
-      dialogContainer.appendChild(closeButton);
-      dialogContainer.appendChild(fileButton);
-      dialogContainer.appendChild(folderButton);
-      
-      // Ajouter un fond semi-transparent
-      const overlay = document.createElement('div');
-      overlay.style.position = 'fixed';
-      overlay.style.top = '0';
-      overlay.style.left = '0';
-      overlay.style.right = '0';
-      overlay.style.bottom = '0';
-      overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
-      overlay.style.zIndex = '999';
-      
-      overlay.onclick = () => {
-        overlay.remove();
-        dialogContainer.remove();
-      };
-      
-      // Ajouter les éléments au DOM
-      document.body.appendChild(overlay);
-      document.body.appendChild(dialogContainer);
+      // Nettoyer
+      setTimeout(() => {
+        document.body.removeChild(fileInput);
+      }, 1000);
     }
   };
 
@@ -237,29 +159,83 @@ function App() {
     e.stopPropagation();
     setDragActive(false);
     
-    let files = [];
+    const processItems = async (items) => {
+      const files = [];
+      for (const item of items) {
+        if (item.kind === 'file') {
+          const entry = item.webkitGetAsEntry();
+          if (entry) {
+            if (entry.isDirectory) {
+              await readDirectoryEntries(entry, '', files);
+            } else {
+              const file = item.getAsFile();
+              if (file) {
+                files.push({
+                  name: file.name,
+                  path: '/' + file.name,
+                  size: file.size,
+                  file: file
+                });
+              }
+            }
+          }
+        }
+      }
+      return files;
+    };
+
+    const readDirectoryEntries = async (dirEntry, path, files) => {
+      const dirReader = dirEntry.createReader();
+      await new Promise((resolve, reject) => {
+        const readEntries = () => {
+          dirReader.readEntries(async (entries) => {
+            if (entries.length === 0) {
+              resolve();
+            } else {
+              for (const entry of entries) {
+                const fullPath = path ? `${path}/${entry.name}` : entry.name;
+                if (entry.isDirectory) {
+                  await readDirectoryEntries(entry, fullPath, files);
+                } else {
+                  await new Promise((fileResolve) => {
+                    entry.file((file) => {
+                      files.push({
+                        name: file.name,
+                        path: '/' + fullPath,
+                        size: file.size,
+                        file: file
+                      });
+                      fileResolve();
+                    });
+                  });
+                }
+              }
+              readEntries();
+            }
+          }, reject);
+        };
+        readEntries();
+      });
+    };
     
-    if (e.dataTransfer.items) {
-      const items = Array.from(e.dataTransfer.items);
-      files = await processFilesAndFolders(items);
-      const processedFiles = files.map(file => ({
-        name: file.name,
-        path: file.relativePath || ('/' + file.name),
-        size: file.size,
-        file: file
-      }));
-      setDraggedFiles(files);
-      setUploadedItems(prevItems => [...prevItems, ...processedFiles]);
-    } else {
-      files = Array.from(e.dataTransfer.files);
-      const processedFiles = files.map(file => ({
-        name: file.name,
-        path: '/' + file.name,
-        size: file.size,
-        file: file
-      }));
-      setDraggedFiles(files);
-      setUploadedItems(prevItems => [...prevItems, ...processedFiles]);
+    try {
+      let files = [];
+      if (e.dataTransfer.items) {
+        files = await processItems(Array.from(e.dataTransfer.items));
+      } else {
+        files = Array.from(e.dataTransfer.files).map(file => ({
+          name: file.name,
+          path: '/' + file.name,
+          size: file.size,
+          file: file
+        }));
+      }
+      
+      if (files.length > 0) {
+        setUploadedItems(prevItems => [...prevItems, ...files]);
+      }
+    } catch (error) {
+      console.error('Erreur lors du traitement des fichiers:', error);
     }
   };
 
