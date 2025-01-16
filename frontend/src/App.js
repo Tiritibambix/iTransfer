@@ -50,66 +50,108 @@ function App() {
   };
 
   const handleClick = async () => {
-    if (supportsFileSystemAccess()) {
-      try {
-        // Solution moderne avec File System Access API
-        const handles = await window.showOpenFilePicker({
-          multiple: true,
-          types: [
-            {
-              description: 'Tous les fichiers',
-              accept: {'*/*': []}
-            }
-          ]
-        });
+    // Solution simplifiée pour la sélection de fichiers uniquement
+    const fileInput = document.createElement('input');
+    fileInput.type = 'file';
+    fileInput.multiple = true;
+    fileInput.style.display = 'none';
+    
+    fileInput.addEventListener('change', handleLegacyFileSelect);
+    
+    // Ajouter l'input au DOM temporairement
+    document.body.appendChild(fileInput);
+    
+    // Déclencher le sélecteur de fichiers
+    fileInput.click();
+    
+    // Nettoyer
+    setTimeout(() => {
+      document.body.removeChild(fileInput);
+    }, 1000);
+  };
 
-        const files = [];
-        for (const handle of handles) {
-          if (handle.kind === 'directory') {
-            await processDirectory(handle, '', files);
+  const handleDrop = async (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragActive(false);
+    
+    const processItems = async (items) => {
+      const files = [];
+      const processEntry = async (entry, path = '') => {
+        if (entry.isFile) {
+          return new Promise((resolve, reject) => {
+            entry.file(file => {
+              const relativePath = path ? `/${path}/${file.name}` : `/${file.name}`;
+              files.push({
+                name: file.name,
+                path: relativePath,
+                size: file.size,
+                file: file
+              });
+              resolve();
+            }, reject);
+          });
+        } else if (entry.isDirectory) {
+          const dirReader = entry.createReader();
+          return new Promise((resolve, reject) => {
+            const readEntries = () => {
+              dirReader.readEntries(async (entries) => {
+                if (entries.length === 0) {
+                  resolve();
+                } else {
+                  const promises = entries.map(entry => {
+                    const newPath = path ? `${path}/${entry.name}` : entry.name;
+                    return processEntry(entry, newPath);
+                  });
+                  await Promise.all(promises);
+                  readEntries();
+                }
+              }, reject);
+            };
+            readEntries();
+          });
+        }
+      };
+
+      for (const item of items) {
+        if (item.kind === 'file') {
+          const entry = item.webkitGetAsEntry();
+          if (entry) {
+            await processEntry(entry);
           } else {
-            const file = await handle.getFile();
-            files.push({
-              name: file.name,
-              path: '/' + file.name,
-              size: file.size,
-              file: file
-            });
+            const file = item.getAsFile();
+            if (file) {
+              files.push({
+                name: file.name,
+                path: `/${file.name}`,
+                size: file.size,
+                file: file
+              });
+            }
           }
         }
-
-        if (files.length > 0) {
-          setUploadedItems(prevItems => [...prevItems, ...files]);
-        }
-      } catch (err) {
-        if (err.name !== 'AbortError') {
-          console.error('Erreur lors de la sélection:', err);
-        }
       }
-    } else {
-      // Solution de repli pour Firefox et Safari
-      const fileInput = document.createElement('input');
-      fileInput.type = 'file';
-      fileInput.multiple = true;
-      fileInput.style.display = 'none';
+      return files;
+    };
+
+    try {
+      let files = [];
+      if (e.dataTransfer.items) {
+        files = await processItems(Array.from(e.dataTransfer.items));
+      } else {
+        files = Array.from(e.dataTransfer.files).map(file => ({
+          name: file.name,
+          path: `/${file.name}`,
+          size: file.size,
+          file: file
+        }));
+      }
       
-      // Permettre la sélection de fichiers ET de dossiers
-      fileInput.webkitdirectory = '';
-      fileInput.directory = '';
-      fileInput.multiple = true;
-      
-      fileInput.addEventListener('change', handleLegacyFileSelect);
-      
-      // Ajouter l'input au DOM temporairement
-      document.body.appendChild(fileInput);
-      
-      // Déclencher le sélecteur de fichiers
-      fileInput.click();
-      
-      // Nettoyer
-      setTimeout(() => {
-        document.body.removeChild(fileInput);
-      }, 1000);
+      if (files.length > 0) {
+        setUploadedItems(prevItems => [...prevItems, ...files]);
+      }
+    } catch (error) {
+      console.error('Erreur lors du traitement des fichiers:', error);
     }
   };
 
@@ -151,91 +193,6 @@ function App() {
           file: file
         });
       }
-    }
-  };
-
-  const handleDrop = async (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setDragActive(false);
-    
-    const processItems = async (items) => {
-      const files = [];
-      for (const item of items) {
-        if (item.kind === 'file') {
-          const entry = item.webkitGetAsEntry();
-          if (entry) {
-            if (entry.isDirectory) {
-              await readDirectoryEntries(entry, '', files);
-            } else {
-              const file = item.getAsFile();
-              if (file) {
-                files.push({
-                  name: file.name,
-                  path: '/' + file.name,
-                  size: file.size,
-                  file: file
-                });
-              }
-            }
-          }
-        }
-      }
-      return files;
-    };
-
-    const readDirectoryEntries = async (dirEntry, path, files) => {
-      const dirReader = dirEntry.createReader();
-      await new Promise((resolve, reject) => {
-        const readEntries = () => {
-          dirReader.readEntries(async (entries) => {
-            if (entries.length === 0) {
-              resolve();
-            } else {
-              for (const entry of entries) {
-                const fullPath = path ? `${path}/${entry.name}` : entry.name;
-                if (entry.isDirectory) {
-                  await readDirectoryEntries(entry, fullPath, files);
-                } else {
-                  await new Promise((fileResolve) => {
-                    entry.file((file) => {
-                      files.push({
-                        name: file.name,
-                        path: '/' + fullPath,
-                        size: file.size,
-                        file: file
-                      });
-                      fileResolve();
-                    });
-                  });
-                }
-              }
-              readEntries();
-            }
-          }, reject);
-        };
-        readEntries();
-      });
-    };
-    
-    try {
-      let files = [];
-      if (e.dataTransfer.items) {
-        files = await processItems(Array.from(e.dataTransfer.items));
-      } else {
-        files = Array.from(e.dataTransfer.files).map(file => ({
-          name: file.name,
-          path: '/' + file.name,
-          size: file.size,
-          file: file
-        }));
-      }
-      
-      if (files.length > 0) {
-        setUploadedItems(prevItems => [...prevItems, ...files]);
-      }
-    } catch (error) {
-      console.error('Erreur lors du traitement des fichiers:', error);
     }
   };
 
@@ -459,7 +416,7 @@ function App() {
           <div style={{ textAlign: 'center' }}>
             <p style={{ margin: '0 0 1rem 0' }}>
               Glissez et déposez vos fichiers et dossiers ici<br />
-              ou cliquez pour sélectionner des fichiers et dossiers
+              ou cliquez pour sélectionner des fichiers uniquement
             </p>
           </div>
         </div>
