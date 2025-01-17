@@ -56,8 +56,7 @@ ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')
 ADMIN_PASSWORD = os.environ.get('ADMIN_PASSWORD')
 JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
 
-def send_notification_email(to_email, subject, message_content, smtp_config):
-    server = None
+def send_email(to_email, subject, message_content, html_content):
     try:
         backend_url = get_backend_url()
         app.logger.info(f"URL backend pour l'email : {backend_url}")
@@ -67,7 +66,7 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         
         # Utiliser un nom d'affichage professionnel
         sender_name = "iTransfer"
-        sender_email = smtp_config['smtp_sender_email']
+        sender_email = "no-reply@itransfer.com"
         
         # Ajouter les en-têtes standards avec un format plus professionnel
         msg['From'] = formataddr((sender_name, sender_email))
@@ -88,125 +87,14 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         text_part = MIMEText(message_content, 'plain', 'utf-8')
         msg.attach(text_part)
         
-        # Créer une version HTML plus professionnelle
-        html_template = '''
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="utf-8">
-            <style>
-                body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; }}
-                .container {{ max-width: 600px; margin: 0 auto; }}
-                .header {{ margin-bottom: 20px; }}
-                .info {{ margin-bottom: 20px; }}
-                .files {{ 
-                    background-color: #f5f5f5; 
-                    padding: 15px; 
-                    border-radius: 4px; 
-                    margin-bottom: 20px;
-                }}
-                .download-link {{ 
-                    display: inline-block; 
-                    background-color: #007bff; 
-                    color: white; 
-                    padding: 10px 20px; 
-                    text-decoration: none; 
-                    border-radius: 4px; 
-                    margin: 20px 0;
-                }}
-                .download-link:hover {{ background-color: #0056b3; }}
-                .expiry {{ 
-                    font-size: 0.9em; 
-                    color: #666; 
-                    font-style: italic; 
-                }}
-                .footer {{ 
-                    margin-top: 30px; 
-                    padding-top: 20px; 
-                    border-top: 1px solid #eee; 
-                    font-size: 0.9em; 
-                }}
-            </style>
-        </head>
-        <body>
-            <div class="container">
-                <div class="header">
-                    <p>Bonjour,</p>
-                    <p>Des fichiers ont été partagés avec vous via iTransfer.</p>
-                </div>
-                
-                <div class="info">
-                    <p><strong>Archive ZIP :</strong> {{zip_name}}</p>
-                    <p><strong>Taille totale :</strong> {{size}}</p>
-                </div>
-                
-                <div class="files">
-                    <strong>Contenu de l'archive :</strong><br>
-                    {{file_list}}
-                </div>
-                
-                <a href="{{download_link}}" class="download-link">Télécharger les fichiers</a>
-                
-                <p class="expiry">Ce lien expirera dans 7 jours.</p>
-                
-                <div class="footer">
-                    <p>Cordialement,<br>L'équipe iTransfer</p>
-                </div>
-            </div>
-        </body>
-        </html>
-        '''
-        
-        # Créer le contenu du message
-        message_content = f"""
-Bonjour,
-
-Des fichiers ont été partagés avec vous via iTransfer.
-
-Archive ZIP : {zip_name}
-Taille totale : {total_size_str}
-
-Contenu de l'archive :
-{file_list_str}
-
-Lien de téléchargement : {download_url}
-
-Ce lien expirera dans 7 jours.
-
-Cordialement,
-L'équipe iTransfer"""
-
-        # Formater la liste des fichiers pour HTML
-        files_html = []
-        current_folder = None
-        
-        for line in file_list_str.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-                
-            if line.startswith('Dossier '):
-                current_folder = line.replace('Dossier ', '')
-                files_html.append(f'<div style="margin-top: 10px;"><strong>{current_folder}</strong></div>')
-            else:
-                file_info = line.strip('- ')
-                if current_folder:
-                    files_html.append(f'<div style="margin-left: 20px;">└─ {file_info}</div>')
-                else:
-                    files_html.append(f'<div>• {file_info}</div>')
-
-        # Créer le contenu HTML final
-        html_content = html_template.format(
-            zip_name=zip_name,
-            size=total_size_str,
-            file_list='\n'.join(files_html),
-            download_link=download_url
-        )
-        
+        # Ajouter le contenu HTML
         html_part = MIMEText(html_content, 'html', 'utf-8')
         msg.attach(html_part)
         
         # Configuration et envoi de l'email
+        with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
+            smtp_config = json.load(config_file)
+        
         port = int(smtp_config['smtp_port'])
         if port == 465:
             server = smtplib.SMTP_SSL(smtp_config['smtp_server'], port)
@@ -223,91 +111,204 @@ L'équipe iTransfer"""
         return False
         
     finally:
-        if server:
+        if 'server' in locals():
             try:
                 server.quit()
             except Exception as e:
                 app.logger.error(f"Erreur lors de la fermeture de la connexion SMTP : {str(e)}")
 
-def send_recipient_notification(to_email, file_id, filename, smtp_config):
-    """Envoie une notification au destinataire avec le lien de téléchargement"""
+def send_recipient_notification_with_files(to_email, file_id, zip_name, files_summary, total_size, smtp_config):
+    """Envoie une notification au destinataire avec la liste des fichiers"""
     app.logger.info(f"Préparation de la notification pour le destinataire : {to_email}")
     backend_url = get_backend_url()
-    app.logger.info(f"URL backend : {backend_url}")
-    download_link = f"{backend_url}/download/{file_id}"
-    app.logger.info(f"Lien de téléchargement généré : {download_link}")
-    
-    message = f"""
+    download_url = f"{backend_url}/download/{file_id}"
+    success = True
+
+    # Créer le contenu du message
+    message_content = f"""
     Bonjour,
 
-    Un fichier a été partagé avec vous via iTransfer.
-    
-    Fichier : {filename}
-    Lien de téléchargement : {download_link}
-    
+    Des fichiers ont été partagés avec vous via iTransfer.
+
+    Archive ZIP : {zip_name}
+    Taille totale : {total_size}
+
+    Contenu de l'archive :
+    {files_summary}
+
+    Lien de téléchargement : {download_url}
+
     Ce lien expirera dans 7 jours.
-    
+
     Cordialement,
     L'équipe iTransfer
     """
+
+    # Formater la liste des fichiers pour HTML
+    files_html = []
+    current_folder = None
     
-    app.logger.info("Envoi de la notification au destinataire")
-    success = send_notification_email(to_email, "iTransfer - Nouveau fichier partagé", message, smtp_config)
-    if not success:
-        app.logger.error(f"Échec de l'envoi de la notification au destinataire : {to_email}")
+    for line in files_summary.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+            
+        if line.startswith('Dossier '):
+            current_folder = line.replace('Dossier ', '')
+            files_html.append(f'<div style="margin-top: 10px;"><strong>{current_folder}</strong></div>')
+        else:
+            file_info = line.strip('- ')
+            if current_folder:
+                files_html.append(f'<div style="margin-left: 20px;">└─ {file_info}</div>')
+            else:
+                files_html.append(f'<div>• {file_info}</div>')
+
+    # Créer le contenu HTML
+    html_template = '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
+            .container { max-width: 600px; margin: 0 auto; }
+            .header { margin-bottom: 20px; }
+            .info { margin-bottom: 20px; }
+            .files { 
+                background-color: #f5f5f5; 
+                padding: 15px; 
+                border-radius: 4px; 
+                margin-bottom: 20px;
+            }
+            .download-link { 
+                display: inline-block; 
+                background-color: #007bff; 
+                color: white; 
+                padding: 10px 20px; 
+                text-decoration: none; 
+                border-radius: 4px; 
+                margin: 20px 0;
+            }
+            .download-link:hover { background-color: #0056b3; }
+            .expiry { 
+                font-size: 0.9em; 
+                color: #666; 
+                font-style: italic; 
+            }
+            .footer { 
+                margin-top: 30px; 
+                padding-top: 20px; 
+                border-top: 1px solid #eee; 
+                font-size: 0.9em; 
+            }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <p>Bonjour,</p>
+                <p>Des fichiers ont été partagés avec vous via iTransfer.</p>
+            </div>
+            
+            <div class="info">
+                <p><strong>Archive ZIP :</strong> {zip_name}</p>
+                <p><strong>Taille totale :</strong> {total_size}</p>
+            </div>
+            
+            <div class="files">
+                <strong>Contenu de l'archive :</strong><br>
+                {files}
+            </div>
+            
+            <a href="{download_url}" class="download-link">Télécharger les fichiers</a>
+            
+            <p class="expiry">Ce lien expirera dans 7 jours.</p>
+            
+            <div class="footer">
+                <p>Cordialement,<br>L'équipe iTransfer</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    '''
+
+    # Créer le contenu HTML final
+    html_content = html_template.format(
+        zip_name=zip_name,
+        total_size=total_size,
+        files='\n'.join(files_html),
+        download_url=download_url
+    )
+
+    try:
+        send_email(to_email, "Transfert de fichiers via iTransfer", message_content, html_content)
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+        success = False
+
     return success
 
-def send_sender_upload_confirmation(to_email, file_id, filename, smtp_config):
-    """Envoie une confirmation à l'expéditeur après l'upload"""
+def send_sender_upload_confirmation_with_files(to_email, file_id, zip_name, files_summary, total_size, smtp_config):
+    """Envoie une confirmation à l'expéditeur avec la liste des fichiers"""
     app.logger.info(f"Préparation de la confirmation pour l'expéditeur : {to_email}")
     backend_url = get_backend_url()
-    app.logger.info(f"URL backend : {backend_url}")
-    download_link = f"{backend_url}/download/{file_id}"
-    app.logger.info(f"Lien de téléchargement généré : {download_link}")
-    
-    message = f"""
+    download_url = f"{backend_url}/download/{file_id}"
+    success = True
+
+    # Créer le contenu du message
+    message_content = f"""
     Bonjour,
 
-    Votre fichier a été uploadé avec succès sur iTransfer.
-    
-    Fichier : {filename}
+    Vos fichiers ont été uploadés avec succès sur iTransfer.
+
+    Archive ZIP : {zip_name}
+    Taille totale : {total_size}
+
+    Contenu de l'archive :
+    {files_summary}
+
     ID : {file_id}
-    Lien de téléchargement : {download_link}
-    
+    Lien de téléchargement : {download_url}
+
     Une notification a été envoyée au destinataire avec ce même lien.
-    
+
     Cordialement,
     L'équipe iTransfer
     """
-    
-    app.logger.info("Envoi de la confirmation à l'expéditeur")
-    success = send_notification_email(to_email, "iTransfer - Upload réussi", message, smtp_config)
-    if not success:
-        app.logger.error(f"Échec de l'envoi de la confirmation à l'expéditeur : {to_email}")
-    return success
 
-def send_sender_download_notification(to_email, filename, smtp_config):
-    """Envoie une notification à l'expéditeur quand le fichier est téléchargé"""
-    app.logger.info(f"Préparation de la notification pour l'expéditeur : {to_email}")
+    # Formater la liste des fichiers pour HTML (même code que pour le destinataire)
+    files_html = []
+    current_folder = None
     
-    message = f"""
-    Bonjour,
+    for line in files_summary.split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+            
+        if line.startswith('Dossier '):
+            current_folder = line.replace('Dossier ', '')
+            files_html.append(f'<div style="margin-top: 10px;"><strong>{current_folder}</strong></div>')
+        else:
+            file_info = line.strip('- ')
+            if current_folder:
+                files_html.append(f'<div style="margin-left: 20px;">└─ {file_info}</div>')
+            else:
+                files_html.append(f'<div>• {file_info}</div>')
 
-    Le fichier que vous avez partagé via iTransfer a été téléchargé par le destinataire.
-    
-    Fichier : {filename}
-    Date de téléchargement : {formatdate(localtime=True)}
-    
-    Cette notification vous est envoyée à titre informatif.
-    
-    Cordialement,
-    L'équipe iTransfer
-    """
-    
-    app.logger.info("Envoi de la notification à l'expéditeur")
-    success = send_notification_email(to_email, "iTransfer - Fichier téléchargé", message, smtp_config)
-    if not success:
-        app.logger.error(f"Échec de l'envoi de la notification à l'expéditeur : {to_email}")
+    # Utiliser le même template HTML que pour le destinataire
+    html_content = html_template.format(
+        zip_name=zip_name,
+        total_size=total_size,
+        files='\n'.join(files_html),
+        download_url=download_url
+    )
+
+    try:
+        send_email(to_email, "Confirmation d'envoi de fichiers via iTransfer", message_content, html_content)
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'envoi de la confirmation : {str(e)}")
+        success = False
+
     return success
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
@@ -425,10 +426,13 @@ def upload_file():
 
         notification_errors = []
         
-        if not send_recipient_notification_with_files(email, file_id, zip_filename, files_summary, total_size_formatted, smtp_config):
+        # Utiliser zip_name au lieu de zip_filename pour être cohérent avec les fonctions d'envoi d'email
+        zip_name = zip_filename
+        
+        if not send_recipient_notification_with_files(email, file_id, zip_name, files_summary, total_size_formatted, smtp_config):
             notification_errors.append("destinataire")
         
-        if not send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filename, files_summary, total_size_formatted, smtp_config):
+        if not send_sender_upload_confirmation_with_files(sender_email, file_id, zip_name, files_summary, total_size_formatted, smtp_config):
             notification_errors.append("expéditeur")
 
         response_data = {
@@ -455,73 +459,6 @@ def format_size(size):
             return f"{size:.1f} {unit}"
         size /= 1024.0
     return f"{size:.1f} PB"
-
-def send_recipient_notification_with_files(to_email, file_id, zip_name, files_summary, total_size, smtp_config):
-    """Envoie une notification au destinataire avec la liste des fichiers"""
-    app.logger.info(f"Préparation de la notification pour le destinataire : {to_email}")
-    backend_url = get_backend_url()
-    app.logger.info(f"URL backend : {backend_url}")
-    download_link = f"{backend_url}/download/{file_id}"
-    app.logger.info(f"Lien de téléchargement généré : {download_link}")
-    
-    message = f"""
-    Bonjour,
-
-    Des fichiers ont été partagés avec vous via iTransfer.
-
-    Archive ZIP : {zip_name}
-    Taille totale : {total_size}
-
-    Contenu de l'archive :
-    {files_summary}
-
-    Lien de téléchargement : {download_link}
-
-    Ce lien expirera dans 7 jours.
-
-    Cordialement,
-    L'équipe iTransfer
-    """
-    
-    app.logger.info("Envoi de la notification au destinataire")
-    success = send_notification_email(to_email, "iTransfer - Nouveaux fichiers partagés", message, smtp_config)
-    if not success:
-        app.logger.error(f"Échec de l'envoi de la notification au destinataire : {to_email}")
-    return success
-
-def send_sender_upload_confirmation_with_files(to_email, file_id, zip_name, files_summary, total_size, smtp_config):
-    """Envoie une confirmation à l'expéditeur avec la liste des fichiers"""
-    app.logger.info(f"Préparation de la confirmation pour l'expéditeur : {to_email}")
-    backend_url = get_backend_url()
-    app.logger.info(f"URL backend : {backend_url}")
-    download_link = f"{backend_url}/download/{file_id}"
-    app.logger.info(f"Lien de téléchargement généré : {download_link}")
-    
-    message = f"""
-    Bonjour,
-
-    Vos fichiers ont été uploadés avec succès sur iTransfer.
-
-    Archive ZIP : {zip_name}
-    Taille totale : {total_size}
-
-    Contenu de l'archive :
-    {files_summary}
-
-    ID : {file_id}
-    Lien de téléchargement : {download_link}
-
-    Une notification a été envoyée au destinataire avec ce même lien.
-
-    Cordialement,
-    L'équipe iTransfer
-    """
-    
-    app.logger.info("Envoi de la confirmation à l'expéditeur")
-    success = send_notification_email(to_email, "iTransfer - Upload réussi", message, smtp_config)
-    if not success:
-        app.logger.error(f"Échec de l'envoi de la confirmation à l'expéditeur : {to_email}")
-    return success
 
 @app.route('/api/save-smtp-settings', methods=['POST', 'OPTIONS'])
 def save_smtp_settings():
