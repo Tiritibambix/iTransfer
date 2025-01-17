@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import JSZip from 'jszip';
 
 function App() {
   const navigate = useNavigate();
@@ -13,6 +14,8 @@ function App() {
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
   const [warning, setWarning] = useState(null);
+  const [compressionProgress, setCompressionProgress] = useState(0);
+  const [isCompressing, setIsCompressing] = useState(false);
   const xhrRef = useRef(null);
   const fileInputRef = useRef(null);
   const backendUrl = window.BACKEND_URL;
@@ -270,7 +273,6 @@ function App() {
       return;
     }
 
-    setUploading(true);
     setError(null);
     setProgress(0);
 
@@ -279,12 +281,40 @@ function App() {
       formData.append('email', recipientEmail);
       formData.append('sender_email', senderEmail);
 
-      uploadedItems.forEach((item) => {
-        const file = item.file;
-        formData.append('files[]', file);
-        const path = item.path;
-        formData.append('paths[]', path);
-      });
+      // Si plusieurs fichiers, on compresse
+      if (uploadedItems.length > 1) {
+        setIsCompressing(true);
+        const zip = new JSZip();
+        
+        // Ajouter chaque fichier au zip
+        for (let i = 0; i < uploadedItems.length; i++) {
+          const item = uploadedItems[i];
+          zip.file(item.path.substring(1), item.file);
+          // Mise à jour de la progression de compression
+          setCompressionProgress(Math.round((i + 1) * 100 / uploadedItems.length));
+        }
+
+        // Générer le zip avec compression
+        const zipBlob = await zip.generateAsync({ 
+          type: "blob",
+          compression: "DEFLATE",
+          compressionOptions: { level: 6 }
+        }, (metadata) => {
+          setCompressionProgress(Math.round(metadata.percent));
+        });
+
+        formData.append('files[]', zipBlob, 'archive.zip');
+        formData.append('paths[]', '/archive.zip');
+        setIsCompressing(false);
+      } else {
+        // Un seul fichier, pas de compression
+        uploadedItems.forEach((item) => {
+          formData.append('files[]', item.file);
+          formData.append('paths[]', item.path);
+        });
+      }
+
+      setUploading(true);
 
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${backendUrl}/upload`, true);
@@ -324,6 +354,7 @@ function App() {
       console.error('Erreur:', error);
       showNotification("Une erreur est survenue lors de l'upload", "error");
       setUploading(false);
+      setIsCompressing(false);
     }
   };
 
@@ -578,15 +609,24 @@ function App() {
           </div>
         )}
 
-        {progress > 0 && (
+        {(isCompressing || progress > 0) && (
           <div className="progress-container">
-            <div className="progress-bar" style={{ width: `${progress}%` }} />
+            <div 
+              className="progress-bar" 
+              style={{ 
+                width: `${isCompressing ? compressionProgress : progress}%` 
+              }} 
+            />
             <div className="progress-info">
-              <span className="progress-text">{progress}% uploadé</span>
+              <span className="progress-text">
+                {isCompressing 
+                  ? `Compression : ${compressionProgress}%` 
+                  : `Upload : ${progress}%`}
+              </span>
               <button 
                 className="cancel-button"
                 onClick={cancelUpload}
-                aria-label="Annuler l'upload"
+                aria-label="Annuler"
               >
                 Annuler
               </button>
