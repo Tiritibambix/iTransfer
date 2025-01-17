@@ -529,44 +529,68 @@ def upload_file():
         if 'temp_dir' in locals() and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
 
-@app.route('/download/<file_id>', methods=['GET'])
+@app.route('/download/<file_id>')
 def download_file(file_id):
     try:
         # Récupérer les informations du fichier depuis la base de données
         file_info = FileUpload.query.get(file_id)
         if not file_info:
-            return jsonify({'error': 'Fichier non trouvé'}), 404
+            return jsonify({'error': 'File not found'}), 404
 
-        # Construire le chemin du fichier
+        # Vérifier si le fichier existe
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_info.filename)
-        
         if not os.path.exists(file_path):
-            return jsonify({'error': 'Fichier non trouvé sur le serveur'}), 404
+            return jsonify({'error': 'File not found on server'}), 404
 
-        # Marquer le fichier comme téléchargé
-        if not file_info.downloaded:
-            file_info.downloaded = True
-            db.session.commit()
-
-            # Charger la configuration SMTP
-            with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
-                smtp_config = json.load(config_file)
-
-            # Récupérer le résumé des fichiers stocké lors de l'upload
-            stored_summary = app.config.get(f'files_summary_{file_id}')
-            if stored_summary:
-                files_summary = stored_summary['summary']
-                total_size_formatted = stored_summary['total_size']
-                # Nettoyer après utilisation
-                del app.config[f'files_summary_{file_id}']
+        # Préparer le résumé des fichiers pour l'email de confirmation
+        try:
+            # Si c'est un fichier ZIP, lister son contenu
+            if file_info.filename.endswith('.zip'):
+                files_content = ""
+                total_size = 0
+                with zipfile.ZipFile(file_path, 'r') as zip_ref:
+                    for info in zip_ref.infolist():
+                        if not info.filename.endswith('/'):  # Ignorer les dossiers
+                            size_mb = info.file_size / (1024 * 1024)
+                            files_content += f"- {info.filename} ({size_mb:.2f} MB)\n"
+                            total_size += info.file_size
+                total_size_mb = total_size / (1024 * 1024)
+                files_content += f"\nTaille totale : {total_size_mb:.2f} MB"
             else:
-                # Fallback si le résumé n'est pas trouvé
+                # Si c'est un fichier unique
                 file_size = os.path.getsize(file_path)
-                files_summary = f"- {file_info.filename} ({format_size(file_size)})"
-                total_size_formatted = format_size(file_size)
+                size_mb = file_size / (1024 * 1024)
+                files_content = f"- {file_info.filename} ({size_mb:.2f} MB)\n"
+                files_content += f"\nTaille totale : {size_mb:.2f} MB"
 
-            # Envoyer une notification à l'expéditeur
-            send_download_notification(file_info.sender_email, file_id, smtp_config)
+            # Stocker le résumé pour l'email de confirmation
+            app.config[f'files_summary_{file_id}'] = {
+                'summary': files_content,
+                'total_size': f"{total_size_mb:.2f} MB" if 'total_size_mb' in locals() else f"{size_mb:.2f} MB"
+            }
+        except Exception as e:
+            app.logger.error(f"Erreur lors de la préparation du résumé des fichiers : {str(e)}")
+            # En cas d'erreur, créer un résumé basique
+            app.config[f'files_summary_{file_id}'] = {
+                'summary': f"- {file_info.filename}",
+                'total_size': "Taille non disponible"
+            }
+
+        # Marquer comme téléchargé dans la base de données
+        file_info.downloaded = True
+        db.session.commit()
+
+        # Configuration SMTP
+        smtp_config = {
+            'smtp_server': app.config.get('SMTP_SERVER'),
+            'smtp_port': app.config.get('SMTP_PORT'),
+            'smtp_user': app.config.get('SMTP_USER'),
+            'smtp_password': app.config.get('SMTP_PASSWORD'),
+            'smtp_sender_email': app.config.get('SMTP_SENDER_EMAIL')
+        }
+
+        # Envoyer une notification à l'expéditeur
+        send_download_notification(file_info.sender_email, file_id, smtp_config)
 
         # Envoyer le fichier
         return send_file(
@@ -577,7 +601,7 @@ def download_file(file_id):
 
     except Exception as e:
         app.logger.error(f"Erreur lors du téléchargement : {str(e)}")
-        return jsonify({'error': 'Une erreur est survenue lors du téléchargement'}), 500
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
