@@ -91,7 +91,7 @@ def get_backend_url():
     app.logger.info(f"URL backend générée depuis la requête : {generated_url}")
     return generated_url
 
-def send_recipient_notification_with_files(recipient_email, file_id, zip_filename, files_summary, total_size, smtp_config):
+def send_recipient_notification_with_files(recipient_email, file_id, zip_filename, files_summary, total_size, smtp_config, sender_email):
     """
     Envoie un email de notification au destinataire avec le résumé des fichiers
     """
@@ -103,21 +103,26 @@ def send_recipient_notification_with_files(recipient_email, file_id, zip_filenam
         msg = MIMEMultipart()
         msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
         msg['To'] = recipient_email
-        msg['Subject'] = "Nouveau transfert de fichiers reçu"
+        msg['Subject'] = f"{sender_email}: Nouveau transfert de fichiers."
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
 
         body = f"""
         Bonjour,
 
-        Vous avez reçu un nouveau transfert de fichiers.
+        Vous avez reçu un nouveau transfert de fichiers de :
+        {sender_email}
 
+        Détails du transfert :
+        -------------------------
         Résumé des fichiers :
         {files_summary}
 
         Taille totale : {total_size}
 
-        Lien de téléchargement : {download_link}
+        Lien de téléchargement : 
+        {download_link}
+
         Ce lien expirera dans 7 jours.
 
         Cordialement,
@@ -130,7 +135,7 @@ def send_recipient_notification_with_files(recipient_email, file_id, zip_filenam
         app.logger.error(f"Erreur lors de la préparation de l'email : {str(e)}")
         return False
 
-def send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filename, files_summary, total_size, smtp_config):
+def send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filename, files_summary, total_size, smtp_config, recipient_email):
     """
     Envoie un email de confirmation à l'expéditeur avec le résumé des fichiers envoyés
     """
@@ -142,7 +147,7 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filena
         msg = MIMEMultipart()
         msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
         msg['To'] = sender_email
-        msg['Subject'] = "Confirmation de votre transfert de fichiers"
+        msg['Subject'] = f"Confirmation de votre transfert de fichiers à {recipient_email}"
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
 
@@ -151,15 +156,21 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filena
 
         Votre transfert de fichiers a été effectué avec succès.
 
-        Résumé des fichiers envoyés :
+        Détails du transfert :
+        -------------------------
+        Destinataire : {recipient_email}
+
+        Résumé des fichiers :
         {files_summary}
 
         Taille totale : {total_size}
         
-        Lien de téléchargement : {download_link}
+        Lien de téléchargement : 
+        {download_link}
+
         Ce lien expirera dans 7 jours.
 
-        Une notification a été envoyée au destinataire avec ce même lien.
+        Une notification a été envoyée au destinataire.
 
         Cordialement,
         L'équipe iTransfer
@@ -306,11 +317,11 @@ def upload_file():
         notification_errors = []
 
         try:
-            if not send_recipient_notification_with_files(email, file_id, zip_filename, files_summary, total_size_formatted, smtp_config):
+            if not send_recipient_notification_with_files(email, file_id, zip_filename, files_summary, total_size_formatted, smtp_config, sender_email):
                 app.logger.error(f"Échec de l'envoi de la notification au destinataire: {email}")
                 notification_errors.append("destinataire")
             
-            if not send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filename, files_summary, total_size_formatted, smtp_config):
+            if not send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filename, files_summary, total_size_formatted, smtp_config, email):
                 app.logger.error(f"Échec de l'envoi de la notification à l'expéditeur: {sender_email}")
                 notification_errors.append("expéditeur")
         except Exception as e:
@@ -368,14 +379,17 @@ def download_file(file_id):
             msg = MIMEMultipart()
             msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
             msg['To'] = file_info.sender_email
-            msg['Subject'] = "Votre fichier a été téléchargé"
+            msg['Subject'] = f"Vos fichiers ont été téléchargés par {file_info.recipient_email}"
             msg['Date'] = formatdate(localtime=True)
             msg['Message-ID'] = make_msgid()
 
             body = f"""
             Bonjour,
 
-            Votre fichier {file_info.filename} a été téléchargé.
+            Vos fichiers ont été téléchargés par :
+            {file_info.recipient_email}
+
+            Fichier : {file_info.filename}
 
             Cordialement,
             L'équipe iTransfer
