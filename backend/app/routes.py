@@ -13,6 +13,16 @@ from .models import FileUpload
 import zipfile
 import shutil
 
+def format_size(bytes):
+    """
+    Formate une taille en bytes en une chaîne lisible (KB, MB, GB, etc.)
+    """
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if bytes < 1024:
+            return f"{bytes:.2f} {unit}"
+        bytes /= 1024
+    return f"{bytes:.2f} PB"
+
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
     if request.method == 'OPTIONS':
