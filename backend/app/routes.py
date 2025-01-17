@@ -310,22 +310,17 @@ Lien de téléchargement : <a href="{download_link}" class="link">{download_link
 
 def send_download_notification(sender_email, file_id, smtp_config):
     try:
-        # Vérifier que nous avons toutes les valeurs requises
-        if not sender_email or not smtp_config or not smtp_config.get('smtp_sender_email'):
-            app.logger.error("Informations manquantes pour l'envoi de l'email")
+        # Récupérer les informations du fichier depuis la base de données
+        file_info = FileUpload.query.get(file_id)
+        if not file_info:
+            app.logger.error("Fichier non trouvé dans la base de données")
             return False
 
         # Récupérer le fuseau horaire configuré
         timezone = pytz.timezone(app.config.get('TIMEZONE', 'Europe/Paris'))
         # Obtenir l'heure actuelle dans le bon fuseau horaire
         download_time = datetime.now(timezone).strftime('%d/%m/%Y à %H:%M:%S (%Z)')
-        
-        # Récupérer les informations des fichiers
-        files_info = app.config.get(f'files_summary_{file_id}', {})
-        files_summary = files_info.get('summary', 'Information non disponible')
-        total_size = files_info.get('total_size', 'Taille non disponible')
 
-        # Créer le message avec des valeurs par défaut si nécessaire
         msg = MIMEMultipart('alternative')
         msg['Subject'] = "Vos fichiers ont été téléchargés"
         msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', 'no-reply@itransfer.local')))
@@ -338,18 +333,12 @@ def send_download_notification(sender_email, file_id, smtp_config):
 Vos fichiers ont été téléchargés le {download_time}.
 
 Fichiers téléchargés :
-{files_summary}
+{file_info.files_summary}
 
 Cordialement,
 L'équipe iTransfer"""
 
         msg.attach(MIMEText(body, 'plain', 'utf-8'))
-        
-        # Log pour le debug
-        app.logger.info(f"Préparation de l'email de confirmation pour {sender_email}")
-        app.logger.info(f"Contenu du message : {body}")
-        app.logger.info(f"Configuration SMTP : {smtp_config}")
-
         return send_email_with_smtp(msg, smtp_config)
     except Exception as e:
         app.logger.error(f"Erreur lors de l'envoi de la notification de téléchargement: {str(e)}")
@@ -556,38 +545,34 @@ def download_file(file_id):
             return jsonify({'error': 'File not found on server'}), 404
 
         # Préparer le résumé des fichiers pour l'email de confirmation
+        files_summary = ""
+        total_size = 0
+
         try:
             # Si c'est un fichier ZIP, lister son contenu
             if file_info.filename.endswith('.zip'):
-                files_content = ""
-                total_size = 0
                 with zipfile.ZipFile(file_path, 'r') as zip_ref:
                     for info in zip_ref.infolist():
                         if not info.filename.endswith('/'):  # Ignorer les dossiers
                             size_mb = info.file_size / (1024 * 1024)
-                            files_content += f"- {info.filename} ({size_mb:.2f} MB)\n"
+                            files_summary += f"- {info.filename} ({size_mb:.2f} MB)\n"
                             total_size += info.file_size
-                total_size_mb = total_size / (1024 * 1024)
-                files_content += f"\nTaille totale : {total_size_mb:.2f} MB"
             else:
                 # Si c'est un fichier unique
                 file_size = os.path.getsize(file_path)
                 size_mb = file_size / (1024 * 1024)
-                files_content = f"- {file_info.filename} ({size_mb:.2f} MB)\n"
-                files_content += f"\nTaille totale : {size_mb:.2f} MB"
+                files_summary = f"- {file_info.filename} ({size_mb:.2f} MB)\n"
+                total_size = file_size
 
-            # Stocker le résumé pour l'email de confirmation
-            app.config[f'files_summary_{file_id}'] = {
-                'summary': files_content,
-                'total_size': f"{total_size_mb:.2f} MB" if 'total_size_mb' in locals() else f"{size_mb:.2f} MB"
-            }
+            total_size_mb = total_size / (1024 * 1024)
+            files_summary += f"\nTaille totale : {total_size_mb:.2f} MB"
+
         except Exception as e:
             app.logger.error(f"Erreur lors de la préparation du résumé des fichiers : {str(e)}")
-            # En cas d'erreur, créer un résumé basique
-            app.config[f'files_summary_{file_id}'] = {
-                'summary': f"- {file_info.filename}",
-                'total_size': "Taille non disponible"
-            }
+            files_summary = f"- {file_info.filename}\n"
+
+        # Stocker le résumé directement dans l'objet file_info
+        file_info.files_summary = files_summary
 
         # Marquer comme téléchargé dans la base de données
         file_info.downloaded = True
@@ -602,7 +587,7 @@ def download_file(file_id):
             'smtp_sender_email': app.config.get('SMTP_SENDER_EMAIL')
         }
 
-        # Envoyer une notification à l'expéditeur
+        # Envoyer une notification à l'expéditeur avec le résumé des fichiers
         send_download_notification(file_info.sender_email, file_id, smtp_config)
 
         # Envoyer le fichier
