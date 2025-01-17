@@ -248,23 +248,13 @@ function App() {
   };
 
   const handleUpload = async () => {
-    // Vérification des champs vides
-    if (!recipientEmail && !senderEmail) {
-      showNotification("Les adresses email du destinataire et de l'expéditeur sont requises", "error");
-      return;
-    }
-    if (!recipientEmail) {
-      showNotification("L'adresse email du destinataire est requise", "error");
-      return;
-    }
-    if (!senderEmail) {
-      showNotification("L'adresse email de l'expéditeur est requise", "error");
+    if (uploadedItems.length === 0) {
+      showNotification("Veuillez sélectionner au moins un fichier", "error");
       return;
     }
 
-    // Vérification des fichiers
-    if (uploadedItems.length === 0) {
-      showNotification("Veuillez sélectionner au moins un fichier", "error");
+    if (!recipientEmail || !senderEmail) {
+      showNotification("Veuillez remplir les adresses email du destinataire et de l'expéditeur", "error");
       return;
     }
 
@@ -298,7 +288,7 @@ function App() {
         if (xhr.status === 200) {
           const response = JSON.parse(xhr.responseText);
           if (response.warning) {
-            showNotification("Les fichiers ont été uploadés mais il y a eu un problème avec l'envoi des notifications. L'administrateur a été prévenu.", "warning");
+            showNotification("Les fichiers ont été uploadés mais il y a eu un problème avec l'envoi des notifications.", "warning");
           } else {
             showNotification("Les fichiers ont été uploadés et les notifications ont été envoyées avec succès !", "success");
           }
@@ -306,16 +296,7 @@ function App() {
           setRecipientEmail('');
           setSenderEmail('');
         } else {
-          let errorMessage = "Une erreur est survenue lors de l'upload";
-          try {
-            const response = JSON.parse(xhr.responseText);
-            if (response.error) {
-              errorMessage = response.error;
-            }
-          } catch (e) {
-            // Si on ne peut pas parser la réponse, on garde le message par défaut
-          }
-          showNotification(errorMessage, "error");
+          showNotification("Une erreur est survenue lors de l'upload. Veuillez vérifier que les emails sont valides et réessayer.", "error");
         }
         setUploading(false);
       };
@@ -329,40 +310,40 @@ function App() {
       xhrRef.current = xhr;
     } catch (error) {
       console.error('Erreur:', error);
-      showNotification("Une erreur inattendue est survenue. Veuillez réessayer.", "error");
+      showNotification("Une erreur est survenue lors de l'upload", "error");
       setUploading(false);
     }
   };
 
   const showNotification = (message, type = 'info') => {
     if (!("Notification" in window)) {
-      alert(message); // Fallback sur alert si les notifications ne sont pas supportées
+      console.log("Ce navigateur ne supporte pas les notifications desktop");
       return;
     }
 
-    const showNotificationMessage = () => {
-      const options = {
-        body: message,
-        icon: "/logo192.png",
-        silent: true  // Toujours silencieux, même pour les erreurs
-      };
-
-      new Notification("iTransfer", options);
-    };
-
     if (Notification.permission === "granted") {
-      showNotificationMessage();
+      new Notification("iTransfer", {
+        body: message,
+        icon: "/logo192.png"
+      });
     } else if (Notification.permission !== "denied") {
       Notification.requestPermission().then(permission => {
         if (permission === "granted") {
-          showNotificationMessage();
-        } else {
-          alert(message); // Fallback sur alert si l'utilisateur refuse les notifications
+          new Notification("iTransfer", {
+            body: message,
+            icon: "/logo192.png"
+          });
         }
       });
-    } else {
-      alert(message); // Fallback sur alert si les notifications sont refusées
     }
+  };
+
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   const handleRecipientEmailChange = (event) => {
@@ -390,14 +371,6 @@ function App() {
     }
     setUploading(false);
     setProgress(0);
-  };
-
-  const formatFileSize = (bytes) => {
-    if (bytes === 0) return '0 B';
-    const k = 1024;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
   return (
