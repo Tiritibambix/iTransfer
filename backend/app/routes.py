@@ -29,13 +29,19 @@ def upload_file():
         
         files = request.files.getlist('files[]')
         paths = request.form.getlist('paths[]')
-        email = request.form.get('recipientEmail')
-        sender_email = request.form.get('senderEmail')
-
+        
+        # Ajout de logs pour déboguer le contenu du form
+        app.logger.info(f"Contenu du form data: {request.form}")
+        
+        # Récupérer les emails avec vérification des deux formats possibles
+        email = request.form.get('recipientEmail') or request.form.get('email')
+        sender_email = request.form.get('senderEmail') or request.form.get('sender_email')
+        
+        # Log plus détaillé des valeurs
         app.logger.info(f"Nombre de fichiers: {len(files)}")
         app.logger.info(f"Nombre de paths: {len(paths)}")
-        app.logger.info(f"Email destinataire: {email}")
-        app.logger.info(f"Email expéditeur: {sender_email}")
+        app.logger.info(f"Email destinataire (recipientEmail/email): {email}")
+        app.logger.info(f"Email expéditeur (senderEmail/sender_email): {sender_email}")
 
         if not files or not email or not sender_email:
             app.logger.error(f"Données manquantes - files: {bool(files)}, email: {bool(email)}, sender_email: {bool(sender_email)}")
