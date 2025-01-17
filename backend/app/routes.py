@@ -10,7 +10,6 @@ from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate, make_msgid, formataddr
 from . import app, db
 from .models import FileUpload
-from .utils import send_email
 import zipfile
 import shutil
 from datetime import datetime
@@ -320,7 +319,13 @@ def send_download_notification(sender_email, file_id, smtp_config):
         files_summary = files_info.get('summary', 'Information non disponible')
         total_size = files_info.get('total_size', 'Taille non disponible')
 
-        subject = "Vos fichiers ont été téléchargés"
+        msg = MIMEMultipart('alternative')
+        msg['Subject'] = "Vos fichiers ont été téléchargés"
+        msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
+        msg['To'] = sender_email
+        msg['Date'] = formatdate(localtime=True)
+        msg['Message-ID'] = make_msgid()
+
         body = f"""Bonjour,
 
 Vos fichiers ont été téléchargés le {download_time}.
@@ -331,7 +336,8 @@ Fichiers téléchargés :
 Cordialement,
 L'équipe iTransfer"""
 
-        return send_email(sender_email, subject, body, smtp_config)
+        msg.attach(MIMEText(body, 'plain'))
+        return send_email_with_smtp(msg, smtp_config)
     except Exception as e:
         app.logger.error(f"Erreur lors de l'envoi de la notification de téléchargement: {str(e)}")
         return False
