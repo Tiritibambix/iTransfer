@@ -91,7 +91,7 @@ def get_backend_url():
     app.logger.info(f"URL backend générée depuis la requête : {generated_url}")
     return generated_url
 
-def create_email_template(title, message, file_summary, total_size):
+def create_email_template(title, message, file_summary, total_size, download_link=None):
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -99,19 +99,10 @@ def create_email_template(title, message, file_summary, total_size):
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            :root {{
-                --primary-color: #a88aa5;
-                --primary-dark: #693a67;
-                --surface-light: #f8f9fa;
-                --surface-dark: #423542;
-                --text-primary: #170017;
-                --text-secondary: #5a4e5a;
-            }}
-            
             body {{
                 font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
                 line-height: 1.6;
-                color: var(--text-primary);
+                color: #170017;
                 margin: 0;
                 padding: 0;
                 background-color: #f5f5f5;
@@ -127,7 +118,7 @@ def create_email_template(title, message, file_summary, total_size):
             .header {{
                 text-align: center;
                 padding: 30px 0;
-                background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+                background: #693a67;
                 border-radius: 12px 12px 0 0;
                 margin-bottom: 0;
             }}
@@ -146,31 +137,31 @@ def create_email_template(title, message, file_summary, total_size):
                 margin-bottom: 30px;
             }}
             .message h2 {{
-                color: var(--primary-dark);
+                color: #693a67;
                 margin: 0 0 15px 0;
                 font-size: 22px;
                 font-weight: 500;
             }}
             .message p {{
-                color: var(--text-primary);
+                color: #170017;
                 margin: 0;
                 font-size: 16px;
                 line-height: 1.6;
             }}
             .files {{
-                background-color: var(--surface-light);
+                background-color: #f8f9fa;
                 padding: 20px;
                 border-radius: 8px;
                 font-family: 'Courier New', monospace;
                 white-space: pre-wrap;
-                color: var(--text-primary);
+                color: #170017;
                 border: 1px solid rgba(0, 0, 0, 0.05);
                 margin: 20px 0;
             }}
             .total {{
                 margin-top: 20px;
                 padding: 15px 20px;
-                background-color: var(--primary-dark);
+                background-color: #693a67;
                 color: #ffffff;
                 border-radius: 8px;
                 font-weight: 500;
@@ -179,15 +170,29 @@ def create_email_template(title, message, file_summary, total_size):
             .footer {{
                 text-align: center;
                 padding: 20px;
-                color: var(--text-secondary);
+                color: #5a4e5a;
                 font-size: 14px;
                 border-top: 1px solid rgba(0, 0, 0, 0.05);
             }}
-            a {{
-                color: var(--primary-dark);
+            .download-btn {{
+                display: inline-block;
+                margin: 20px 0;
+                padding: 12px 24px;
+                background-color: #693a67;
+                color: #ffffff !important;
+                text-decoration: none;
+                border-radius: 6px;
+                font-weight: 500;
+                text-align: center;
+            }}
+            .download-btn:hover {{
+                background-color: #7e547b;
+            }}
+            .link {{
+                color: #693a67;
                 text-decoration: none;
             }}
-            a:hover {{
+            .link:hover {{
                 text-decoration: underline;
             }}
         </style>
@@ -202,6 +207,7 @@ def create_email_template(title, message, file_summary, total_size):
                     <h2>{title}</h2>
                     <p>{message}</p>
                 </div>
+                {f'<a href="{download_link}" class="download-btn">Télécharger les fichiers</a>' if download_link else ''}
                 <div class="files">
 {file_summary}
                 </div>
@@ -222,6 +228,8 @@ def create_email_template(title, message, file_summary, total_size):
 {title}
 
 {message}
+
+{f'Lien de téléchargement : {download_link}' if download_link else ''}
 
 Résumé des fichiers :
 {file_summary}
@@ -252,9 +260,10 @@ def send_recipient_notification_with_files(recipient_email, file_id, file_name, 
         title = "Vous avez reçu des fichiers"
         message = f"""
 {sender_email} vous a envoyé des fichiers.
-Vous pouvez les télécharger en cliquant sur ce lien : {download_link}"""
 
-        html, text = create_email_template(title, message, files_summary, total_size)
+Vous pouvez les télécharger en cliquant sur ce bouton :"""
+
+        html, text = create_email_template(title, message, files_summary, total_size, download_link)
         
         msg.attach(MIMEText(text, 'plain'))
         msg.attach(MIMEText(html, 'html'))
@@ -283,7 +292,9 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, file_name,
         title = "Vos fichiers ont été envoyés"
         message = f"""
 Vos fichiers ont été envoyés avec succès à :
-{recipient_email}"""
+{recipient_email}
+
+Lien de téléchargement : <a href="{download_link}" class="link">{download_link}</a>"""
 
         html, text = create_email_template(title, message, files_summary, total_size)
         
