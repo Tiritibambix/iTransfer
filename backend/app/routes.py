@@ -15,6 +15,7 @@ import jwt
 from datetime import datetime, timedelta
 import zipfile
 import shutil
+import traceback
 
 # Charger l'URL dynamique du backend (par exemple, pour envoyer des notifications)
 def get_backend_url():
@@ -59,7 +60,10 @@ JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
 def send_email(to_email, subject, message_content, html_content):
     try:
         backend_url = get_backend_url()
-        app.logger.info(f"URL backend pour l'email : {backend_url}")
+        app.logger.info(f"=== ENVOI D'EMAIL ===")
+        app.logger.info(f"À: {to_email}")
+        app.logger.info(f"Sujet: {subject}")
+        app.logger.info(f"URL backend: {backend_url}")
         
         # Créer un message MIME multipart
         msg = MIMEMultipart('alternative')
@@ -67,6 +71,7 @@ def send_email(to_email, subject, message_content, html_content):
         # Utiliser un nom d'affichage professionnel
         sender_name = "iTransfer"
         sender_email = "no-reply@itransfer.com"
+        app.logger.info(f"De: {sender_name} <{sender_email}>")
         
         # Ajouter les en-têtes standards avec un format plus professionnel
         msg['From'] = formataddr((sender_name, sender_email))
@@ -83,37 +88,54 @@ def send_email(to_email, subject, message_content, html_content):
         msg.add_header('Feedback-ID', 'iTransfer:FileTransfer')
         msg.add_header('X-Report-Abuse', f'Please report abuse to {sender_email}')
         
+        app.logger.info("En-têtes d'email configurés")
+        
         # Ajouter le contenu en texte brut
         text_part = MIMEText(message_content, 'plain', 'utf-8')
         msg.attach(text_part)
+        app.logger.info("Contenu texte attaché")
         
         # Ajouter le contenu HTML
         html_part = MIMEText(html_content, 'html', 'utf-8')
         msg.attach(html_part)
+        app.logger.info("Contenu HTML attaché")
         
         # Configuration et envoi de l'email
+        app.logger.info("=== CONFIGURATION SMTP ===")
         with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
             smtp_config = json.load(config_file)
+            app.logger.info(f"Configuration SMTP chargée: {smtp_config['smtp_server']}:{smtp_config['smtp_port']}")
         
         port = int(smtp_config['smtp_port'])
+        app.logger.info(f"Connexion au serveur SMTP: {smtp_config['smtp_server']}:{port}")
+        
         if port == 465:
+            app.logger.info("Utilisation de SMTP_SSL")
             server = smtplib.SMTP_SSL(smtp_config['smtp_server'], port)
         else:
+            app.logger.info("Utilisation de SMTP avec STARTTLS")
             server = smtplib.SMTP(smtp_config['smtp_server'], port)
             server.starttls()
         
+        app.logger.info("Tentative de connexion SMTP...")
         server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
+        app.logger.info("Connexion SMTP réussie")
+        
+        app.logger.info("Envoi de l'email...")
         server.send_message(msg)
+        app.logger.info("Email envoyé avec succès")
         return True
         
     except Exception as e:
         app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+        app.logger.error(f"Traceback: {traceback.format_exc()}")
         return False
         
     finally:
         if 'server' in locals():
             try:
                 server.quit()
+                app.logger.info("Connexion SMTP fermée")
             except Exception as e:
                 app.logger.error(f"Erreur lors de la fermeture de la connexion SMTP : {str(e)}")
 
@@ -317,8 +339,11 @@ def upload_file():
         return jsonify({'message': 'CORS preflight success'}), 200
 
     try:
-        app.logger.info("Début du traitement de l'upload")
+        app.logger.info("=== DÉBUT DE L'UPLOAD ===")
+        app.logger.info(f"Headers reçus: {dict(request.headers)}")
+        
         if 'files[]' not in request.files:
+            app.logger.error("Aucun fichier dans la requête")
             return jsonify({'error': 'Aucun fichier envoyé'}), 400
         
         files = request.files.getlist('files[]')
@@ -326,45 +351,64 @@ def upload_file():
         
         email = request.form.get('email')
         sender_email = request.form.get('sender_email')
+        
+        app.logger.info(f"Email destinataire (brut): {email}")
+        app.logger.info(f"Email expéditeur (brut): {sender_email}")
+        
         if email:
             email = email.lower().strip()
         if sender_email:
             sender_email = sender_email.lower().strip()
 
-        app.logger.info(f"Nombre de fichiers reçus : {len(files)}")
-        app.logger.info(f"Email destinataire : {email}")
-        app.logger.info(f"Email expéditeur : {sender_email}")
+        app.logger.info(f"Email destinataire (nettoyé): {email}")
+        app.logger.info(f"Email expéditeur (nettoyé): {sender_email}")
+        app.logger.info(f"Nombre de fichiers reçus: {len(files)}")
+        app.logger.info(f"Chemins reçus: {paths}")
 
         if not files or not email or not sender_email:
+            app.logger.error(f"Validation échouée - Files: {bool(files)}, Email: {bool(email)}, Sender: {bool(sender_email)}")
             return jsonify({'error': 'Fichiers ou email manquant'}), 400
 
         file_id = str(uuid.uuid4())
         temp_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'temp', file_id)
+        app.logger.info(f"ID généré: {file_id}")
+        app.logger.info(f"Dossier temporaire: {temp_dir}")
         
         file_list = []
         total_size = 0
         
         try:
-            # Créer un dictionnaire pour organiser les fichiers par dossier
+            app.logger.info("=== TRAITEMENT DES FICHIERS ===")
             folders = {}
             for file, path in zip(files, paths):
                 if file.filename:
-                    # Nettoyer le chemin et extraire le dossier parent
+                    app.logger.info(f"Traitement du fichier: {file.filename}")
+                    app.logger.info(f"Chemin demandé: {path}")
+                    
                     clean_path = path.lstrip('/')
                     parent_folder = os.path.dirname(clean_path) if '/' in clean_path else ''
+                    
+                    app.logger.info(f"Chemin nettoyé: {clean_path}")
+                    app.logger.info(f"Dossier parent: {parent_folder}")
                     
                     if parent_folder not in folders:
                         folders[parent_folder] = []
                     
-                    # Sauvegarder le fichier
                     full_path = os.path.join(temp_dir, clean_path)
-                    os.makedirs(os.path.dirname(full_path), exist_ok=True)
-                    file.save(full_path)
+                    app.logger.info(f"Chemin complet: {full_path}")
+                    
+                    try:
+                        os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                        file.save(full_path)
+                        app.logger.info(f"Fichier sauvegardé: {full_path}")
+                    except Exception as e:
+                        app.logger.error(f"Erreur lors de la sauvegarde du fichier {full_path}: {str(e)}")
+                        raise
                     
                     file_size = os.path.getsize(full_path)
                     total_size += file_size
+                    app.logger.info(f"Taille du fichier: {file_size} bytes")
                     
-                    # Ajouter à la liste des fichiers avec la structure correcte
                     file_info = {
                         'name': clean_path,
                         'size': file_size,
@@ -373,20 +417,27 @@ def upload_file():
                     folders[parent_folder].append(file_info)
                     file_list.append(file_info)
             
+            app.logger.info("=== CRÉATION DU ZIP ===")
             zip_filename = f"transfer_{file_id}.zip"
             zip_path = os.path.join(app.config['UPLOAD_FOLDER'], zip_filename)
+            app.logger.info(f"Nom du ZIP: {zip_filename}")
+            app.logger.info(f"Chemin du ZIP: {zip_path}")
             
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
                 for root, _, files in os.walk(temp_dir):
                     for file in files:
                         file_path = os.path.join(root, file)
-                        # Préserver la structure exacte des dossiers
                         arcname = os.path.relpath(file_path, temp_dir)
+                        app.logger.info(f"Ajout au ZIP: {file_path} -> {arcname}")
                         zipf.write(file_path, arcname)
+            
+            app.logger.info("ZIP créé avec succès")
             
             with open(zip_path, 'rb') as f:
                 encrypted_data = hashlib.sha256(f.read()).hexdigest()
+            app.logger.info(f"Hash du ZIP: {encrypted_data}")
             
+            app.logger.info("=== ENREGISTREMENT EN BASE ===")
             new_file = FileUpload(
                 id=file_id,
                 filename=zip_filename,
@@ -397,19 +448,24 @@ def upload_file():
             )
             db.session.add(new_file)
             db.session.commit()
+            app.logger.info("Enregistrement en base réussi")
             
         except Exception as e:
             app.logger.error(f"Erreur lors du traitement des fichiers: {str(e)}")
+            app.logger.error(f"Traceback: {traceback.format_exc()}")
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
+                app.logger.info(f"Nettoyage: dossier temporaire supprimé {temp_dir}")
             if os.path.exists(zip_path):
                 os.remove(zip_path)
+                app.logger.info(f"Nettoyage: fichier ZIP supprimé {zip_path}")
             return jsonify({'error': 'Erreur lors du traitement des fichiers'}), 500
         finally:
             if os.path.exists(temp_dir):
                 shutil.rmtree(temp_dir)
+                app.logger.info(f"Nettoyage final: dossier temporaire supprimé {temp_dir}")
 
-        # Préparer un résumé des fichiers organisé par dossier
+        app.logger.info("=== PRÉPARATION DES NOTIFICATIONS ===")
         files_summary = []
         for folder, files in folders.items():
             if folder:
@@ -420,19 +476,29 @@ def upload_file():
         
         files_summary = "\n".join(files_summary)
         total_size_formatted = format_size(total_size)
+        app.logger.info(f"Résumé des fichiers préparé: \n{files_summary}")
+        app.logger.info(f"Taille totale: {total_size_formatted}")
 
-        with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
-            smtp_config = json.load(config_file)
+        app.logger.info("=== ENVOI DES NOTIFICATIONS ===")
+        try:
+            with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
+                smtp_config = json.load(config_file)
+                app.logger.info(f"Configuration SMTP chargée depuis {app.config['SMTP_CONFIG_PATH']}")
+        except Exception as e:
+            app.logger.error(f"Erreur lors du chargement de la configuration SMTP: {str(e)}")
+            return jsonify({'error': 'Erreur de configuration SMTP'}), 500
 
         notification_errors = []
         
-        # Utiliser zip_name au lieu de zip_filename pour être cohérent avec les fonctions d'envoi d'email
         zip_name = zip_filename
-        
+        app.logger.info(f"Envoi de la notification au destinataire: {email}")
         if not send_recipient_notification_with_files(email, file_id, zip_name, files_summary, total_size_formatted, smtp_config):
+            app.logger.error(f"Échec de l'envoi au destinataire: {email}")
             notification_errors.append("destinataire")
         
+        app.logger.info(f"Envoi de la confirmation à l'expéditeur: {sender_email}")
         if not send_sender_upload_confirmation_with_files(sender_email, file_id, zip_name, files_summary, total_size_formatted, smtp_config):
+            app.logger.error(f"Échec de l'envoi à l'expéditeur: {sender_email}")
             notification_errors.append("expéditeur")
 
         response_data = {
@@ -442,23 +508,20 @@ def upload_file():
         }
 
         if notification_errors:
-            response_data['warning'] = f"Impossible d'envoyer les notifications aux destinataires suivants: {', '.join(notification_errors)}"
+            warning_msg = f"Impossible d'envoyer les notifications aux destinataires suivants: {', '.join(notification_errors)}"
+            app.logger.warning(warning_msg)
+            response_data['warning'] = warning_msg
 
+        app.logger.info("=== UPLOAD TERMINÉ AVEC SUCCÈS ===")
         return jsonify(response_data), 200
 
     except Exception as e:
         app.logger.error(f"Erreur lors de l'upload: {str(e)}")
+        app.logger.error(f"Traceback complet: {traceback.format_exc()}")
         if 'zip_path' in locals() and os.path.exists(zip_path):
             os.remove(zip_path)
+            app.logger.info(f"Nettoyage d'erreur: fichier ZIP supprimé {zip_path}")
         return jsonify({'error': 'Une erreur interne est survenue'}), 500
-
-def format_size(size):
-    """Formate la taille en bytes en une chaîne lisible"""
-    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
-        if size < 1024.0:
-            return f"{size:.1f} {unit}"
-        size /= 1024.0
-    return f"{size:.1f} PB"
 
 @app.route('/api/save-smtp-settings', methods=['POST', 'OPTIONS'])
 def save_smtp_settings():
@@ -631,3 +694,11 @@ Si vous recevez cet email, la configuration est correcte."""
         response = jsonify({"success": False, "error": "An internal error has occurred. Please try again later."})
         response.headers.add("Access-Control-Allow-Origin", '*')
         return response, 500
+
+def format_size(size):
+    """Formate la taille en bytes en une chaîne lisible"""
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+        if size < 1024.0:
+            return f"{size:.1f} {unit}"
+        size /= 1024.0
+    return f"{size:.1f} PB"
