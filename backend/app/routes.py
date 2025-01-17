@@ -117,6 +117,75 @@ def send_email(to_email, subject, message_content, html_content):
             except Exception as e:
                 app.logger.error(f"Erreur lors de la fermeture de la connexion SMTP : {str(e)}")
 
+# Template HTML partagé pour les emails
+html_template = '''
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .header { margin-bottom: 20px; }
+        .info { margin-bottom: 20px; }
+        .files { 
+            background-color: #f5f5f5; 
+            padding: 15px; 
+            border-radius: 4px; 
+            margin-bottom: 20px;
+        }
+        .download-link { 
+            display: inline-block; 
+            background-color: #007bff; 
+            color: white; 
+            padding: 10px 20px; 
+            text-decoration: none; 
+            border-radius: 4px; 
+            margin: 20px 0;
+        }
+        .download-link:hover { background-color: #0056b3; }
+        .expiry { 
+            font-size: 0.9em; 
+            color: #666; 
+            font-style: italic; 
+        }
+        .footer { 
+            margin-top: 30px; 
+            padding-top: 20px; 
+            border-top: 1px solid #eee; 
+            font-size: 0.9em; 
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <p>Bonjour,</p>
+            <p>Des fichiers ont été partagés avec vous via iTransfer.</p>
+        </div>
+        
+        <div class="info">
+            <p><strong>Archive ZIP :</strong> {zip_name}</p>
+            <p><strong>Taille totale :</strong> {total_size}</p>
+        </div>
+        
+        <div class="files">
+            <strong>Contenu de l'archive :</strong><br>
+            {files}
+        </div>
+        
+        <a href="{download_url}" class="download-link">Télécharger les fichiers</a>
+        
+        <p class="expiry">Ce lien expirera dans 7 jours.</p>
+        
+        <div class="footer">
+            <p>Cordialement,<br>L'équipe iTransfer</p>
+        </div>
+    </div>
+</body>
+</html>
+'''
+
 def send_recipient_notification_with_files(to_email, file_id, zip_name, files_summary, total_size, smtp_config):
     """Envoie une notification au destinataire avec la liste des fichiers"""
     app.logger.info(f"Préparation de la notification pour le destinataire : {to_email}")
@@ -164,75 +233,6 @@ def send_recipient_notification_with_files(to_email, file_id, zip_name, files_su
                 files_html.append(f'<div>• {file_info}</div>')
 
     # Créer le contenu HTML
-    html_template = '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <meta charset="utf-8">
-        <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; }
-            .container { max-width: 600px; margin: 0 auto; }
-            .header { margin-bottom: 20px; }
-            .info { margin-bottom: 20px; }
-            .files { 
-                background-color: #f5f5f5; 
-                padding: 15px; 
-                border-radius: 4px; 
-                margin-bottom: 20px;
-            }
-            .download-link { 
-                display: inline-block; 
-                background-color: #007bff; 
-                color: white; 
-                padding: 10px 20px; 
-                text-decoration: none; 
-                border-radius: 4px; 
-                margin: 20px 0;
-            }
-            .download-link:hover { background-color: #0056b3; }
-            .expiry { 
-                font-size: 0.9em; 
-                color: #666; 
-                font-style: italic; 
-            }
-            .footer { 
-                margin-top: 30px; 
-                padding-top: 20px; 
-                border-top: 1px solid #eee; 
-                font-size: 0.9em; 
-            }
-        </style>
-    </head>
-    <body>
-        <div class="container">
-            <div class="header">
-                <p>Bonjour,</p>
-                <p>Des fichiers ont été partagés avec vous via iTransfer.</p>
-            </div>
-            
-            <div class="info">
-                <p><strong>Archive ZIP :</strong> {zip_name}</p>
-                <p><strong>Taille totale :</strong> {total_size}</p>
-            </div>
-            
-            <div class="files">
-                <strong>Contenu de l'archive :</strong><br>
-                {files}
-            </div>
-            
-            <a href="{download_url}" class="download-link">Télécharger les fichiers</a>
-            
-            <p class="expiry">Ce lien expirera dans 7 jours.</p>
-            
-            <div class="footer">
-                <p>Cordialement,<br>L'équipe iTransfer</p>
-            </div>
-        </div>
-    </body>
-    </html>
-    '''
-
-    # Créer le contenu HTML final
     html_content = html_template.format(
         zip_name=zip_name,
         total_size=total_size,
@@ -276,7 +276,7 @@ def send_sender_upload_confirmation_with_files(to_email, file_id, zip_name, file
     L'équipe iTransfer
     """
 
-    # Formater la liste des fichiers pour HTML (même code que pour le destinataire)
+    # Formater la liste des fichiers pour HTML
     files_html = []
     current_folder = None
     
@@ -295,7 +295,7 @@ def send_sender_upload_confirmation_with_files(to_email, file_id, zip_name, file
             else:
                 files_html.append(f'<div>• {file_info}</div>')
 
-    # Utiliser le même template HTML que pour le destinataire
+    # Créer le contenu HTML final
     html_content = html_template.format(
         zip_name=zip_name,
         total_size=total_size,
