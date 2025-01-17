@@ -287,9 +287,8 @@ def upload_file():
                     if parent_folder not in folders:
                         folders[parent_folder] = []
                     
-                    # Sauvegarder le fichier en préservant la structure exacte
-                    full_path = os.path.join(temp_dir, clean_path)
-                    os.makedirs(os.path.dirname(full_path) if os.path.dirname(full_path) else temp_dir, exist_ok=True)
+                    # Sauvegarder le fichier sans créer de sous-dossiers supplémentaires
+                    full_path = os.path.join(temp_dir, os.path.basename(file.filename))
                     file.save(full_path)
                     
                     file_size = os.path.getsize(full_path)
@@ -299,7 +298,8 @@ def upload_file():
                     file_info = {
                         'name': clean_path,
                         'size': file_size,
-                        'folder': parent_folder
+                        'folder': parent_folder,
+                        'temp_path': full_path  # Ajouter le chemin temporaire pour le zip
                     }
                     folders[parent_folder].append(file_info)
                     file_list.append(file_info)
@@ -308,12 +308,10 @@ def upload_file():
             zip_path = os.path.join(app.config['UPLOAD_FOLDER'], zip_filename)
             
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                # Au lieu d'utiliser os.walk, on utilise directement la liste des fichiers qu'on a déjà
                 for folder_name, folder_files in folders.items():
                     for file_info in folder_files:
-                        file_path = os.path.join(temp_dir, file_info['name'])
-                        # Utiliser directement le nom relatif comme arcname
-                        zipf.write(file_path, file_info['name'])
+                        # Utiliser le chemin d'origine pour l'archive
+                        zipf.write(file_info['temp_path'], file_info['name'])
             
             with open(zip_path, 'rb') as f:
                 encrypted_data = hashlib.sha256(f.read()).hexdigest()
