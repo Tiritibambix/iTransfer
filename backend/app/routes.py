@@ -56,11 +56,50 @@ def send_email_with_smtp(msg, smtp_config):
             except Exception as e:
                 app.logger.error(f"Erreur lors de la fermeture de la connexion SMTP : {str(e)}")
 
+def get_backend_url():
+    """
+    Génère l'URL du backend en se basant sur la variable d'environnement BACKEND_URL
+    ou sur la requête entrante en développement
+    """
+    # Utiliser BACKEND_URL s'il est défini (environnement de production)
+    backend_url = os.environ.get('BACKEND_URL')
+    if backend_url:
+        # Forcer HTTPS si configuré
+        if app.config['FORCE_HTTPS']:
+            if backend_url.startswith('http://'):
+                backend_url = 'https://' + backend_url[7:]
+            elif not backend_url.startswith('https://'):
+                backend_url = 'https://' + backend_url
+            
+        app.logger.info(f"Utilisation de l'URL backend depuis l'environnement : {backend_url}")
+        return backend_url
+    
+    # Sinon, construire l'URL à partir de la requête (pour le développement)
+    if not request:
+        protocol = 'https' if app.config['FORCE_HTTPS'] else 'http'
+        return f'{protocol}://localhost:5500'
+    
+    # En développement, on utilise le protocole configuré
+    protocol = 'https' if app.config['FORCE_HTTPS'] else request.scheme
+    host = request.headers.get('Host', 'localhost:5500')
+    
+    # Si on est derrière un proxy, on vérifie le X-Forwarded-Proto
+    if app.config['PROXY_COUNT'] > 0 and request.headers.get('X-Forwarded-Proto'):
+        protocol = request.headers.get('X-Forwarded-Proto')
+    
+    generated_url = f"{protocol}://{host}"
+    app.logger.info(f"URL backend générée depuis la requête : {generated_url}")
+    return generated_url
+
 def send_recipient_notification_with_files(recipient_email, file_id, zip_filename, files_summary, total_size, smtp_config):
     """
     Envoie un email de notification au destinataire avec le résumé des fichiers
     """
     try:
+        backend_url = get_backend_url()
+        download_link = f"{backend_url}/download/{file_id}"
+        app.logger.info(f"Lien de téléchargement généré : {download_link}")
+
         msg = MIMEMultipart()
         msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
         msg['To'] = recipient_email
@@ -78,6 +117,9 @@ def send_recipient_notification_with_files(recipient_email, file_id, zip_filenam
 
         Taille totale : {total_size}
 
+        Lien de téléchargement : {download_link}
+        Ce lien expirera dans 7 jours.
+
         Cordialement,
         L'équipe iTransfer
         """
@@ -93,6 +135,10 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filena
     Envoie un email de confirmation à l'expéditeur avec le résumé des fichiers envoyés
     """
     try:
+        backend_url = get_backend_url()
+        download_link = f"{backend_url}/download/{file_id}"
+        app.logger.info(f"Lien de téléchargement généré : {download_link}")
+
         msg = MIMEMultipart()
         msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
         msg['To'] = sender_email
@@ -109,6 +155,11 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filena
         {files_summary}
 
         Taille totale : {total_size}
+        
+        Lien de téléchargement : {download_link}
+        Ce lien expirera dans 7 jours.
+
+        Une notification a été envoyée au destinataire avec ce même lien.
 
         Cordialement,
         L'équipe iTransfer
