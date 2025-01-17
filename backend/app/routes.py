@@ -12,6 +12,7 @@ from . import app, db
 from .models import FileUpload
 import zipfile
 import shutil
+from datetime import datetime
 
 def format_size(bytes):
     """
@@ -322,30 +323,32 @@ def upload_file():
         
         files = request.files.getlist('files[]')
         paths = request.form.getlist('paths[]')
+        email = request.form.get('email')
+        sender_email = request.form.get('sender_email')
         
-        # Ajout de logs pour déboguer le contenu du form
-        app.logger.info(f"Contenu du form data: {request.form}")
-        
-        # Récupérer les emails avec vérification des deux formats possibles
-        email = request.form.get('recipientEmail') or request.form.get('email')
-        sender_email = request.form.get('senderEmail') or request.form.get('sender_email')
-        
-        # Log plus détaillé des valeurs
-        app.logger.info(f"Nombre de fichiers: {len(files)}")
-        app.logger.info(f"Nombre de paths: {len(paths)}")
-        app.logger.info(f"Email destinataire (recipientEmail/email): {email}")
-        app.logger.info(f"Email expéditeur (senderEmail/sender_email): {sender_email}")
+        if not email or not sender_email:
+            return jsonify({'error': 'Email addresses are required'}), 400
 
-        if not files or not email or not sender_email:
-            app.logger.error(f"Données manquantes - files: {bool(files)}, email: {bool(email)}, sender_email: {bool(sender_email)}")
-            return jsonify({'error': 'Fichiers et emails requis'}), 400
+        # Récupérer la liste des fichiers pour les emails
+        files_list = json.loads(request.form.get('files_list', '[]'))
+        
+        # Préparer le contenu des fichiers pour les emails
+        files_content = ""
+        total_size = 0
+        for file_info in files_list:
+            size_mb = file_info['size'] / (1024 * 1024)
+            files_content += f"- {file_info['name']} ({size_mb:.2f} MB)\n"
+            total_size += file_info['size']
+        
+        total_size_mb = total_size / (1024 * 1024)
+        files_content += f"\nTaille totale : {total_size_mb:.2f} MB"
 
+        # Sauvegarder les fichiers
         file_id = str(uuid.uuid4())
         temp_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'temp', file_id)
         os.makedirs(temp_dir, exist_ok=True)
         app.logger.info(f"Dossier temporaire créé: {temp_dir}")
 
-        total_size = 0
         folders = {}
         file_list = []
 
@@ -377,7 +380,6 @@ def upload_file():
                 app.logger.info(f"Fichier sauvegardé: {temp_file_path}")
                 
                 file_size = os.path.getsize(temp_file_path)
-                total_size += file_size
                 app.logger.info(f"Taille du fichier: {format_size(file_size)}")
                 
                 # Ajouter à la liste des fichiers avec la structure correcte
@@ -442,19 +444,12 @@ def upload_file():
         app.logger.info(f"Fichier enregistré en base avec l'ID: {file_id}")
 
         # Préparer le résumé des fichiers
-        files_summary = []
-        for f in file_list:
-            files_summary.append(f"- {f['name']} ({format_size(f['size'])})")
+        files_summary = files_content
         
-        files_summary = "\n".join(files_summary)
-        total_size = sum(f['size'] for f in file_list)
-        total_size_formatted = format_size(total_size)
-        app.logger.info(f"Résumé des fichiers:\n{files_summary}\nTaille totale: {total_size_formatted}")
-
         # Stocker le résumé pour l'email de confirmation de téléchargement
         app.config[f'files_summary_{file_id}'] = {
             'summary': files_summary,
-            'total_size': total_size_formatted
+            'total_size': f"{total_size_mb:.2f} MB"
         }
 
         # Envoyer les notifications
@@ -464,11 +459,11 @@ def upload_file():
         notification_errors = []
 
         try:
-            if not send_recipient_notification_with_files(email, file_id, final_filename, files_summary, total_size_formatted, smtp_config, sender_email):
+            if not send_recipient_notification_with_files(email, file_id, final_filename, files_summary, f"{total_size_mb:.2f} MB", smtp_config, sender_email):
                 app.logger.error(f"Échec de l'envoi de la notification au destinataire: {email}")
                 notification_errors.append("destinataire")
             
-            if not send_sender_upload_confirmation_with_files(sender_email, file_id, final_filename, files_summary, total_size_formatted, smtp_config, email):
+            if not send_sender_upload_confirmation_with_files(sender_email, file_id, final_filename, files_summary, f"{total_size_mb:.2f} MB", smtp_config, email):
                 app.logger.error(f"Échec de l'envoi de la notification à l'expéditeur: {sender_email}")
                 notification_errors.append("expéditeur")
         except Exception as e:

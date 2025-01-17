@@ -257,6 +257,16 @@ function App() {
     }
   };
 
+  const generateZipName = () => {
+    const now = new Date();
+    const year = now.getFullYear().toString().slice(-2);
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `iTransfer_${year}${month}${day}${hours}${minutes}.zip`;
+  };
+
   const handleUpload = async () => {
     if (uploadedItems.length === 0) {
       showNotification("Veuillez sélectionner au moins un fichier", "error");
@@ -281,6 +291,13 @@ function App() {
       formData.append('email', recipientEmail);
       formData.append('sender_email', senderEmail);
 
+      // Préparer la liste des fichiers pour les emails
+      const filesList = uploadedItems.map(item => ({
+        name: item.path.substring(1),
+        size: item.file.size
+      }));
+      formData.append('files_list', JSON.stringify(filesList));
+
       // Si plusieurs fichiers, on compresse
       if (uploadedItems.length > 1) {
         setIsCompressing(true);
@@ -303,8 +320,9 @@ function App() {
           setCompressionProgress(Math.round(metadata.percent));
         });
 
-        formData.append('files[]', zipBlob, 'archive.zip');
-        formData.append('paths[]', '/archive.zip');
+        const zipName = generateZipName();
+        formData.append('files[]', zipBlob, zipName);
+        formData.append('paths[]', '/' + zipName);
         setIsCompressing(false);
       } else {
         // Un seul fichier, pas de compression
