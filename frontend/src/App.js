@@ -253,8 +253,13 @@ function App() {
       return;
     }
 
-    if (!recipientEmail || !senderEmail) {
-      showNotification("Veuillez remplir les adresses email du destinataire et de l'expéditeur", "error");
+    if (!recipientEmail) {
+      showNotification("Veuillez remplir l'adresse email du destinataire", "error");
+      return;
+    }
+
+    if (!senderEmail) {
+      showNotification("Veuillez remplir votre adresse email", "error");
       return;
     }
 
