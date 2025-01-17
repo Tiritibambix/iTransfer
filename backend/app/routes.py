@@ -15,6 +15,7 @@ import shutil
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
+    temp_dir = None
     if request.method == 'OPTIONS':
         return jsonify({'message': 'CORS preflight success'}), 200
 
