@@ -91,7 +91,7 @@ def get_backend_url():
     app.logger.info(f"URL backend générée depuis la requête : {generated_url}")
     return generated_url
 
-def send_recipient_notification_with_files(recipient_email, file_id, zip_filename, files_summary, total_size, smtp_config, sender_email):
+def send_recipient_notification_with_files(recipient_email, file_id, file_name, files_summary, total_size, smtp_config, sender_email):
     """
     Envoie un email de notification au destinataire avec le résumé des fichiers
     """
@@ -135,7 +135,7 @@ def send_recipient_notification_with_files(recipient_email, file_id, zip_filenam
         app.logger.error(f"Erreur lors de la préparation de l'email : {str(e)}")
         return False
 
-def send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filename, files_summary, total_size, smtp_config, recipient_email):
+def send_sender_upload_confirmation_with_files(sender_email, file_id, file_name, files_summary, total_size, smtp_config, recipient_email):
     """
     Envoie un email de confirmation à l'expéditeur avec le résumé des fichiers envoyés
     """
@@ -266,27 +266,49 @@ def upload_file():
                 folders[parent_folder].append(file_info)
                 file_list.append(file_info)
 
-        # Créer le ZIP avec la même structure
-        zip_filename = f"transfer_{file_id}.zip"
-        zip_path = os.path.join(app.config['UPLOAD_FOLDER'], zip_filename)
-        app.logger.info(f"Création du ZIP: {zip_path}")
+        # Déterminer si on doit créer un zip
+        needs_zip = len(file_list) > 1 or any(f['folder'] for f in file_list)
+        
+        if needs_zip:
+            # Créer le ZIP avec la même structure
+            zip_filename = f"transfer_{file_id}.zip"
+            zip_path = os.path.join(app.config['UPLOAD_FOLDER'], zip_filename)
+            app.logger.info(f"Création du ZIP: {zip_path}")
 
-        with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for parent_folder, folder_files in folders.items():
-                for file_info in folder_files:
-                    app.logger.info(f"Ajout au ZIP: {file_info['name']}")
-                    # Utiliser le nom nettoyé pour l'archivage
-                    zipf.write(file_info['temp_path'], file_info['name'])
+            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                for parent_folder, folder_files in folders.items():
+                    for file_info in folder_files:
+                        app.logger.info(f"Ajout au ZIP: {file_info['name']}")
+                        # Utiliser le nom nettoyé pour l'archivage
+                        zipf.write(file_info['temp_path'], file_info['name'])
 
-        # Hasher le fichier
-        with open(zip_path, 'rb') as f:
-            encrypted_data = hashlib.sha256(f.read()).hexdigest()
-        app.logger.info(f"Hash du ZIP: {encrypted_data}")
+            # Hasher le fichier zip
+            with open(zip_path, 'rb') as f:
+                encrypted_data = hashlib.sha256(f.read()).hexdigest()
+            
+            final_filename = zip_filename
+            final_path = zip_path
+        else:
+            # Cas d'un fichier unique
+            single_file = file_list[0]
+            final_filename = single_file['name']
+            final_path = single_file['temp_path']
+            
+            # Hasher le fichier unique
+            with open(final_path, 'rb') as f:
+                encrypted_data = hashlib.sha256(f.read()).hexdigest()
+            
+            # Déplacer le fichier vers le dossier final
+            final_destination = os.path.join(app.config['UPLOAD_FOLDER'], final_filename)
+            shutil.move(final_path, final_destination)
+            final_path = final_destination
+
+        app.logger.info(f"Hash du fichier: {encrypted_data}")
 
         # Sauvegarder en base
         new_file = FileUpload(
             id=file_id,
-            filename=zip_filename,
+            filename=final_filename,
             email=email,
             sender_email=sender_email,
             encrypted_data=encrypted_data,
@@ -305,11 +327,6 @@ def upload_file():
         total_size_formatted = format_size(total_size)
         app.logger.info(f"Résumé des fichiers:\n{files_summary}\nTaille totale: {total_size_formatted}")
 
-        # Vérification de zip_filename avant l'envoi des emails
-        if 'zip_filename' not in locals():
-            app.logger.error("zip_filename n'est pas défini avant l'envoi des emails")
-            return jsonify({'error': 'Une erreur interne est survenue lors de la préparation du fichier'}), 500
-
         # Envoyer les notifications
         with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
             smtp_config = json.load(config_file)
@@ -317,11 +334,11 @@ def upload_file():
         notification_errors = []
 
         try:
-            if not send_recipient_notification_with_files(email, file_id, zip_filename, files_summary, total_size_formatted, smtp_config, sender_email):
+            if not send_recipient_notification_with_files(email, file_id, final_filename, files_summary, total_size_formatted, smtp_config, sender_email):
                 app.logger.error(f"Échec de l'envoi de la notification au destinataire: {email}")
                 notification_errors.append("destinataire")
             
-            if not send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filename, files_summary, total_size_formatted, smtp_config, email):
+            if not send_sender_upload_confirmation_with_files(sender_email, file_id, final_filename, files_summary, total_size_formatted, smtp_config, email):
                 app.logger.error(f"Échec de l'envoi de la notification à l'expéditeur: {sender_email}")
                 notification_errors.append("expéditeur")
         except Exception as e:
