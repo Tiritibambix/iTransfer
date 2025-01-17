@@ -375,6 +375,13 @@ def download_file(file_id):
             with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
                 smtp_config = json.load(config_file)
 
+            # Obtenir la taille du fichier
+            file_size = os.path.getsize(file_path)
+            formatted_size = format_size(file_size)
+
+            # Préparer le résumé des fichiers
+            files_summary = f"- {file_info.filename} ({formatted_size})"
+
             # Envoyer une notification à l'expéditeur
             msg = MIMEMultipart()
             msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
@@ -389,7 +396,10 @@ def download_file(file_id):
             Vos fichiers ont été téléchargés par :
             {file_info.email}
 
-            Fichier : {file_info.filename}
+            Résumé des fichiers :
+            {files_summary}
+
+            Taille totale : {formatted_size}
 
             Cordialement,
             L'équipe iTransfer
