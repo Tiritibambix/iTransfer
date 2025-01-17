@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 function App() {
@@ -16,6 +16,13 @@ function App() {
   const xhrRef = useRef(null);
   const fileInputRef = useRef(null);
   const backendUrl = window.BACKEND_URL;
+
+  // Demander la permission des notifications au chargement
+  useEffect(() => {
+    if ("Notification" in window && Notification.permission === "default") {
+      Notification.requestPermission();
+    }
+  }, []);
 
   const processFilesAndFolders = async (items) => {
     const allFiles = [];
@@ -321,25 +328,23 @@ function App() {
   };
 
   const showNotification = (message, type = 'info') => {
+    console.log(`Notification (${type}):`, message); // Toujours logger pour debug
+    
     if (!("Notification" in window)) {
       console.log("Ce navigateur ne supporte pas les notifications desktop");
       return;
     }
 
     if (Notification.permission === "granted") {
-      new Notification("iTransfer", {
-        body: message,
-        icon: "/logo192.png"
-      });
-    } else if (Notification.permission !== "denied") {
-      Notification.requestPermission().then(permission => {
-        if (permission === "granted") {
-          new Notification("iTransfer", {
-            body: message,
-            icon: "/logo192.png"
-          });
-        }
-      });
+      try {
+        new Notification("iTransfer", {
+          body: message,
+          icon: "/logo192.png",
+          tag: type // Ajouter un tag pour le type de notification
+        });
+      } catch (error) {
+        console.error("Erreur lors de l'envoi de la notification:", error);
+      }
     }
   };
 

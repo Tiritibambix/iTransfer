@@ -341,6 +341,60 @@ def upload_file():
         if 'temp_dir' in locals() and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
 
+@app.route('/download/<file_id>', methods=['GET'])
+def download_file(file_id):
+    try:
+        # Récupérer les informations du fichier depuis la base de données
+        file_info = FileUpload.query.get(file_id)
+        if not file_info:
+            return jsonify({'error': 'Fichier non trouvé'}), 404
+
+        # Construire le chemin du fichier
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_info.filename)
+        
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Fichier non trouvé sur le serveur'}), 404
+
+        # Marquer le fichier comme téléchargé
+        if not file_info.downloaded:
+            file_info.downloaded = True
+            db.session.commit()
+
+            # Charger la configuration SMTP
+            with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
+                smtp_config = json.load(config_file)
+
+            # Envoyer une notification à l'expéditeur
+            msg = MIMEMultipart()
+            msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
+            msg['To'] = file_info.sender_email
+            msg['Subject'] = "Votre fichier a été téléchargé"
+            msg['Date'] = formatdate(localtime=True)
+            msg['Message-ID'] = make_msgid()
+
+            body = f"""
+            Bonjour,
+
+            Votre fichier {file_info.filename} a été téléchargé.
+
+            Cordialement,
+            L'équipe iTransfer
+            """
+
+            msg.attach(MIMEText(body, 'plain'))
+            send_email_with_smtp(msg, smtp_config)
+
+        # Envoyer le fichier
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=os.path.basename(file_info.filename)
+        )
+
+    except Exception as e:
+        app.logger.error(f"Erreur lors du téléchargement : {str(e)}")
+        return jsonify({'error': 'Une erreur est survenue lors du téléchargement'}), 500
+
 @app.route('/login', methods=['POST', 'OPTIONS'])
 def login():
     if request.method == 'OPTIONS':
