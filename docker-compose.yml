@@ -55,6 +55,7 @@ services:
       - ADMIN_PASSWORD=${ADMIN_PASSWORD:-adminuserpassword}
       # Configuration base de données
       - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
+      - TIMEZONE=${TIMEZONE:-Europe/Paris}
       # Configuration HTTPS
       - FORCE_HTTPS=true
       # Public URL of the backend

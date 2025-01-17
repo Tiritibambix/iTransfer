@@ -23,6 +23,9 @@ class Config:
     SMTP_USER = os.environ.get('SMTP_USER')
     SMTP_PASSWORD = os.environ.get('SMTP_PASSWORD')
     
+    # Configuration du fuseau horaire (requis)
+    TIMEZONE = os.environ.get('TIMEZONE')
+    
     # Configuration des chemins
     UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024 * 1024  # 50 GB max-limit

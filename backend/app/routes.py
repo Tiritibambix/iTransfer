@@ -13,6 +13,7 @@ from .models import FileUpload
 import zipfile
 import shutil
 from datetime import datetime
+import pytz
 
 def format_size(bytes):
     """
@@ -307,6 +308,33 @@ Lien de téléchargement : <a href="{download_link}" class="link">{download_link
         app.logger.error(f"Erreur lors de la préparation de l'email : {str(e)}")
         return False
 
+def send_download_notification(sender_email, file_id, smtp_config):
+    try:
+        # Récupérer le fuseau horaire configuré
+        timezone = pytz.timezone(app.config.get('TIMEZONE', 'Europe/Paris'))
+        # Obtenir l'heure actuelle dans le bon fuseau horaire
+        download_time = datetime.now(timezone).strftime('%d/%m/%Y à %H:%M:%S (%Z)')
+        
+        files_info = app.config.get(f'files_summary_{file_id}', {})
+        files_summary = files_info.get('summary', 'Information non disponible')
+        total_size = files_info.get('total_size', 'Taille non disponible')
+
+        subject = "Vos fichiers ont été téléchargés"
+        body = f"""Bonjour,
+
+Vos fichiers ont été téléchargés le {download_time}.
+
+Fichiers téléchargés :
+{files_summary}
+
+Cordialement,
+L'équipe iTransfer"""
+
+        return send_email(sender_email, subject, body, smtp_config)
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'envoi de la notification de téléchargement: {str(e)}")
+        return False
+
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
     if request.method == 'OPTIONS':
@@ -531,24 +559,7 @@ def download_file(file_id):
                 total_size_formatted = format_size(file_size)
 
             # Envoyer une notification à l'expéditeur
-            msg = MIMEMultipart('alternative')
-            msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
-            msg['To'] = file_info.sender_email
-            msg['Subject'] = f"Vos fichiers ont été téléchargés par {file_info.email}"
-            msg['Date'] = formatdate(localtime=True)
-            msg['Message-ID'] = make_msgid()
-
-            title = "Vos fichiers ont été téléchargés"
-            message = f"""
-Vos fichiers ont été téléchargés par :
-{file_info.email}"""
-
-            html, text = create_email_template(title, message, files_summary, total_size_formatted)
-            
-            msg.attach(MIMEText(text, 'plain'))
-            msg.attach(MIMEText(html, 'html'))
-            
-            send_email_with_smtp(msg, smtp_config)
+            send_download_notification(file_info.sender_email, file_id, smtp_config)
 
         # Envoyer le fichier
         return send_file(
