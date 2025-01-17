@@ -15,7 +15,6 @@ import shutil
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
-    temp_dir = None
     if request.method == 'OPTIONS':
         return jsonify({'message': 'CORS preflight success'}), 200
 
@@ -50,7 +49,7 @@ def upload_file():
                     folders[parent_folder] = []
                 
                 # Créer le dossier temporaire si nécessaire
-                temp_file_path = os.path.join(temp_dir, os.path.basename(file.filename))
+                temp_file_path = os.path.join(temp_dir, clean_path)
                 os.makedirs(os.path.dirname(temp_file_path) if os.path.dirname(temp_file_path) else temp_dir, exist_ok=True)
                 
                 # Sauvegarder le fichier
@@ -75,8 +74,8 @@ def upload_file():
         with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
             for folder_name, folder_files in folders.items():
                 for file_info in folder_files:
-                    # Utiliser le chemin d'origine pour l'archive
-                    zipf.write(file_info['temp_path'], file_info['name'])
+                    arcname = file_info['name']
+                    zipf.write(file_info['temp_path'], arcname)
         
         with open(zip_path, 'rb') as f:
             encrypted_data = hashlib.sha256(f.read()).hexdigest()
@@ -128,12 +127,12 @@ def upload_file():
 
     except Exception as e:
         app.logger.error(f"Erreur lors du traitement des fichiers: {str(e)}")
-        if os.path.exists(temp_dir):
+        if 'temp_dir' in locals() and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
         if 'zip_path' in locals() and os.path.exists(zip_path):
             os.remove(zip_path)
         return jsonify({'error': 'Une erreur interne est survenue'}), 500
         
     finally:
-        if os.path.exists(temp_dir):
+        if 'temp_dir' in locals() and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
