@@ -340,3 +340,19 @@ def upload_file():
     finally:
         if 'temp_dir' in locals() and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
+
+@app.route('/login', methods=['POST', 'OPTIONS'])
+def login():
+    if request.method == 'OPTIONS':
+        return jsonify({'message': 'CORS preflight success'}), 200
+
+    data = request.get_json()
+    username = data.get('username')
+    password = data.get('password')
+
+    if username == app.config['ADMIN_USERNAME'] and password == app.config['ADMIN_PASSWORD']:
+        # Ici, vous pourriez vouloir générer un vrai token JWT
+        token = "admin-token"  # Simplifié pour l'exemple
+        return jsonify({'token': token}), 200
+    
+    return jsonify({'error': 'Invalid credentials'}), 401
