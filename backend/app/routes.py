@@ -23,6 +23,35 @@ def format_size(bytes):
         bytes /= 1024
     return f"{bytes:.2f} PB"
 
+def send_email_with_smtp(msg, smtp_config):
+    """
+    Envoie un email en utilisant le mode de connexion approprié selon le port SMTP
+    """
+    try:
+        port = smtp_config['smtp_port']
+        server = None
+        
+        app.logger.info(f"Tentative de connexion SMTP sur le port {port}")
+        
+        if port == 465:  # SSL/TLS direct
+            app.logger.info("Utilisation du mode SSL/TLS direct")
+            server = smtplib.SMTP_SSL(smtp_config['smtp_server'], port)
+        else:  # STARTTLS ou non sécurisé
+            app.logger.info("Utilisation du mode STARTTLS ou non sécurisé")
+            server = smtplib.SMTP(smtp_config['smtp_server'], port)
+            if port == 587:  # STARTTLS
+                app.logger.info("Activation de STARTTLS")
+                server.starttls()
+        
+        server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
+        server.send_message(msg)
+        server.quit()
+        return True
+                
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+        return False
+
 def send_recipient_notification_with_files(recipient_email, file_id, zip_filename, files_summary, total_size, smtp_config):
     """
     Envoie un email de notification au destinataire avec le résumé des fichiers
@@ -50,14 +79,9 @@ def send_recipient_notification_with_files(recipient_email, file_id, zip_filenam
         """
 
         msg.attach(MIMEText(body, 'plain'))
-
-        with smtplib.SMTP_SSL(smtp_config['smtp_server'], smtp_config['smtp_port']) as server:
-            server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
-            server.send_message(msg)
-            app.logger.info(f"Email de notification envoyé à {recipient_email}")
-            return True
+        return send_email_with_smtp(msg, smtp_config)
     except Exception as e:
-        app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+        app.logger.error(f"Erreur lors de la préparation de l'email : {str(e)}")
         return False
 
 def send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filename, files_summary, total_size, smtp_config):
@@ -87,14 +111,9 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filena
         """
 
         msg.attach(MIMEText(body, 'plain'))
-
-        with smtplib.SMTP_SSL(smtp_config['smtp_server'], smtp_config['smtp_port']) as server:
-            server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
-            server.send_message(msg)
-            app.logger.info(f"Email de confirmation envoyé à {sender_email}")
-            return True
+        return send_email_with_smtp(msg, smtp_config)
     except Exception as e:
-        app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+        app.logger.error(f"Erreur lors de la préparation de l'email : {str(e)}")
         return False
 
 @app.route('/upload', methods=['POST', 'OPTIONS'])
