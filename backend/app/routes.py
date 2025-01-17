@@ -286,7 +286,13 @@ def upload_file():
             with open(zip_path, 'rb') as f:
                 encrypted_data = hashlib.sha256(f.read()).hexdigest()
             
-            final_filename = zip_filename
+            final_filename = json.dumps({
+                'zip_name': zip_filename,
+                'files': [{
+                    'name': f['name'],
+                    'size': f['size']
+                } for f in file_list]
+            })
             final_path = zip_path
         else:
             # Cas d'un fichier unique
@@ -324,8 +330,15 @@ def upload_file():
             files_summary.append(f"- {f['name']} ({format_size(f['size'])})")
         
         files_summary = "\n".join(files_summary)
+        total_size = sum(f['size'] for f in file_list)
         total_size_formatted = format_size(total_size)
         app.logger.info(f"Résumé des fichiers:\n{files_summary}\nTaille totale: {total_size_formatted}")
+
+        # Stocker le résumé pour l'email de confirmation de téléchargement
+        app.config[f'files_summary_{file_id}'] = {
+            'summary': files_summary,
+            'total_size': total_size_formatted
+        }
 
         # Envoyer les notifications
         with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
@@ -392,12 +405,18 @@ def download_file(file_id):
             with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
                 smtp_config = json.load(config_file)
 
-            # Obtenir la taille du fichier
-            file_size = os.path.getsize(file_path)
-            formatted_size = format_size(file_size)
-
-            # Préparer le résumé des fichiers
-            files_summary = f"- {file_info.filename} ({formatted_size})"
+            # Récupérer le résumé des fichiers stocké lors de l'upload
+            stored_summary = app.config.get(f'files_summary_{file_id}')
+            if stored_summary:
+                files_summary = stored_summary['summary']
+                total_size_formatted = stored_summary['total_size']
+                # Nettoyer après utilisation
+                del app.config[f'files_summary_{file_id}']
+            else:
+                # Fallback si le résumé n'est pas trouvé
+                file_size = os.path.getsize(file_path)
+                files_summary = f"- {file_info.filename} ({format_size(file_size)})"
+                total_size_formatted = format_size(file_size)
 
             # Envoyer une notification à l'expéditeur
             msg = MIMEMultipart()
@@ -416,7 +435,7 @@ def download_file(file_id):
             Résumé des fichiers :
             {files_summary}
 
-            Taille totale : {formatted_size}
+            Taille totale : {total_size_formatted}
 
             Cordialement,
             L'équipe iTransfer
