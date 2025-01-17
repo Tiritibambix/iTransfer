@@ -287,9 +287,9 @@ def upload_file():
                     if parent_folder not in folders:
                         folders[parent_folder] = []
                     
-                    # Sauvegarder le fichier
+                    # Sauvegarder le fichier en préservant la structure exacte
                     full_path = os.path.join(temp_dir, clean_path)
-                    os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                    os.makedirs(os.path.dirname(full_path) if os.path.dirname(full_path) else temp_dir, exist_ok=True)
                     file.save(full_path)
                     
                     file_size = os.path.getsize(full_path)
@@ -311,7 +311,7 @@ def upload_file():
                 for root, _, files in os.walk(temp_dir):
                     for file in files:
                         file_path = os.path.join(root, file)
-                        # Préserver la structure exacte des dossiers
+                        # Préserver la structure exacte des dossiers sans créer de sous-dossiers supplémentaires
                         arcname = os.path.relpath(file_path, temp_dir)
                         zipf.write(file_path, arcname)
             
