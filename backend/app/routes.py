@@ -10,6 +10,7 @@ from email.mime.multipart import MIMEMultipart
 from email.utils import formatdate, make_msgid, formataddr
 from . import app, db
 from .models import FileUpload
+from .utils import send_email
 import zipfile
 import shutil
 from datetime import datetime
