@@ -328,24 +328,27 @@ function App() {
   };
 
   const showNotification = (message, type = 'info') => {
-    console.log(`Notification (${type}):`, message); // Toujours logger pour debug
+    // Log pour debug
+    console.log(`Notification (${type}):`, message);
     
-    if (!("Notification" in window)) {
-      console.log("Ce navigateur ne supporte pas les notifications desktop");
-      return;
+    // Préfixer le message selon le type
+    let prefix = '';
+    switch (type) {
+        case 'error':
+            prefix = '❌ Erreur : ';
+            break;
+        case 'success':
+            prefix = '✅ Succès : ';
+            break;
+        case 'warning':
+            prefix = '⚠️ Attention : ';
+            break;
+        default:
+            prefix = 'ℹ️ Info : ';
     }
-
-    if (Notification.permission === "granted") {
-      try {
-        new Notification("iTransfer", {
-          body: message,
-          icon: "/logo192.png",
-          tag: type // Ajouter un tag pour le type de notification
-        });
-      } catch (error) {
-        console.error("Erreur lors de l'envoi de la notification:", error);
-      }
-    }
+    
+    // Afficher l'alerte
+    alert(prefix + message);
   };
 
   const formatFileSize = (bytes) => {
