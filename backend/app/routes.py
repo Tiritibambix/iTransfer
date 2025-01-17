@@ -261,7 +261,7 @@ def send_recipient_notification_with_files(recipient_email, file_id, file_name, 
         message = f"""
 {sender_email} vous a envoyé des fichiers.
 
-Vous pouvez les télécharger en cliquant sur ce bouton :"""
+Vous pouvez les télécharger en cliquant ici :"""
 
         html, text = create_email_template(title, message, files_summary, total_size, download_link)
         
