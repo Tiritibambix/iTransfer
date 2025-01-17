@@ -91,6 +91,148 @@ def get_backend_url():
     app.logger.info(f"URL backend générée depuis la requête : {generated_url}")
     return generated_url
 
+def create_email_template(title, message, file_summary, total_size):
+    html = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            :root {{
+                --primary-color: #a88aa5;
+                --primary-dark: #693a67;
+                --surface-light: #f8f9fa;
+                --surface-dark: #423542;
+                --text-primary: #170017;
+                --text-secondary: #5a4e5a;
+            }}
+            
+            body {{
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+                line-height: 1.6;
+                color: var(--text-primary);
+                margin: 0;
+                padding: 0;
+                background-color: #f5f5f5;
+            }}
+            .container {{
+                max-width: 600px;
+                margin: 20px auto;
+                padding: 0;
+                background-color: #ffffff;
+                border-radius: 12px;
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+            }}
+            .header {{
+                text-align: center;
+                padding: 30px 0;
+                background: linear-gradient(135deg, var(--primary-dark), var(--primary-color));
+                border-radius: 12px 12px 0 0;
+                margin-bottom: 0;
+            }}
+            .header h1 {{
+                color: #ffffff;
+                margin: 0;
+                font-size: 28px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+            }}
+            .content {{
+                padding: 30px;
+                background-color: #ffffff;
+            }}
+            .message {{
+                margin-bottom: 30px;
+            }}
+            .message h2 {{
+                color: var(--primary-dark);
+                margin: 0 0 15px 0;
+                font-size: 22px;
+                font-weight: 500;
+            }}
+            .message p {{
+                color: var(--text-primary);
+                margin: 0;
+                font-size: 16px;
+                line-height: 1.6;
+            }}
+            .files {{
+                background-color: var(--surface-light);
+                padding: 20px;
+                border-radius: 8px;
+                font-family: 'Courier New', monospace;
+                white-space: pre-wrap;
+                color: var(--text-primary);
+                border: 1px solid rgba(0, 0, 0, 0.05);
+                margin: 20px 0;
+            }}
+            .total {{
+                margin-top: 20px;
+                padding: 15px 20px;
+                background-color: var(--primary-dark);
+                color: #ffffff;
+                border-radius: 8px;
+                font-weight: 500;
+                font-size: 16px;
+            }}
+            .footer {{
+                text-align: center;
+                padding: 20px;
+                color: var(--text-secondary);
+                font-size: 14px;
+                border-top: 1px solid rgba(0, 0, 0, 0.05);
+            }}
+            a {{
+                color: var(--primary-dark);
+                text-decoration: none;
+            }}
+            a:hover {{
+                text-decoration: underline;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <div class="header">
+                <h1>iTransfer</h1>
+            </div>
+            <div class="content">
+                <div class="message">
+                    <h2>{title}</h2>
+                    <p>{message}</p>
+                </div>
+                <div class="files">
+{file_summary}
+                </div>
+                <div class="total">
+                    {total_size}
+                </div>
+            </div>
+            <div class="footer">
+                <p>Envoyé via iTransfer</p>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+    
+    # Version texte brut pour les clients qui ne supportent pas l'HTML
+    text = f"""
+{title}
+
+{message}
+
+Résumé des fichiers :
+{file_summary}
+
+Taille totale : {total_size}
+
+Envoyé via iTransfer
+    """
+    
+    return html, text
+
 def send_recipient_notification_with_files(recipient_email, file_id, file_name, files_summary, total_size, smtp_config, sender_email):
     """
     Envoie un email de notification au destinataire avec le résumé des fichiers
@@ -100,36 +242,23 @@ def send_recipient_notification_with_files(recipient_email, file_id, file_name, 
         download_link = f"{backend_url}/download/{file_id}"
         app.logger.info(f"Lien de téléchargement généré : {download_link}")
 
-        msg = MIMEMultipart()
+        msg = MIMEMultipart('alternative')
         msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
         msg['To'] = recipient_email
         msg['Subject'] = f"{sender_email}: Nouveau transfert de fichiers."
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
 
-        body = f"""
-        Bonjour,
+        title = "Vous avez reçu des fichiers"
+        message = f"""
+{sender_email} vous a envoyé des fichiers.
+Vous pouvez les télécharger en cliquant sur ce lien : {download_link}"""
 
-        Vous avez reçu un nouveau transfert de fichiers de :
-        {sender_email}
-
-        Détails du transfert :
-        -------------------------
-        Résumé des fichiers :
-        {files_summary}
-
-        Taille totale : {total_size}
-
-        Lien de téléchargement : 
-        {download_link}
-
-        Ce lien expirera dans 7 jours.
-
-        Cordialement,
-        L'équipe iTransfer
-        """
-
-        msg.attach(MIMEText(body, 'plain'))
+        html, text = create_email_template(title, message, files_summary, total_size)
+        
+        msg.attach(MIMEText(text, 'plain'))
+        msg.attach(MIMEText(html, 'html'))
+        
         return send_email_with_smtp(msg, smtp_config)
     except Exception as e:
         app.logger.error(f"Erreur lors de la préparation de l'email : {str(e)}")
@@ -144,39 +273,23 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, file_name,
         download_link = f"{backend_url}/download/{file_id}"
         app.logger.info(f"Lien de téléchargement généré : {download_link}")
 
-        msg = MIMEMultipart()
+        msg = MIMEMultipart('alternative')
         msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
         msg['To'] = sender_email
         msg['Subject'] = f"Confirmation de votre transfert de fichiers à {recipient_email}"
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
 
-        body = f"""
-        Bonjour,
+        title = "Vos fichiers ont été envoyés"
+        message = f"""
+Vos fichiers ont été envoyés avec succès à :
+{recipient_email}"""
 
-        Votre transfert de fichiers a été effectué avec succès.
-
-        Détails du transfert :
-        -------------------------
-        Destinataire : {recipient_email}
-
-        Résumé des fichiers :
-        {files_summary}
-
-        Taille totale : {total_size}
+        html, text = create_email_template(title, message, files_summary, total_size)
         
-        Lien de téléchargement : 
-        {download_link}
-
-        Ce lien expirera dans 7 jours.
-
-        Une notification a été envoyée au destinataire.
-
-        Cordialement,
-        L'équipe iTransfer
-        """
-
-        msg.attach(MIMEText(body, 'plain'))
+        msg.attach(MIMEText(text, 'plain'))
+        msg.attach(MIMEText(html, 'html'))
+        
         return send_email_with_smtp(msg, smtp_config)
     except Exception as e:
         app.logger.error(f"Erreur lors de la préparation de l'email : {str(e)}")
@@ -412,29 +525,23 @@ def download_file(file_id):
                 total_size_formatted = format_size(file_size)
 
             # Envoyer une notification à l'expéditeur
-            msg = MIMEMultipart()
+            msg = MIMEMultipart('alternative')
             msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
             msg['To'] = file_info.sender_email
             msg['Subject'] = f"Vos fichiers ont été téléchargés par {file_info.email}"
             msg['Date'] = formatdate(localtime=True)
             msg['Message-ID'] = make_msgid()
 
-            body = f"""
-            Bonjour,
+            title = "Vos fichiers ont été téléchargés"
+            message = f"""
+Vos fichiers ont été téléchargés par :
+{file_info.email}"""
 
-            Vos fichiers ont été téléchargés par :
-            {file_info.email}
-
-            Résumé des fichiers :
-            {files_summary}
-
-            Taille totale : {total_size_formatted}
-
-            Cordialement,
-            L'équipe iTransfer
-            """
-
-            msg.attach(MIMEText(body, 'plain'))
+            html, text = create_email_template(title, message, files_summary, total_size_formatted)
+            
+            msg.attach(MIMEText(text, 'plain'))
+            msg.attach(MIMEText(html, 'html'))
+            
             send_email_with_smtp(msg, smtp_config)
 
         # Envoyer le fichier

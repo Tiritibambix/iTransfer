@@ -160,6 +160,23 @@ docker-compose up -d
 
 For production deployment behind a reverse proxy, use this `docker-compose.yml`:
 
+1. Set up the database initialization file:
+   - Either download [init.sql](https://github.com/tiritibambix/iTransfer/blob/main/backend/init.sql) and place it in `backend/init.sql`
+   - Or create the file manually at `backend/init.sql` with the following content:
+```sql
+CREATE TABLE IF NOT EXISTS file_upload (
+    id VARCHAR(36) PRIMARY KEY,
+    filename VARCHAR(256) NOT NULL,
+    email VARCHAR(256) NOT NULL,
+    sender_email VARCHAR(256) NOT NULL,
+    encrypted_data VARCHAR(256) NOT NULL,
+    downloaded BOOLEAN DEFAULT FALSE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+2. Create your `docker-compose.yml` for production development:
+
 ```yaml
 services:
   frontend:
