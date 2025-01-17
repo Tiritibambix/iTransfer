@@ -23,6 +23,80 @@ def format_size(bytes):
         bytes /= 1024
     return f"{bytes:.2f} PB"
 
+def send_recipient_notification_with_files(recipient_email, file_id, zip_filename, files_summary, total_size, smtp_config):
+    """
+    Envoie un email de notification au destinataire avec le résumé des fichiers
+    """
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
+        msg['To'] = recipient_email
+        msg['Subject'] = "Nouveau transfert de fichiers reçu"
+        msg['Date'] = formatdate(localtime=True)
+        msg['Message-ID'] = make_msgid()
+
+        body = f"""
+        Bonjour,
+
+        Vous avez reçu un nouveau transfert de fichiers.
+
+        Résumé des fichiers :
+        {files_summary}
+
+        Taille totale : {total_size}
+
+        Cordialement,
+        L'équipe iTransfer
+        """
+
+        msg.attach(MIMEText(body, 'plain'))
+
+        with smtplib.SMTP_SSL(smtp_config['smtp_server'], smtp_config['smtp_port']) as server:
+            server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
+            server.send_message(msg)
+            app.logger.info(f"Email de notification envoyé à {recipient_email}")
+            return True
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+        return False
+
+def send_sender_upload_confirmation_with_files(sender_email, file_id, zip_filename, files_summary, total_size, smtp_config):
+    """
+    Envoie un email de confirmation à l'expéditeur avec le résumé des fichiers envoyés
+    """
+    try:
+        msg = MIMEMultipart()
+        msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
+        msg['To'] = sender_email
+        msg['Subject'] = "Confirmation de votre transfert de fichiers"
+        msg['Date'] = formatdate(localtime=True)
+        msg['Message-ID'] = make_msgid()
+
+        body = f"""
+        Bonjour,
+
+        Votre transfert de fichiers a été effectué avec succès.
+
+        Résumé des fichiers envoyés :
+        {files_summary}
+
+        Taille totale : {total_size}
+
+        Cordialement,
+        L'équipe iTransfer
+        """
+
+        msg.attach(MIMEText(body, 'plain'))
+
+        with smtplib.SMTP_SSL(smtp_config['smtp_server'], smtp_config['smtp_port']) as server:
+            server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
+            server.send_message(msg)
+            app.logger.info(f"Email de confirmation envoyé à {sender_email}")
+            return True
+    except Exception as e:
+        app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
+        return False
+
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
     if request.method == 'OPTIONS':
