@@ -27,30 +27,34 @@ def send_email_with_smtp(msg, smtp_config):
     """
     Envoie un email en utilisant le mode de connexion approprié selon le port SMTP
     """
+    server = None
     try:
-        port = smtp_config['smtp_port']
-        server = None
-        
-        app.logger.info(f"Tentative de connexion SMTP sur le port {port}")
-        
-        if port == 465:  # SSL/TLS direct
-            app.logger.info("Utilisation du mode SSL/TLS direct")
+        # Choisir le type de connexion en fonction du port
+        port = int(smtp_config['smtp_port'])
+        if port == 465:
+            # Port 465 : SMTP_SSL
+            app.logger.info("Utilisation de SMTP_SSL (port 465)")
             server = smtplib.SMTP_SSL(smtp_config['smtp_server'], port)
-        else:  # STARTTLS ou non sécurisé
-            app.logger.info("Utilisation du mode STARTTLS ou non sécurisé")
+        else:
+            # Port 587 ou autre : SMTP + STARTTLS
+            app.logger.info(f"Utilisation de SMTP + STARTTLS (port {port})")
             server = smtplib.SMTP(smtp_config['smtp_server'], port)
-            if port == 587:  # STARTTLS
-                app.logger.info("Activation de STARTTLS")
-                server.starttls()
+            server.starttls()
         
         server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
         server.send_message(msg)
-        server.quit()
         return True
-                
+        
     except Exception as e:
         app.logger.error(f"Erreur lors de l'envoi de l'email : {str(e)}")
         return False
+        
+    finally:
+        if server:
+            try:
+                server.quit()
+            except Exception as e:
+                app.logger.error(f"Erreur lors de la fermeture de la connexion SMTP : {str(e)}")
 
 def send_recipient_notification_with_files(recipient_email, file_id, zip_filename, files_summary, total_size, smtp_config):
     """
