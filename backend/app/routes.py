@@ -163,7 +163,7 @@ Bonjour,
 
 Des fichiers ont été partagés avec vous via iTransfer.
 
-Archive ZIP : {zip_filename}
+Archive ZIP : {zip_name}
 Taille totale : {total_size_str}
 
 Contenu de l'archive :
@@ -197,7 +197,7 @@ L'équipe iTransfer"""
 
         # Créer le contenu HTML final
         html_content = html_template.format(
-            zip_name=zip_filename,
+            zip_name=zip_name,
             size=total_size_str,
             file_list='\n'.join(files_html),
             download_link=download_url
@@ -456,7 +456,7 @@ def format_size(size):
         size /= 1024.0
     return f"{size:.1f} PB"
 
-def send_recipient_notification_with_files(to_email, file_id, zip_filename, files_summary, total_size, smtp_config):
+def send_recipient_notification_with_files(to_email, file_id, zip_name, files_summary, total_size, smtp_config):
     """Envoie une notification au destinataire avec la liste des fichiers"""
     app.logger.info(f"Préparation de la notification pour le destinataire : {to_email}")
     backend_url = get_backend_url()
@@ -469,7 +469,7 @@ def send_recipient_notification_with_files(to_email, file_id, zip_filename, file
 
     Des fichiers ont été partagés avec vous via iTransfer.
 
-    Archive ZIP : {zip_filename}
+    Archive ZIP : {zip_name}
     Taille totale : {total_size}
 
     Contenu de l'archive :
@@ -489,7 +489,7 @@ def send_recipient_notification_with_files(to_email, file_id, zip_filename, file
         app.logger.error(f"Échec de l'envoi de la notification au destinataire : {to_email}")
     return success
 
-def send_sender_upload_confirmation_with_files(to_email, file_id, zip_filename, files_summary, total_size, smtp_config):
+def send_sender_upload_confirmation_with_files(to_email, file_id, zip_name, files_summary, total_size, smtp_config):
     """Envoie une confirmation à l'expéditeur avec la liste des fichiers"""
     app.logger.info(f"Préparation de la confirmation pour l'expéditeur : {to_email}")
     backend_url = get_backend_url()
@@ -502,7 +502,7 @@ def send_sender_upload_confirmation_with_files(to_email, file_id, zip_filename, 
 
     Vos fichiers ont été uploadés avec succès sur iTransfer.
 
-    Archive ZIP : {zip_filename}
+    Archive ZIP : {zip_name}
     Taille totale : {total_size}
 
     Contenu de l'archive :
