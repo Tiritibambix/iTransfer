@@ -271,8 +271,8 @@ def upload_file():
         
         if needs_zip:
             # Créer le ZIP avec la même structure
-            zip_filename = f"transfer_{file_id}.zip"
-            zip_path = os.path.join(app.config['UPLOAD_FOLDER'], zip_filename)
+            final_filename = f"transfer_{file_id}.zip"
+            zip_path = os.path.join(app.config['UPLOAD_FOLDER'], final_filename)
             app.logger.info(f"Création du ZIP: {zip_path}")
 
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
@@ -286,13 +286,6 @@ def upload_file():
             with open(zip_path, 'rb') as f:
                 encrypted_data = hashlib.sha256(f.read()).hexdigest()
             
-            final_filename = json.dumps({
-                'zip_name': zip_filename,
-                'files': [{
-                    'name': f['name'],
-                    'size': f['size']
-                } for f in file_list]
-            })
             final_path = zip_path
         else:
             # Cas d'un fichier unique
