@@ -59,9 +59,6 @@ JWT_SECRET_KEY = os.environ.get('JWT_SECRET_KEY')
 def send_notification_email(to_email, subject, message_content, smtp_config):
     server = None
     try:
-        backend_url = get_backend_url()
-        app.logger.info(f"URL backend pour l'email : {backend_url}")
-        
         # Créer un message MIME multipart
         msg = MIMEMultipart('alternative')
         
@@ -130,79 +127,14 @@ def send_notification_email(to_email, subject, message_content, smtp_config):
         </head>
         <body>
             <div class="container">
-                <div class="header">
-                    <p>Bonjour,</p>
-                    <p>Des fichiers ont été partagés avec vous via iTransfer.</p>
-                </div>
-                
-                <div class="info">
-                    <p><strong>Archive ZIP :</strong> {zip_filename}</p>
-                    <p><strong>Taille totale :</strong> {total_size}</p>
-                </div>
-                
-                <div class="files">
-                    <strong>Contenu de l'archive :</strong><br>
-                    {files}
-                </div>
-                
-                <a href="{download_url}" class="download-link">Télécharger les fichiers</a>
-                
-                <p class="expiry">Ce lien expirera dans 7 jours.</p>
-                
-                <div class="footer">
-                    <p>Cordialement,<br>L'équipe iTransfer</p>
-                </div>
+                {message_content}
             </div>
         </body>
         </html>
         '''
         
-        # Créer le contenu du message
-        message_content = f"""
-Bonjour,
-
-Des fichiers ont été partagés avec vous via iTransfer.
-
-Archive ZIP : {zip_filename}
-Taille totale : {total_size_str}
-
-Contenu de l'archive :
-{file_list_str}
-
-Lien de téléchargement : {download_url}
-
-Ce lien expirera dans 7 jours.
-
-Cordialement,
-L'équipe iTransfer"""
-
-        # Formater la liste des fichiers pour HTML
-        files_html = []
-        current_folder = None
-        
-        for line in file_list_str.split('\n'):
-            line = line.strip()
-            if not line:
-                continue
-                
-            if line.startswith('Dossier '):
-                current_folder = line.replace('Dossier ', '')
-                files_html.append(f'<div style="margin-top: 10px;"><strong>{current_folder}</strong></div>')
-            else:
-                file_info = line.strip('- ')
-                if current_folder:
-                    files_html.append(f'<div style="margin-left: 20px;">└─ {file_info}</div>')
-                else:
-                    files_html.append(f'<div>• {file_info}</div>')
-
         # Créer le contenu HTML final
-        html_content = html_template.format(
-            zip_filename=zip_filename,
-            total_size=total_size_str,
-            files='\n'.join(files_html),
-            download_url=download_url
-        )
-        
+        html_content = html_template.format(message_content=message_content.replace('\n', '<br>'))
         html_part = MIMEText(html_content, 'html', 'utf-8')
         msg.attach(html_part)
         
