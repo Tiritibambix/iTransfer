@@ -308,12 +308,12 @@ def upload_file():
             zip_path = os.path.join(app.config['UPLOAD_FOLDER'], zip_filename)
             
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for root, _, files in os.walk(temp_dir):
-                    for file in files:
-                        file_path = os.path.join(root, file)
-                        # Préserver la structure exacte des dossiers sans créer de sous-dossiers supplémentaires
-                        arcname = os.path.relpath(file_path, temp_dir)
-                        zipf.write(file_path, arcname)
+                # Au lieu d'utiliser os.walk, on utilise directement la liste des fichiers qu'on a déjà
+                for folder_name, folder_files in folders.items():
+                    for file_info in folder_files:
+                        file_path = os.path.join(temp_dir, file_info['name'])
+                        # Utiliser directement le nom relatif comme arcname
+                        zipf.write(file_path, file_info['name'])
             
             with open(zip_path, 'rb') as f:
                 encrypted_data = hashlib.sha256(f.read()).hexdigest()
