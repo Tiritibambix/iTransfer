@@ -310,21 +310,28 @@ Lien de téléchargement : <a href="{download_link}" class="link">{download_link
 
 def send_download_notification(sender_email, file_id, smtp_config):
     try:
+        # Vérifier que nous avons toutes les valeurs requises
+        if not sender_email or not smtp_config or not smtp_config.get('smtp_sender_email'):
+            app.logger.error("Informations manquantes pour l'envoi de l'email")
+            return False
+
         # Récupérer le fuseau horaire configuré
         timezone = pytz.timezone(app.config.get('TIMEZONE', 'Europe/Paris'))
         # Obtenir l'heure actuelle dans le bon fuseau horaire
         download_time = datetime.now(timezone).strftime('%d/%m/%Y à %H:%M:%S (%Z)')
         
+        # Récupérer les informations des fichiers
         files_info = app.config.get(f'files_summary_{file_id}', {})
         files_summary = files_info.get('summary', 'Information non disponible')
         total_size = files_info.get('total_size', 'Taille non disponible')
 
+        # Créer le message avec des valeurs par défaut si nécessaire
         msg = MIMEMultipart('alternative')
         msg['Subject'] = "Vos fichiers ont été téléchargés"
-        msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
+        msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', 'no-reply@itransfer.local')))
         msg['To'] = sender_email
         msg['Date'] = formatdate(localtime=True)
-        msg['Message-ID'] = make_msgid()
+        msg['Message-ID'] = make_msgid(domain=smtp_config.get('smtp_sender_email', 'itransfer.local').split('@')[-1])
 
         body = f"""Bonjour,
 
@@ -336,7 +343,13 @@ Fichiers téléchargés :
 Cordialement,
 L'équipe iTransfer"""
 
-        msg.attach(MIMEText(body, 'plain'))
+        msg.attach(MIMEText(body, 'plain', 'utf-8'))
+        
+        # Log pour le debug
+        app.logger.info(f"Préparation de l'email de confirmation pour {sender_email}")
+        app.logger.info(f"Contenu du message : {body}")
+        app.logger.info(f"Configuration SMTP : {smtp_config}")
+
         return send_email_with_smtp(msg, smtp_config)
     except Exception as e:
         app.logger.error(f"Erreur lors de l'envoi de la notification de téléchargement: {str(e)}")
