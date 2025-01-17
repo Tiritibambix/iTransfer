@@ -579,38 +579,18 @@ function App() {
         )}
 
         {progress > 0 && (
-          <div className="progress-container" style={{
-            marginBottom: 'clamp(1rem, 3vw, 2rem)'
-          }}>
-            <div className="progress-bar" style={{
-              height: '4px',
-              backgroundColor: 'var(--clr-surface-a30)',
-              borderRadius: '2px',
-              overflow: 'hidden'
-            }}>
-              <div style={{
-                width: `${progress}%`,
-                height: '100%',
-                backgroundColor: 'var(--clr-primary-a40)',
-                transition: 'width 0.3s ease'
-              }} />
+          <div className="progress-container">
+            <div className="progress-bar" style={{ width: `${progress}%` }} />
+            <div className="progress-info">
+              <span className="progress-text">{progress}% uploadé</span>
+              <button 
+                className="cancel-button"
+                onClick={cancelUpload}
+                aria-label="Annuler l'upload"
+              >
+                Annuler
+              </button>
             </div>
-            <p style={{ 
-              margin: '0.5rem 0 0 0',
-              fontSize: 'clamp(0.875rem, 2vw, 1rem)'
-            }}>
-              {progress}% uploadé
-            </p>
-            <button 
-              onClick={cancelUpload}
-              style={{
-                backgroundColor: 'var(--clr-surface-a30)',
-                fontSize: 'clamp(0.875rem, 2vw, 1rem)',
-                padding: 'clamp(0.5rem, 2vw, 0.75rem) clamp(1rem, 3vw, 1.5rem)'
-              }}
-            >
-              Annuler
-            </button>
           </div>
         )}
 

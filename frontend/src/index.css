@@ -142,6 +142,51 @@ button:disabled {
   background-color: var(--clr-surface-a30);
 }
 
+/* Progress bar styles */
+.progress-container {
+  margin: var(--spacing-md) 0;
+  background: var(--clr-surface-a20);
+  border-radius: 8px;
+  padding: var(--spacing-md);
+  position: relative;
+}
+
+.progress-bar {
+  height: 8px;
+  background: linear-gradient(90deg, var(--clr-primary-a30) 0%, var(--clr-primary-a40) 100%);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--spacing-sm);
+}
+
+.progress-text {
+  font-size: var(--font-size-sm);
+  color: var(--clr-primary-a50);
+}
+
+.cancel-button {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: var(--font-size-xs);
+  background-color: var(--clr-surface-a30);
+  color: var(--clr-primary-a50);
+  border: 1px solid var(--clr-surface-a40);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.cancel-button:hover {
+  background-color: var(--clr-surface-a40);
+  color: white;
+}
+
 /* Accessibility */
 @media (prefers-reduced-motion: reduce) {
   * {
