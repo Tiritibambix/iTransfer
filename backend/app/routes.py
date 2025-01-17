@@ -379,7 +379,7 @@ def download_file(file_id):
             msg = MIMEMultipart()
             msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
             msg['To'] = file_info.sender_email
-            msg['Subject'] = f"Vos fichiers ont été téléchargés par {file_info.recipient_email}"
+            msg['Subject'] = f"Vos fichiers ont été téléchargés par {file_info.email}"
             msg['Date'] = formatdate(localtime=True)
             msg['Message-ID'] = make_msgid()
 
@@ -387,7 +387,7 @@ def download_file(file_id):
             Bonjour,
 
             Vos fichiers ont été téléchargés par :
-            {file_info.recipient_email}
+            {file_info.email}
 
             Fichier : {file_info.filename}
 
