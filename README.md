@@ -12,15 +12,21 @@ iTransfer is a secure file transfer system that allows users to share files and 
 - 🌐 Support for reverse proxy deployment
 - 🔐 HTTPS enforcement in production
 - 🔌 Flexible port configuration
+- 📁 Smart file handling (ZIP for multiple files, direct download for single files)
+- 📝 Detailed file listings in all notifications
 
 ## Email Notifications
 
 The system sends three types of email notifications:
-1. To the recipient when a file is uploaded
-2. To the sender when their file is uploaded
-3. To the sender when their file is downloaded
+1. To the recipient when a file is uploaded (includes detailed file list)
+2. To the sender when their file is uploaded (includes detailed file list)
+3. To the sender when their file is downloaded (includes detailed file list)
 
-All emails are sent using a professional HTML template with both HTML and plain text versions for maximum compatibility.
+All notifications include:
+- Complete list of transferred files with sizes
+- Total transfer size
+- Download link (when applicable)
+- Professional HTML template with both HTML and plain text versions
 
 ### Email Delivery Features
 
@@ -34,6 +40,15 @@ All emails are sent using a professional HTML template with both HTML and plain 
 - Professional HTML templates
 - Multipart emails (HTML + plain text)
 - Anti-spam measures
+
+### File Handling Features
+
+- Smart compression:
+  - Multiple files are automatically compressed into a ZIP
+  - Single files are transferred directly without compression
+- Folder structure preservation in ZIP files
+- Human-readable file sizes (KB, MB, GB)
+- Detailed file listings in all notifications
 
 ## Installation
 
