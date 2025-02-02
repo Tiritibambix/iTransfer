@@ -594,3 +594,105 @@ def login():
         return jsonify({'token': token}), 200
     
     return jsonify({'error': 'Invalid credentials'}), 401
+
+@app.route('/api/save-smtp-settings', methods=['POST'])
+def save_smtp_settings():
+    """
+    Sauvegarde la configuration SMTP
+    """
+    try:
+        app.logger.info("Réception d'une nouvelle configuration SMTP")
+        data = request.get_json()
+        
+        # Validation des données requises
+        required_fields = ['smtpServer', 'smtpPort', 'smtpUser', 'smtpPassword', 'smtpSenderEmail']
+        for field in required_fields:
+            if not data.get(field):
+                app.logger.error(f"Champ manquant : {field}")
+                return jsonify({'error': f'Le champ {field} est requis'}), 400
+
+        # Formater la configuration
+        smtp_config = {
+            'smtp_server': data['smtpServer'],
+            'smtp_port': data['smtpPort'],
+            'smtp_user': data['smtpUser'],
+            'smtp_password': data['smtpPassword'],
+            'smtp_sender_email': data['smtpSenderEmail']
+        }
+
+        app.logger.info(f"Configuration SMTP : serveur={smtp_config['smtp_server']}, port={smtp_config['smtp_port']}, user={smtp_config['smtp_user']}, sender={smtp_config['smtp_sender_email']}")
+        
+        # Sauvegarder la configuration
+        with open(app.config['SMTP_CONFIG_PATH'], 'w') as config_file:
+            json.dump(smtp_config, config_file, indent=2)
+        
+        app.logger.info("Configuration SMTP sauvegardée avec succès")
+        return jsonify({'message': 'Configuration SMTP sauvegardée'}), 200
+
+    except Exception as e:
+        app.logger.error(f"Erreur lors de la sauvegarde de la configuration SMTP : {str(e)}")
+        return jsonify({'error': f'Erreur lors de la sauvegarde : {str(e)}'}), 500
+
+@app.route('/api/test-smtp', methods=['POST'])
+def test_smtp():
+    """
+    Teste la configuration SMTP en envoyant un email de test
+    """
+    try:
+        app.logger.info("Début du test SMTP")
+        
+        # Charger la configuration SMTP
+        try:
+            with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
+                smtp_config = json.load(config_file)
+                app.logger.info(f"Configuration SMTP chargée : serveur={smtp_config['smtp_server']}, port={smtp_config['smtp_port']}, user={smtp_config['smtp_user']}, sender={smtp_config['smtp_sender_email']}")
+        except Exception as e:
+            app.logger.error(f"Erreur lors du chargement de la configuration SMTP : {str(e)}")
+            return jsonify({'error': 'Configuration SMTP non trouvée. Veuillez d\'abord configurer les paramètres SMTP.'}), 404
+
+        # Créer un message de test
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['From'] = formataddr(("iTransfer", smtp_config['smtp_sender_email']))
+            msg['To'] = smtp_config['smtp_sender_email']
+            msg['Subject'] = "Test de configuration SMTP"
+            msg['Date'] = formatdate(localtime=True)
+            msg['Message-ID'] = make_msgid()
+
+            text = "Ceci est un message de test pour vérifier la configuration SMTP."
+            html = f"""
+            <html>
+              <body>
+                <p>Ceci est un message de test pour vérifier la configuration SMTP.</p>
+                <p>Si vous recevez ce message, la configuration SMTP est correcte.</p>
+                <hr>
+                <p><b>Détails de la configuration :</b></p>
+                <ul>
+                    <li>Serveur : {smtp_config['smtp_server']}</li>
+                    <li>Port : {smtp_config['smtp_port']}</li>
+                    <li>Utilisateur : {smtp_config['smtp_user']}</li>
+                    <li>Email expéditeur : {smtp_config['smtp_sender_email']}</li>
+                </ul>
+              </body>
+            </html>
+            """
+
+            msg.attach(MIMEText(text, 'plain'))
+            msg.attach(MIMEText(html, 'html'))
+            app.logger.info("Message de test créé avec succès")
+
+        except Exception as e:
+            app.logger.error(f"Erreur lors de la création du message de test : {str(e)}")
+            return jsonify({'error': f'Erreur lors de la création du message : {str(e)}'}), 500
+
+        # Tenter d'envoyer l'email
+        if send_email_with_smtp(msg, smtp_config):
+            app.logger.info("Test SMTP réussi")
+            return jsonify({'message': 'Test SMTP réussi! Un email de test a été envoyé.'}), 200
+        else:
+            app.logger.error("Échec de l'envoi du message de test")
+            return jsonify({'error': 'Échec du test SMTP. Vérifiez les logs pour plus de détails.'}), 500
+
+    except Exception as e:
+        app.logger.error(f"Erreur inattendue lors du test SMTP : {str(e)}")
+        return jsonify({'error': f'Erreur lors du test SMTP : {str(e)}'}), 500
