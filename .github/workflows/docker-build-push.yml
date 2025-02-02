@@ -44,7 +44,9 @@ jobs:
         file: ./backend/Dockerfile
         push: true
         platforms: linux/amd64
-        tags: tiritibambix/itransfer-backend:amd64
+        tags: |
+          tiritibambix/itransfer-backend:amd64
+          tiritibambix/itransfer-backend:latest-amd64
 
     - name: Build and Push Frontend (amd64)
       uses: docker/build-push-action@v6
@@ -53,7 +55,9 @@ jobs:
         file: ./frontend/Dockerfile
         push: true
         platforms: linux/amd64
-        tags: tiritibambix/itransfer-frontend:amd64
+        tags: |
+          tiritibambix/itransfer-frontend:amd64
+          tiritibambix/itransfer-frontend:latest-amd64
 
   build-push-arm64:
     runs-on: ubuntu-latest  # Peut être remplacé par un runner ARM natif
@@ -81,7 +85,9 @@ jobs:
         file: ./backend/Dockerfile
         push: true
         platforms: linux/arm64
-        tags: tiritibambix/itransfer-backend:arm64
+        tags: |
+          tiritibambix/itransfer-backend:arm64
+          tiritibambix/itransfer-backend:latest-arm64
 
     - name: Build and Push Frontend (arm64)
       uses: docker/build-push-action@v6
@@ -90,7 +96,9 @@ jobs:
         file: ./frontend/Dockerfile
         push: true
         platforms: linux/arm64
-        tags: tiritibambix/itransfer-frontend:arm64
+        tags: |
+          tiritibambix/itransfer-frontend:arm64
+          tiritibambix/itransfer-frontend:latest-arm64
 
   create-manifest:
     needs: [build-push-amd64, build-push-arm64]
@@ -106,13 +114,13 @@ jobs:
     - name: Create and Push Docker Manifest for Backend
       run: |
         docker manifest create tiritibambix/itransfer-backend:latest \
-          --amend tiritibambix/itransfer-backend:amd64 \
-          --amend tiritibambix/itransfer-backend:arm64
+          --amend tiritibambix/itransfer-backend:latest-amd64 \
+          --amend tiritibambix/itransfer-backend:latest-arm64
         docker manifest push tiritibambix/itransfer-backend:latest
 
     - name: Create and Push Docker Manifest for Frontend
       run: |
         docker manifest create tiritibambix/itransfer-frontend:latest \
-          --amend tiritibambix/itransfer-frontend:amd64 \
-          --amend tiritibambix/itransfer-frontend:arm64
+          --amend tiritibambix/itransfer-frontend:latest-amd64 \
+          --amend tiritibambix/itransfer-frontend:latest-arm64
         docker manifest push tiritibambix/itransfer-frontend:latest
