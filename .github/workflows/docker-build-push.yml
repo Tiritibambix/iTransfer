@@ -26,9 +26,12 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # Étape 2 : Configurer Docker Buildx
+    # Étape 2 : Configurer Docker Buildx pour le multi-arch
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
+      with:
+        install: true
+        use: true
 
     # Étape 3 : Connexion à Docker Hub
     - name: Log in to Docker Hub
@@ -47,19 +50,29 @@ jobs:
         pip-check"
 
     # Étape 5 : Construire et pousser l'image Docker pour le backend
-    - name: Build and Push Backend
+    - name: Build and Push Backend (Multi-Arch)
       uses: docker/build-push-action@v6
       with:
         context: .
         file: ./backend/Dockerfile
         push: true
-        tags: tiritibambix/itransfer-backend:latest
+        platforms: linux/amd64,linux/arm64
+        tags: |
+          tiritibambix/itransfer-backend:latest
+        cache-from: type=registry,ref=tiritibambix/itransfer-backend:buildcache
+        cache-to: type=registry,ref=tiritibambix/itransfer-backend:buildcache,mode=max
+        provenance: false
 
     # Étape 6 : Construire et pousser l'image Docker pour le frontend
-    - name: Build and Push Frontend
+    - name: Build and Push Frontend (Multi-Arch)
       uses: docker/build-push-action@v6
       with:
         context: .
         file: ./frontend/Dockerfile
         push: true
-        tags: tiritibambix/itransfer-frontend:latest
+        platforms: linux/amd64,linux/arm64
+        tags: |
+          tiritibambix/itransfer-frontend:latest
+        cache-from: type=registry,ref=tiritibambix/itransfer-frontend:buildcache
+        cache-to: type=registry,ref=tiritibambix/itransfer-frontend:buildcache,mode=max
+        provenance: false
