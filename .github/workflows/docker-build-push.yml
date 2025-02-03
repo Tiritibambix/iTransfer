@@ -53,9 +53,10 @@ jobs:
           docker run --rm -v $(pwd):/app -w /app python:3.10-slim sh -c " \
           python -m venv venv && \
           . venv/bin/activate && \
+          pip install --upgrade pip setuptools && \
           pip install pip-audit && \
           pip-audit"
-
+          
   build-push-backend:
     runs-on: ubuntu-24.04
     needs: [setup, audit]
