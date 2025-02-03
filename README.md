@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-amd64%20%7C%20arm64-blue" alt="Platform Support" />
+</p>
+
+
 # iTransfer - Secure File Transfer System
 
 iTransfer is a secure file transfer system that allows users to share files and receive email notifications when files are uploaded and downloaded.
