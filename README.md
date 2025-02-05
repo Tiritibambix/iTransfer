@@ -40,6 +40,9 @@ iTransfer is a secure file transfer system that allows users to share files and 
   - 🔌 Flexible port configuration
 - **Smart File Handling**: 
   - 📁 Smart file handling (ZIP for multiple files, direct download for single files)
+- **Download Link Expiration**: 
+  - ⏰ Download links expire after a set period (3, 5, 7, or 10 days)
+  - 🕒 Automatic cleanup of expired files
 
 ## Email Notifications
 
