@@ -1,4 +1,8 @@
 <p align="center">
+  <img src="https://raw.githubusercontent.com/tiritibambix/iTransfer/main/static/media/iTransfer%20Bannière.png" width="400" />
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/Platform-amd64%20%7C%20arm64-blue" alt="Platform Support" />
 </p>
 

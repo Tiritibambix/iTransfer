@@ -451,16 +451,34 @@ function App() {
         alignItems: 'center',
         marginBottom: 'clamp(1rem, 3vw, 2rem)',
         flexWrap: 'wrap',
-        gap: '1rem'
+        gap: 'clamp(0.5rem, 2vw, 1rem)'
       }}>
-        <h1 style={{
-          fontSize: 'clamp(1.5rem, 5vw, 2.5rem)',
-          margin: 0,
-          background: 'linear-gradient(45deg, var(--clr-primary-a40), var(--clr-primary-a30))',
-          WebkitBackgroundClip: 'text',
-          WebkitTextFillColor: 'transparent',
-          flex: '1 1 auto'
-        }}>iTransfer</h1>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 'clamp(0.5rem, 2vw, 1rem)',
+          flex: '1 1 auto',
+          minWidth: '200px'
+        }}>
+          <h1 style={{
+            fontSize: 'clamp(1.2rem, 4vw, 2.5rem)',
+            margin: 0,
+            background: 'linear-gradient(45deg, var(--clr-primary-a40), var(--clr-primary-a30))',
+            WebkitBackgroundClip: 'text',
+            WebkitTextFillColor: 'transparent',
+            flex: '0 1 auto'
+          }}>iTransfer</h1>
+          <img 
+            src="../static/media/iTransfer logo.png" 
+            alt="iTransfer Logo" 
+            style={{
+              height: 'clamp(1.2rem, 4vw, 2.5rem)',
+              width: 'auto',
+              objectFit: 'contain',
+              flexShrink: 0
+            }}
+          />
+        </div>
         <button 
           onClick={() => navigate('/smtp-settings')}
           style={{
