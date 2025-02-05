@@ -5,5 +5,6 @@ CREATE TABLE IF NOT EXISTS file_upload (
     sender_email VARCHAR(256) NOT NULL,
     encrypted_data VARCHAR(256) NOT NULL,
     downloaded BOOLEAN DEFAULT FALSE,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL
 );
