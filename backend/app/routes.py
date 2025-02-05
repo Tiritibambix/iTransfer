@@ -383,7 +383,7 @@ def cleanup_expired_files():
         app.logger.error(f"Erreur lors du nettoyage des fichiers expirés: {str(e)}")
 
 def run_scheduler():
-    schedule.every(1).hours.do(cleanup_expired_files)
+    schedule.every(12).hours.do(cleanup_expired_files)
     while True:
         schedule.run_pending()
         time.sleep(3600)  # Attendre 1 heure
