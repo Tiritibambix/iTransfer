@@ -465,7 +465,7 @@ function App() {
             src={banner}
             alt="iTransfer"
             style={{
-              height: 'clamp(1.2rem, 4vw, 2.5rem)',
+              height: 'clamp(2rem, 6vw, 3rem)',
               width: 'auto',
               objectFit: 'contain'
             }}
