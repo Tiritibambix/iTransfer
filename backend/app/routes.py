@@ -274,10 +274,7 @@ def send_recipient_notification_with_files(recipient_email, file_id, file_name, 
         msg['Message-ID'] = make_msgid()
 
         title = "Vous avez reçu des fichiers"
-        message = f"""
-{sender_email} vous a envoyé des fichiers.
-
-Ce lien expirera le {expiration_formatted}"""
+        message = f"""{sender_email} vous a envoyé des fichiers.<br><br>Ce lien expirera le {expiration_formatted}"""
 
         html, text = create_email_template(title, message, files_summary, total_size, download_link)
         
@@ -306,9 +303,7 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, file_name,
         msg['Message-ID'] = make_msgid()
 
         title = "Vos fichiers ont été envoyés"
-        message = f"""Vos fichiers ont été envoyés avec succès à : {recipient_email}
-
-Lien de téléchargement : {download_link}"""
+        message = f"""Vos fichiers ont été envoyés avec succès à : {recipient_email}<br><br>Lien de téléchargement : {download_link}"""
 
         html, text = create_email_template(title, message, files_summary, total_size)
         
