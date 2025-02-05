@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import JSZip from 'jszip';
-import logo from './assets/iTransfer logo.png';
+import banner from './assets/iTransfer Bannière.png';
 
 function App() {
   const navigate = useNavigate();
@@ -461,22 +461,13 @@ function App() {
           flex: '1 1 auto',
           minWidth: '200px'
         }}>
-          <h1 style={{
-            fontSize: 'clamp(1.2rem, 4vw, 2.5rem)',
-            margin: 0,
-            background: 'linear-gradient(45deg, var(--clr-primary-a40), var(--clr-primary-a30))',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            flex: '0 1 auto'
-          }}>iTransfer</h1>
           <img 
-            src={logo}
-            alt="iTransfer Logo" 
+            src={banner}
+            alt="iTransfer"
             style={{
-              height: 'clamp(1.2rem, 4vw, 2.5rem)',
+              height: 'clamp(2rem, 6vw, 3rem)',
               width: 'auto',
-              objectFit: 'contain',
-              flexShrink: 0
+              objectFit: 'contain'
             }}
           />
         </div>
