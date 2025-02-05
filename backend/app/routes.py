@@ -12,8 +12,11 @@ from . import app, db
 from .models import FileUpload
 import zipfile
 import shutil
-from datetime import datetime
+from datetime import datetime, timedelta
 import pytz
+import schedule
+import time
+import threading
 
 def format_size(bytes):
     """
@@ -342,6 +345,40 @@ L'équipe iTransfer"""
         app.logger.error(f"Erreur lors de l'envoi de la notification de téléchargement: {str(e)}")
         return False
 
+def cleanup_expired_files():
+    try:
+        # Récupérer tous les fichiers expirés
+        expired_files = FileUpload.query.filter(FileUpload.expires_at < datetime.now()).all()
+        
+        for file in expired_files:
+            try:
+                # Supprimer le fichier physique
+                file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                    app.logger.info(f"Fichier expiré supprimé: {file_path}")
+                
+                # Supprimer l'entrée de la base de données
+                db.session.delete(file)
+                app.logger.info(f"Entrée de base de données supprimée pour le fichier: {file.id}")
+            except Exception as e:
+                app.logger.error(f"Erreur lors de la suppression du fichier {file.id}: {str(e)}")
+        
+        db.session.commit()
+        app.logger.info("Nettoyage des fichiers expirés terminé")
+    except Exception as e:
+        app.logger.error(f"Erreur lors du nettoyage des fichiers expirés: {str(e)}")
+
+def run_scheduler():
+    schedule.every(1).hours.do(cleanup_expired_files)
+    while True:
+        schedule.run_pending()
+        time.sleep(3600)  # Attendre 1 heure
+
+# Démarrer le scheduler dans un thread séparé
+scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
+scheduler_thread.start()
+
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
     if request.method == 'OPTIONS':
@@ -360,6 +397,13 @@ def upload_file():
         paths = request.form.getlist('paths[]')
         email = request.form.get('email')
         sender_email = request.form.get('sender_email')
+        expiration_days = int(request.form.get('expiration_days', '7'))
+        
+        # Valider la durée d'expiration
+        if expiration_days not in [3, 5, 7, 10]:
+            expiration_days = 7  # Valeur par défaut si invalide
+            
+        app.logger.info(f"Durée d'expiration choisie: {expiration_days} jours")
         
         if not email or not sender_email:
             return jsonify({'error': 'Email addresses are required'}), 400
@@ -472,7 +516,8 @@ def upload_file():
             email=email,
             sender_email=sender_email,
             encrypted_data=encrypted_data,
-            downloaded=False
+            downloaded=False,
+            expires_at=datetime.now() + timedelta(days=expiration_days)
         )
         db.session.add(new_file)
         db.session.commit()
@@ -535,7 +580,13 @@ def download_file(file_id):
         # Récupérer les informations du fichier depuis la base de données
         file_info = FileUpload.query.get(file_id)
         if not file_info:
+            app.logger.error(f"Fichier non trouvé: {file_id}")
             return jsonify({'error': 'Fichier non trouvé'}), 404
+
+        # Vérifier l'expiration
+        if datetime.now() > file_info.expires_at:
+            app.logger.info(f"Tentative d'accès à un fichier expiré: {file_id}")
+            return jsonify({'error': 'Le lien de téléchargement a expiré'}), 410
 
         # Construire le chemin du fichier
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_info.filename)

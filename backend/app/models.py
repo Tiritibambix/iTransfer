@@ -9,3 +9,4 @@ class FileUpload(db.Model):
     encrypted_data = db.Column(db.String(256), nullable=False)
     downloaded = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
+    expires_at = db.Column(db.DateTime, nullable=False)

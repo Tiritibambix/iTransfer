@@ -7,6 +7,7 @@ function App() {
   const [progress, setProgress] = useState(0);
   const [recipientEmail, setRecipientEmail] = useState('');
   const [senderEmail, setSenderEmail] = useState('');
+  const [expirationDays, setExpirationDays] = useState(7);
   const [dragActive, setDragActive] = useState(false);
   const [uploadedItems, setUploadedItems] = useState([]);
   const [draggedFiles, setDraggedFiles] = useState(null);
@@ -290,6 +291,7 @@ function App() {
       const formData = new FormData();
       formData.append('email', recipientEmail);
       formData.append('sender_email', senderEmail);
+      formData.append('expiration_days', expirationDays);
 
       // Préparer la liste des fichiers pour les emails
       const filesList = uploadedItems.map(item => ({
@@ -519,6 +521,40 @@ function App() {
               boxSizing: 'border-box'
             }}
           />
+        </div>
+
+        <div style={{
+          marginBottom: 'clamp(1rem, 3vw, 1.5rem)',
+          backgroundColor: 'var(--clr-surface-a20)',
+          padding: 'clamp(0.75rem, 2vw, 1rem)',
+          borderRadius: '6px'
+        }}>
+          <label style={{
+            display: 'block',
+            marginBottom: 'clamp(0.5rem, 1vw, 0.75rem)',
+            color: 'var(--clr-primary-a40)',
+            fontSize: 'clamp(0.875rem, 2vw, 1rem)'
+          }}>
+            Expiration du lien
+          </label>
+          <select
+            value={expirationDays}
+            onChange={(e) => setExpirationDays(parseInt(e.target.value))}
+            style={{
+              width: '100%',
+              padding: 'clamp(0.5rem, 2vw, 0.75rem)',
+              backgroundColor: 'var(--clr-surface-a30)',
+              color: 'var(--clr-primary-a50)',
+              border: '1px solid var(--clr-surface-a40)',
+              borderRadius: '4px',
+              fontSize: 'clamp(0.875rem, 2vw, 1rem)'
+            }}
+          >
+            <option value="3">3 jours</option>
+            <option value="5">5 jours</option>
+            <option value="7">7 jours</option>
+            <option value="10">10 jours</option>
+          </select>
         </div>
 
         <div 
