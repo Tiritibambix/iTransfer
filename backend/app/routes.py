@@ -277,8 +277,6 @@ def send_recipient_notification_with_files(recipient_email, file_id, file_name, 
         message = f"""
 {sender_email} vous a envoyé des fichiers.
 
-Vous pouvez les télécharger en cliquant ici :
-
 Ce lien expirera le {expiration_formatted}"""
 
         html, text = create_email_template(title, message, files_summary, total_size, download_link)
@@ -308,14 +306,9 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, file_name,
         msg['Message-ID'] = make_msgid()
 
         title = "Vos fichiers ont été envoyés"
-        message = f"""
-Vos fichiers ont été envoyés avec succès à :
-{recipient_email}
+        message = f"""Vos fichiers ont été envoyés avec succès à : {recipient_email}
 
-Lien de téléchargement :
-<a href="{download_link}" class="link">{download_link}</a>
-
-"""
+Lien de téléchargement : {download_link}"""
 
         html, text = create_email_template(title, message, files_summary, total_size)
         
@@ -334,9 +327,11 @@ def send_download_notification(sender_email, file_id, smtp_config):
         # Obtenir l'heure actuelle dans le bon fuseau horaire
         download_time = datetime.now(timezone).strftime('%d/%m/%Y à %H:%M:%S (%Z)')
         
-        files_info = app.config.get(f'files_summary_{file_id}', {})
-        files_summary = files_info.get('summary', 'Information non disponible')
-        total_size = files_info.get('total_size', 'Taille non disponible')
+        # Récupérer les informations du fichier
+        file_info = FileUpload.query.get(file_id)
+        if not file_info:
+            app.logger.error(f"Fichier non trouvé pour l'envoi de notification: {file_id}")
+            return False
 
         msg = MIMEMultipart('alternative')
         msg['Subject'] = "Vos fichiers ont été téléchargés"
@@ -345,17 +340,18 @@ def send_download_notification(sender_email, file_id, smtp_config):
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
 
-        body = f"""Bonjour,
+        # Créer le résumé des fichiers
+        files_summary = f"- {file_info.filename}"
+        total_size = "Taille non disponible"  # La taille n'est pas stockée dans la base de données
 
-Vos fichiers ont été téléchargés le {download_time}.
+        title = "Vos fichiers ont été téléchargés"
+        message = f"Vos fichiers ont été téléchargés le {download_time}."
 
-Fichiers téléchargés :
-{files_summary}
-
-Cordialement,
-L'équipe iTransfer"""
-
-        msg.attach(MIMEText(body, 'plain'))
+        html, text = create_email_template(title, message, files_summary, total_size)
+        
+        msg.attach(MIMEText(text, 'plain'))
+        msg.attach(MIMEText(html, 'html'))
+        
         return send_email_with_smtp(msg, smtp_config)
     except Exception as e:
         app.logger.error(f"Erreur lors de l'envoi de la notification de téléchargement: {str(e)}")
