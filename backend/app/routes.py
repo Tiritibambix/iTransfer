@@ -269,7 +269,7 @@ def send_recipient_notification_with_files(recipient_email, file_id, file_name, 
         msg = MIMEMultipart('alternative')
         msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
         msg['To'] = recipient_email
-        msg['Subject'] = f"{sender_email}: Nouveau transfert de fichiers."
+        msg['Subject'] = f"{sender_email} vous envoie des fichiers"
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
 
@@ -312,7 +312,10 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, file_name,
 Vos fichiers ont été envoyés avec succès à :
 {recipient_email}
 
-Lien de téléchargement : <a href="{download_link}" class="link">{download_link}</a>"""
+Lien de téléchargement :
+<a href="{download_link}" class="link">{download_link}</a>
+
+"""
 
         html, text = create_email_template(title, message, files_summary, total_size)
         
@@ -539,10 +542,10 @@ def upload_file():
         # Préparer le résumé des fichiers
         files_summary = files_content
         
-        # Stocker le résumé pour l'email de confirmation de téléchargement
+        # Stocker les informations des fichiers pour la notification de téléchargement
         app.config[f'files_summary_{file_id}'] = {
             'summary': files_summary,
-            'total_size': f"{total_size_mb:.2f} MB"
+            'total_size': f"Taille totale : {total_size}"
         }
 
         # Envoyer les notifications
@@ -729,14 +732,6 @@ def test_smtp():
               <body>
                 <p>Ceci est un message de test pour vérifier la configuration SMTP.</p>
                 <p>Si vous recevez ce message, la configuration SMTP est correcte.</p>
-                <hr>
-                <p><b>Détails de la configuration :</b></p>
-                <ul>
-                    <li>Serveur : {smtp_config['smtp_server']}</li>
-                    <li>Port : {smtp_config['smtp_port']}</li>
-                    <li>Utilisateur : {smtp_config['smtp_user']}</li>
-                    <li>Email expéditeur : {smtp_config['smtp_sender_email']}</li>
-                </ul>
               </body>
             </html>
             """
