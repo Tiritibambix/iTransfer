@@ -251,6 +251,17 @@ def send_recipient_notification_with_files(recipient_email, file_id, file_name, 
     Envoie un email de notification au destinataire avec le résumé des fichiers
     """
     try:
+        # Récupérer les informations du fichier pour avoir la date d'expiration
+        file_info = FileUpload.query.get(file_id)
+        if not file_info:
+            app.logger.error(f"Fichier non trouvé pour l'envoi de notification: {file_id}")
+            return False
+
+        # Formater la date d'expiration dans le fuseau horaire configuré
+        timezone = pytz.timezone(app.config.get('TIMEZONE', 'Europe/Paris'))
+        expiration_date = file_info.expires_at.astimezone(timezone)
+        expiration_formatted = expiration_date.strftime('%d/%m/%Y à %H:%M:%S')
+
         backend_url = get_backend_url()
         download_link = f"{backend_url}/download/{file_id}"
         app.logger.info(f"Lien de téléchargement généré : {download_link}")
@@ -266,7 +277,9 @@ def send_recipient_notification_with_files(recipient_email, file_id, file_name, 
         message = f"""
 {sender_email} vous a envoyé des fichiers.
 
-Vous pouvez les télécharger en cliquant ici :"""
+Vous pouvez les télécharger en cliquant ici :
+
+Ce lien expirera le {expiration_formatted}"""
 
         html, text = create_email_template(title, message, files_summary, total_size, download_link)
         
