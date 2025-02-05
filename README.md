@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/tiritibambix/iTransfer/main/static/media/iTransfer%20Bannière.png" width="400" />
+  <img src="https://raw.githubusercontent.com/tiritibambix/iTransfer/main/frontend/src/assets/iTransfer Bannière.png" width="400" />
 </p>
 
 <p align="center">

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import JSZip from 'jszip';
+import logo from './assets/iTransfer logo.png';
 
 function App() {
   const navigate = useNavigate();
@@ -469,7 +470,7 @@ function App() {
             flex: '0 1 auto'
           }}>iTransfer</h1>
           <img 
-            src="../static/media/iTransfer logo.png" 
+            src={logo}
             alt="iTransfer Logo" 
             style={{
               height: 'clamp(1.2rem, 4vw, 2.5rem)',
