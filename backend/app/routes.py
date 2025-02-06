@@ -678,7 +678,7 @@ def save_smtp_settings():
             'smtp_sender_email': data['smtpSenderEmail']
         }
 
-        app.logger.info(f"Configuration SMTP : serveur={smtp_config['smtp_server']}, port={smtp_config['smtp_port']}, user={smtp_config['smtp_user']}, sender={smtp_config['smtp_sender_email']}")
+        app.logger.info("Configuration SMTP reçue et sauvegardée (détails non inclus pour des raisons de sécurité)")
         
         # Sauvegarder la configuration
         with open(app.config['SMTP_CONFIG_PATH'], 'w') as config_file:
@@ -689,7 +689,7 @@ def save_smtp_settings():
 
     except Exception as e:
         app.logger.error(f"Erreur lors de la sauvegarde de la configuration SMTP : {str(e)}")
-        return jsonify({'error': f'Erreur lors de la sauvegarde : {str(e)}'}), 500
+        return jsonify({'error': 'Une erreur interne est survenue lors de la sauvegarde.'}), 500
 
 @app.route('/api/test-smtp', methods=['POST'])
 def test_smtp():
@@ -733,7 +733,7 @@ def test_smtp():
 
         except Exception as e:
             app.logger.error(f"Erreur lors de la création du message de test : {str(e)}")
-            return jsonify({'error': f'Erreur lors de la création du message : {str(e)}'}), 500
+            return jsonify({'error': 'Erreur lors de la création du message.'}), 500
 
         # Tenter d'envoyer l'email
         if send_email_with_smtp(msg, smtp_config):
@@ -745,4 +745,4 @@ def test_smtp():
 
     except Exception as e:
         app.logger.error(f"Erreur inattendue lors du test SMTP : {str(e)}")
-        return jsonify({'error': f'Erreur lors du test SMTP : {str(e)}'}), 500
+        return jsonify({'error': 'Une erreur interne est survenue lors du test SMTP.'}), 500
