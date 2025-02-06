@@ -689,7 +689,7 @@ def save_smtp_settings():
 
     except Exception as e:
         app.logger.error(f"Erreur lors de la sauvegarde de la configuration SMTP : {str(e)}")
-        return jsonify({'error': f'Erreur lors de la sauvegarde : {str(e)}'}), 500
+        return jsonify({'error': 'Une erreur interne est survenue lors de la sauvegarde.'}), 500
 
 @app.route('/api/test-smtp', methods=['POST'])
 def test_smtp():
