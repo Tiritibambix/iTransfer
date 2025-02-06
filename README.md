@@ -113,6 +113,7 @@ CREATE TABLE IF NOT EXISTS file_upload (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP NOT NULL
 );
+
 ```
 
 3. Create your `docker-compose.yml` for local development:
@@ -209,6 +210,7 @@ CREATE TABLE IF NOT EXISTS file_upload (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP NOT NULL
 );
+
 ```
 
 2. Create your `docker-compose.yml` for production development:
@@ -396,6 +398,7 @@ CREATE TABLE IF NOT EXISTS file_upload (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     expires_at TIMESTAMP NOT NULL
 );
+
 ```
 
 2. If the file is missing or incorrect:

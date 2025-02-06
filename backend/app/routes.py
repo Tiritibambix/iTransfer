@@ -335,25 +335,14 @@ def send_download_notification(sender_email, file_id, smtp_config):
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
 
-        # Si c'est un fichier ZIP, lister son contenu
-        if file_info.filename.lower().endswith('.zip'):
-            try:
-                with zipfile.ZipFile(os.path.join(app.config['UPLOAD_FOLDER'], file_info.filename)) as zip_file:
-                    # Lister tous les fichiers du ZIP
-                    file_list = zip_file.namelist()
-                    # Créer un résumé formaté
-                    files_summary = "\n".join([f"- {f}" for f in file_list])
-            except Exception as e:
-                app.logger.error(f"Erreur lors de la lecture du ZIP: {str(e)}")
-                files_summary = f"- {file_info.filename}"
-        else:
-            # Si ce n'est pas un ZIP, afficher juste le nom du fichier
-            files_summary = f"- {file_info.filename}"
+        # Créer le résumé des fichiers
+        files_summary = f"- {file_info.filename}"
+        total_size = "Taille non disponible"  # La taille n'est pas stockée dans la base de données
 
         title = "Vos fichiers ont été téléchargés"
         message = f"Vos fichiers ont été téléchargés le {download_time}."
 
-        html, text = create_email_template(title, message, files_summary, "")
+        html, text = create_email_template(title, message, files_summary, total_size)
         
         msg.attach(MIMEText(text, 'plain'))
         msg.attach(MIMEText(html, 'html'))
@@ -537,49 +526,31 @@ def upload_file():
             downloaded=False,
             expires_at=datetime.now() + timedelta(days=expiration_days)
         )
-
-        # Stocker la liste des fichiers et la taille totale
-        if needs_zip:
-            # Pour un ZIP, on stocke la liste complète des fichiers
-            file_paths = []
-            total_size = 0
-            for parent_folder, folder_files in folders.items():
-                for file_info in folder_files:
-                    file_paths.append(file_info['name'])
-                    total_size += os.path.getsize(file_info['temp_path'])
-            new_file.file_list = json.dumps(file_paths)
-            new_file.total_size = total_size
-        else:
-            # Pour un fichier unique
-            new_file.file_list = json.dumps([final_filename])
-            new_file.total_size = os.path.getsize(final_path)
-
         db.session.add(new_file)
         db.session.commit()
         app.logger.info(f"Fichier enregistré en base avec l'ID: {file_id}")
+
+        # Préparer le résumé des fichiers
+        files_summary = files_content
+        
+        # Stocker les informations des fichiers pour la notification de téléchargement
+        app.config[f'files_summary_{file_id}'] = {
+            'summary': files_summary,
+            'total_size': f"Taille totale : {total_size}"
+        }
 
         # Envoyer les notifications
         with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
             smtp_config = json.load(config_file)
 
         notification_errors = []
-        
-        # Utiliser la liste des fichiers stockée pour les notifications
-        try:
-            file_list = json.loads(new_file.file_list)
-            files_summary = "\n".join([f"- {f}" for f in file_list])
-        except:
-            files_summary = f"- {final_filename}"
-        
-        size_mb = new_file.total_size / (1024 * 1024) if new_file.total_size else 0
-        size_str = f"{size_mb:.2f} MB"
 
         try:
-            if not send_recipient_notification_with_files(email, file_id, final_filename, files_summary, size_str, smtp_config, sender_email):
+            if not send_recipient_notification_with_files(email, file_id, final_filename, files_summary, f"{total_size_mb:.2f} MB", smtp_config, sender_email):
                 app.logger.error(f"Échec de l'envoi de la notification au destinataire: {email}")
                 notification_errors.append("destinataire")
             
-            if not send_sender_upload_confirmation_with_files(sender_email, file_id, final_filename, files_summary, size_str, smtp_config, email):
+            if not send_sender_upload_confirmation_with_files(sender_email, file_id, final_filename, files_summary, f"{total_size_mb:.2f} MB", smtp_config, email):
                 app.logger.error(f"Échec de l'envoi de la notification à l'expéditeur: {sender_email}")
                 notification_errors.append("expéditeur")
         except Exception as e:
