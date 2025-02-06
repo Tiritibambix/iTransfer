@@ -745,4 +745,4 @@ def test_smtp():
 
     except Exception as e:
         app.logger.error(f"Erreur inattendue lors du test SMTP : {str(e)}")
-        return jsonify({'error': f'Erreur lors du test SMTP : {str(e)}'}), 500
+        return jsonify({'error': 'Une erreur interne est survenue lors du test SMTP.'}), 500
