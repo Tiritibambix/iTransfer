@@ -678,7 +678,7 @@ def save_smtp_settings():
             'smtp_sender_email': data['smtpSenderEmail']
         }
 
-        app.logger.info(f"Configuration SMTP : serveur={smtp_config['smtp_server']}, port={smtp_config['smtp_port']}, user={smtp_config['smtp_user']}, sender={smtp_config['smtp_sender_email']}")
+        app.logger.info("Configuration SMTP reçue et sauvegardée (détails non inclus pour des raisons de sécurité)")
         
         # Sauvegarder la configuration
         with open(app.config['SMTP_CONFIG_PATH'], 'w') as config_file:
