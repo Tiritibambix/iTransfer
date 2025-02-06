@@ -335,14 +335,34 @@ def send_download_notification(sender_email, file_id, smtp_config):
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
 
-        # Créer le résumé des fichiers
-        files_summary = f"- {file_info.filename}"
-        total_size = "Taille non disponible"  # La taille n'est pas stockée dans la base de données
+        # Créer le résumé des fichiers à partir des données stockées
+        files_summary = ""
+        if file_info.file_list:
+            try:
+                file_list = json.loads(file_info.file_list)
+                files_summary = "\n".join([f"- {f}" for f in file_list])
+            except:
+                files_summary = f"- {file_info.filename}"
+        else:
+            files_summary = f"- {file_info.filename}"
+
+        # Formater la taille si disponible
+        if file_info.total_size:
+            if file_info.total_size < 1024:
+                size_str = f"{file_info.total_size} o"
+            elif file_info.total_size < 1024 * 1024:
+                size_str = f"{file_info.total_size/1024:.1f} Ko"
+            elif file_info.total_size < 1024 * 1024 * 1024:
+                size_str = f"{file_info.total_size/(1024*1024):.1f} Mo"
+            else:
+                size_str = f"{file_info.total_size/(1024*1024*1024):.1f} Go"
+        else:
+            size_str = "Taille non disponible"
 
         title = "Vos fichiers ont été téléchargés"
         message = f"Vos fichiers ont été téléchargés le {download_time}."
 
-        html, text = create_email_template(title, message, files_summary, total_size)
+        html, text = create_email_template(title, message, files_summary, size_str)
         
         msg.attach(MIMEText(text, 'plain'))
         msg.attach(MIMEText(html, 'html'))
@@ -526,6 +546,23 @@ def upload_file():
             downloaded=False,
             expires_at=datetime.now() + timedelta(days=expiration_days)
         )
+
+        # Stocker la liste des fichiers et la taille totale
+        if needs_zip:
+            # Pour un ZIP, on stocke la liste complète des fichiers
+            file_paths = []
+            total_size = 0
+            for parent_folder, folder_files in folders.items():
+                for file_info in folder_files:
+                    file_paths.append(file_info['name'])
+                    total_size += os.path.getsize(file_info['temp_path'])
+            new_file.file_list = json.dumps(file_paths)
+            new_file.total_size = total_size
+        else:
+            # Pour un fichier unique
+            new_file.file_list = json.dumps([final_filename])
+            new_file.total_size = os.path.getsize(final_path)
+
         db.session.add(new_file)
         db.session.commit()
         app.logger.info(f"Fichier enregistré en base avec l'ID: {file_id}")
@@ -536,7 +573,7 @@ def upload_file():
         # Stocker les informations des fichiers pour la notification de téléchargement
         app.config[f'files_summary_{file_id}'] = {
             'summary': files_summary,
-            'total_size': f"Taille totale : {total_size}"
+            'total_size': f"Taille totale : {total_size_mb:.2f} MB"
         }
 
         # Envoyer les notifications

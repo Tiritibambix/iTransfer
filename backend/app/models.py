@@ -10,3 +10,5 @@ class FileUpload(db.Model):
     downloaded = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     expires_at = db.Column(db.DateTime, nullable=False)
+    file_list = db.Column(db.Text, nullable=True)  # Liste des fichiers en JSON
+    total_size = db.Column(db.BigInteger, nullable=True)  # Taille totale en octets

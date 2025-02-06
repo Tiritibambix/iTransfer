@@ -111,9 +111,10 @@ CREATE TABLE IF NOT EXISTS file_upload (
     encrypted_data VARCHAR(256) NOT NULL,
     downloaded BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NOT NULL
+    expires_at TIMESTAMP NOT NULL,
+    file_list TEXT,
+    total_size BIGINT
 );
-
 ```
 
 3. Create your `docker-compose.yml` for local development:
@@ -208,9 +209,10 @@ CREATE TABLE IF NOT EXISTS file_upload (
     encrypted_data VARCHAR(256) NOT NULL,
     downloaded BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NOT NULL
+    expires_at TIMESTAMP NOT NULL,
+    file_list TEXT,
+    total_size BIGINT
 );
-
 ```
 
 2. Create your `docker-compose.yml` for production development:
@@ -396,9 +398,10 @@ CREATE TABLE IF NOT EXISTS file_upload (
     encrypted_data VARCHAR(256) NOT NULL,
     downloaded BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NOT NULL
+    expires_at TIMESTAMP NOT NULL,
+    file_list TEXT,
+    total_size BIGINT
 );
-
 ```
 
 2. If the file is missing or incorrect:
