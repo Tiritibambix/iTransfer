@@ -324,34 +324,33 @@ docker-compose up -d
 ### Project Structure
 
 ```
-├── LICENSE                 # Project license file
-├── README.md              # Project documentation
-├── backend/               # Flask backend application
-│   ├── Dockerfile        # Backend container configuration
-│   ├── app/              # Application package
-│   │   ├── __init__.py  # Package initialization
-│   │   ├── app.py       # Flask application setup
-│   │   ├── config.py    # Application configuration
-│   │   ├── models.py    # Database models
-│   │   ├── routes.py    # API endpoints
-│   ├── entrypoint.sh    # Container entry point script
-│   ├── init.sql         # Database initialization script
-│   ├── run.py           # Application entry point
-├── docker-compose.yml    # Docker services configuration
-├── frontend/            # React frontend application
-│   ├── Dockerfile      # Frontend container configuration
-│   ├── package.json    # Node.js dependencies
-│   ├── public/         # Static files
-│   │   ├── index.html # Main HTML file
-│   ├── src/           # Source files
+├── LICENSE                  # Project license file
+├── README.md                # Project documentation
+├── backend/                 # Flask backend application
+│   ├── Dockerfile           # Backend container configuration
+│   ├── app/                 # Application package
+│   │   ├── __init__.py      # Package initialization
+│   │   ├── app.py           # Flask application setup
+│   │   ├── config.py        # Application configuration
+│   │   ├── models.py        # Database models
+│   │   ├── routes.py        # API endpoints
+│   ├── entrypoint.sh        # Container entry point script
+│   ├── init.sql             # Database initialization script
+│   ├── run.py               # Application entry point
+├── docker-compose.yml       # Docker services configuration
+├── frontend/                # React frontend application
+│   ├── Dockerfile           # Frontend container configuration
+│   ├── package.json         # Node.js dependencies
+│   ├── public/              # Static files
+│   │   ├── index.html       # Main HTML file
+│   ├── src/                 # Source files
 │   │   ├── App.js           # Main React component
 │   │   ├── Login.js         # Authentication component
 │   │   ├── PrivateRoute.js  # Route protection component
 │   │   ├── SMTPSettings.js  # Email settings component
 │   │   ├── index.css        # Global styles
 │   │   ├── index.js         # React entry point
-└── requirements.txt     # Python dependencies
-```
+└── requirements.txt         # Python dependencies
 
 The project follows a typical client-server architecture:
 
