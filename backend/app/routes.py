@@ -335,23 +335,9 @@ def send_download_notification(sender_email, file_id, smtp_config):
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
 
-        # Récupérer la liste des fichiers depuis la base de données
-        files_summary = ""
-        total_size = 0
-        if file_info.files_list:
-            try:
-                files_data = json.loads(file_info.files_list)
-                for file_data in files_data:
-                    files_summary += f"- {file_data['name']} ({format_size(file_data['size'])})\n"
-                    total_size += file_data['size']
-                total_size = format_size(total_size)
-            except Exception as e:
-                app.logger.error(f"Erreur lors de la lecture de la liste des fichiers: {str(e)}")
-                files_summary = f"- {file_info.filename}"
-                total_size = "Taille non disponible"
-        else:
-            files_summary = f"- {file_info.filename}"
-            total_size = "Taille non disponible"
+        # Créer le résumé des fichiers
+        files_summary = f"- {file_info.filename}"
+        total_size = "Taille non disponible"  # La taille n'est pas stockée dans la base de données
 
         title = "Vos fichiers ont été téléchargés"
         message = f"Vos fichiers ont été téléchargés le {download_time}."
@@ -400,105 +386,158 @@ def run_scheduler():
 scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
 scheduler_thread.start()
 
-@app.route('/upload', methods=['POST'])
+@app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
-    try:
-        # Vérifier que tous les champs requis sont présents
-        if not all(field in request.form for field in ['recipientEmail', 'senderEmail', 'expirationDays']):
-            return jsonify({'error': 'Champs manquants'}), 400
+    if request.method == 'OPTIONS':
+        return jsonify({'message': 'CORS preflight success'}), 200
 
-        recipient_email = request.form['recipientEmail']
-        sender_email = request.form['senderEmail']
-        expiration_days = int(request.form['expirationDays'])
+    try:
+        app.logger.info("Début du traitement de l'upload")
+        app.logger.info(f"Files in request: {request.files}")
+        app.logger.info(f"Form data: {request.form}")
         
-        # Vérifier qu'il y a au moins un fichier
-        if 'file' not in request.files:
+        if 'files[]' not in request.files:
+            app.logger.error("Pas de fichiers dans la requête")
             return jsonify({'error': 'Aucun fichier envoyé'}), 400
         
-        files = request.files.getlist('file')
-        if not files or not files[0].filename:
-            return jsonify({'error': 'Aucun fichier sélectionné'}), 400
-
-        # Générer un ID unique pour ce transfert
-        transfer_id = str(uuid.uuid4())
+        files = request.files.getlist('files[]')
+        paths = request.form.getlist('paths[]')
+        email = request.form.get('email')
+        sender_email = request.form.get('sender_email')
+        expiration_days = int(request.form.get('expiration_days', '7'))
         
-        # Créer le dossier d'upload s'il n'existe pas
-        upload_folder = app.config['UPLOAD_FOLDER']
-        if not os.path.exists(upload_folder):
-            os.makedirs(upload_folder)
+        # Valider la durée d'expiration
+        if expiration_days not in [3, 5, 7, 10]:
+            expiration_days = 7  # Valeur par défaut si invalide
+            
+        app.logger.info(f"Durée d'expiration choisie: {expiration_days} jours")
+        
+        if not email or not sender_email:
+            return jsonify({'error': 'Email addresses are required'}), 400
 
-        # Préparer la liste des fichiers pour le stockage
-        files_info = []
+        # Récupérer la liste des fichiers pour les emails
+        files_list = json.loads(request.form.get('files_list', '[]'))
+        
+        # Préparer le contenu des fichiers pour les emails
+        files_content = ""
         total_size = 0
+        for file_info in files_list:
+            size_mb = file_info['size'] / (1024 * 1024)
+            files_content += f"- {file_info['name']} ({size_mb:.2f} MB)\n"
+            total_size += file_info['size']
+        
+        total_size_mb = total_size / (1024 * 1024)
+        files_content += f"\nTaille totale : {total_size_mb:.2f} MB"
 
-        # Si c'est un seul fichier, pas besoin de ZIP
-        if len(files) == 1 and '/' not in files[0].filename:
-            file = files[0]
-            safe_filename = secure_filename(file.filename)
-            file_path = os.path.join(upload_folder, safe_filename)
-            file.save(file_path)
-            
-            # Stocker les informations du fichier
-            file_size = os.path.getsize(file_path)
-            files_info.append({
-                'name': safe_filename,
-                'size': file_size
-            })
-            total_size = file_size
-            final_filename = safe_filename
-        else:
-            # Créer un fichier ZIP pour plusieurs fichiers
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            zip_filename = f'transfer_{timestamp}.zip'
-            zip_path = os.path.join(upload_folder, zip_filename)
-            
+        # Sauvegarder les fichiers
+        file_id = str(uuid.uuid4())
+        temp_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'temp', file_id)
+        os.makedirs(temp_dir, exist_ok=True)
+        app.logger.info(f"Dossier temporaire créé: {temp_dir}")
+
+        folders = {}
+        file_list = []
+
+        # Sauvegarder les fichiers avec leur structure de dossiers
+        for file, path in zip(files, paths):
+            if file.filename:
+                # Nettoyer le chemin et extraire le dossier parent
+                clean_path = path.lstrip('/')
+                # S'assurer qu'il n'y a qu'un seul niveau de dossier
+                path_parts = clean_path.split('/')
+                if len(path_parts) > 1:
+                    parent_folder = path_parts[0]
+                    filename = path_parts[-1]
+                    clean_path = f"{parent_folder}/{filename}" if parent_folder else filename
+                else:
+                    parent_folder = ''
+                    
+                if parent_folder not in folders:
+                    folders[parent_folder] = []
+                
+                # Créer le dossier temporaire si nécessaire
+                temp_file_path = os.path.join(temp_dir, clean_path)
+                if parent_folder:
+                    os.makedirs(os.path.join(temp_dir, parent_folder), exist_ok=True)
+                    app.logger.info(f"Création du dossier: {os.path.join(temp_dir, parent_folder)}")
+                
+                # Sauvegarder le fichier
+                file.save(temp_file_path)
+                app.logger.info(f"Fichier sauvegardé: {temp_file_path}")
+                
+                file_size = os.path.getsize(temp_file_path)
+                app.logger.info(f"Taille du fichier: {format_size(file_size)}")
+                
+                # Ajouter à la liste des fichiers avec la structure correcte
+                file_info = {
+                    'name': clean_path,
+                    'size': file_size,
+                    'folder': parent_folder,
+                    'temp_path': temp_file_path
+                }
+                folders[parent_folder].append(file_info)
+                file_list.append(file_info)
+
+        # Déterminer si on doit créer un zip
+        needs_zip = len(file_list) > 1 or any(f['folder'] for f in file_list)
+        
+        if needs_zip:
+            # Créer le ZIP avec la même structure
+            final_filename = f"transfer_{file_id}.zip"
+            zip_path = os.path.join(app.config['UPLOAD_FOLDER'], final_filename)
+            app.logger.info(f"Création du ZIP: {zip_path}")
+
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-                for file in files:
-                    # Sécuriser le nom du fichier
-                    safe_filename = secure_filename(file.filename)
-                    
-                    # Sauvegarder temporairement le fichier
-                    temp_path = os.path.join(upload_folder, safe_filename)
-                    file.save(temp_path)
-                    
-                    # Ajouter au ZIP
-                    zipf.write(temp_path, safe_filename)
-                    
-                    # Récupérer la taille et stocker les infos
-                    file_size = os.path.getsize(temp_path)
-                    files_info.append({
-                        'name': safe_filename,
-                        'size': file_size
-                    })
-                    total_size += file_size
-                    
-                    # Supprimer le fichier temporaire
-                    os.remove(temp_path)
-            
-            final_filename = zip_filename
+                for parent_folder, folder_files in folders.items():
+                    for file_info in folder_files:
+                        app.logger.info(f"Ajout au ZIP: {file_info['name']}")
+                        # Utiliser le nom nettoyé pour l'archivage
+                        zipf.write(file_info['temp_path'], file_info['name'])
 
-        # Calculer la date d'expiration
-        expiration_date = datetime.now() + timedelta(days=expiration_days)
-        
-        # Créer l'entrée dans la base de données
-        file_upload = FileUpload(
-            id=transfer_id,
+            # Hasher le fichier zip
+            with open(zip_path, 'rb') as f:
+                encrypted_data = hashlib.sha256(f.read()).hexdigest()
+            
+            final_path = zip_path
+        else:
+            # Cas d'un fichier unique
+            single_file = file_list[0]
+            final_filename = single_file['name']
+            final_path = single_file['temp_path']
+            
+            # Hasher le fichier unique
+            with open(final_path, 'rb') as f:
+                encrypted_data = hashlib.sha256(f.read()).hexdigest()
+            
+            # Déplacer le fichier vers le dossier final
+            final_destination = os.path.join(app.config['UPLOAD_FOLDER'], final_filename)
+            shutil.move(final_path, final_destination)
+            final_path = final_destination
+
+        app.logger.info(f"Hash du fichier: {encrypted_data}")
+
+        # Sauvegarder en base
+        new_file = FileUpload(
+            id=file_id,
             filename=final_filename,
-            email=recipient_email,
+            email=email,
             sender_email=sender_email,
-            encrypted_data='',  # Non utilisé pour le moment
-            expires_at=expiration_date,
-            files_list=json.dumps(files_info)  # Stocker la liste des fichiers en JSON
+            encrypted_data=encrypted_data,
+            downloaded=False,
+            expires_at=datetime.now() + timedelta(days=expiration_days)
         )
-        
-        db.session.add(file_upload)
+        db.session.add(new_file)
         db.session.commit()
+        app.logger.info(f"Fichier enregistré en base avec l'ID: {file_id}")
 
         # Préparer le résumé des fichiers
-        files_summary = ""
-        for file_info in files_info:
-            files_summary += f"- {file_info['name']} ({format_size(file_info['size'])})\n"
-        files_summary += f"\nTaille totale : {format_size(total_size)}"
+        files_summary = files_content
+        
+        # Stocker les informations des fichiers pour la notification de téléchargement
+        app.config[f'files_summary_{file_id}'] = {
+            'summary': files_summary,
+            'total_size': f"Taille totale : {total_size}"
+        }
 
         # Envoyer les notifications
         with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
@@ -507,31 +546,40 @@ def upload_file():
         notification_errors = []
 
         try:
-            if not send_recipient_notification_with_files(recipient_email, transfer_id, final_filename, files_summary, format_size(total_size), smtp_config, sender_email):
-                app.logger.error(f"Échec de l'envoi de la notification au destinataire: {recipient_email}")
+            if not send_recipient_notification_with_files(email, file_id, final_filename, files_summary, f"{total_size_mb:.2f} MB", smtp_config, sender_email):
+                app.logger.error(f"Échec de l'envoi de la notification au destinataire: {email}")
                 notification_errors.append("destinataire")
             
-            if not send_sender_upload_confirmation_with_files(sender_email, transfer_id, final_filename, files_summary, format_size(total_size), smtp_config, recipient_email):
+            if not send_sender_upload_confirmation_with_files(sender_email, file_id, final_filename, files_summary, f"{total_size_mb:.2f} MB", smtp_config, email):
                 app.logger.error(f"Échec de l'envoi de la notification à l'expéditeur: {sender_email}")
                 notification_errors.append("expéditeur")
         except Exception as e:
-            app.logger.error(f"Erreur lors de l'envoi des notifications: {str(e)}")
+            app.logger.error(f"Erreur lors de l'envoi des emails : {str(e)}")
+            notification_errors.append("tous les destinataires")
 
         response_data = {
             'success': True,
-            'file_id': transfer_id,
+            'file_id': file_id,
             'message': 'Fichiers uploadés avec succès'
         }
 
         if notification_errors:
-            response_data['notification_errors'] = notification_errors
-            response_data['message'] += f" (Échec de l'envoi des notifications: {', '.join(notification_errors)})"
+            response_data['warning'] = f"Impossible d'envoyer les notifications aux destinataires suivants: {', '.join(notification_errors)}"
 
-        return jsonify(response_data), 201
+        app.logger.info("Upload terminé avec succès")
+        return jsonify(response_data), 200
 
     except Exception as e:
         app.logger.error(f"Erreur lors du traitement des fichiers: {str(e)}")
+        if 'temp_dir' in locals() and os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+        if 'zip_path' in locals() and os.path.exists(zip_path):
+            os.remove(zip_path)
         return jsonify({'error': 'Une erreur interne est survenue'}), 500
+
+    finally:
+        if 'temp_dir' in locals() and os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
 
 @app.route('/download/<file_id>', methods=['GET'])
 def download_file(file_id):
@@ -562,23 +610,18 @@ def download_file(file_id):
             with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
                 smtp_config = json.load(config_file)
 
-            # Récupérer la liste des fichiers depuis la base de données
-            files_summary = ""
-            total_size = 0
-            if file_info.files_list:
-                try:
-                    files_data = json.loads(file_info.files_list)
-                    for file_data in files_data:
-                        files_summary += f"- {file_data['name']} ({format_size(file_data['size'])})\n"
-                        total_size += file_data['size']
-                    total_size = format_size(total_size)
-                except Exception as e:
-                    app.logger.error(f"Erreur lors de la lecture de la liste des fichiers: {str(e)}")
-                    files_summary = f"- {file_info.filename}"
-                    total_size = "Taille non disponible"
+            # Récupérer le résumé des fichiers stocké lors de l'upload
+            stored_summary = app.config.get(f'files_summary_{file_id}')
+            if stored_summary:
+                files_summary = stored_summary['summary']
+                total_size_formatted = stored_summary['total_size']
+                # Nettoyer après utilisation
+                del app.config[f'files_summary_{file_id}']
             else:
-                files_summary = f"- {file_info.filename}"
-                total_size = "Taille non disponible"
+                # Fallback si le résumé n'est pas trouvé
+                file_size = os.path.getsize(file_path)
+                files_summary = f"- {file_info.filename} ({format_size(file_size)})"
+                total_size_formatted = format_size(file_size)
 
             # Envoyer une notification à l'expéditeur
             send_download_notification(file_info.sender_email, file_id, smtp_config)
