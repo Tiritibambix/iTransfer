@@ -6,7 +6,5 @@ CREATE TABLE IF NOT EXISTS file_upload (
     encrypted_data VARCHAR(256) NOT NULL,
     downloaded BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    expires_at TIMESTAMP NOT NULL,
-    file_list TEXT,
-    total_size BIGINT
+    expires_at TIMESTAMP NOT NULL
 );

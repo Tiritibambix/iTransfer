@@ -335,34 +335,25 @@ def send_download_notification(sender_email, file_id, smtp_config):
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
 
-        # Créer le résumé des fichiers à partir des données stockées
-        files_summary = ""
-        if file_info.file_list:
+        # Si c'est un fichier ZIP, lister son contenu
+        if file_info.filename.lower().endswith('.zip'):
             try:
-                file_list = json.loads(file_info.file_list)
-                files_summary = "\n".join([f"- {f}" for f in file_list])
-            except:
+                with zipfile.ZipFile(os.path.join(app.config['UPLOAD_FOLDER'], file_info.filename)) as zip_file:
+                    # Lister tous les fichiers du ZIP
+                    file_list = zip_file.namelist()
+                    # Créer un résumé formaté
+                    files_summary = "\n".join([f"- {f}" for f in file_list])
+            except Exception as e:
+                app.logger.error(f"Erreur lors de la lecture du ZIP: {str(e)}")
                 files_summary = f"- {file_info.filename}"
         else:
+            # Si ce n'est pas un ZIP, afficher juste le nom du fichier
             files_summary = f"- {file_info.filename}"
-
-        # Formater la taille si disponible
-        if file_info.total_size:
-            if file_info.total_size < 1024:
-                size_str = f"{file_info.total_size} o"
-            elif file_info.total_size < 1024 * 1024:
-                size_str = f"{file_info.total_size/1024:.1f} Ko"
-            elif file_info.total_size < 1024 * 1024 * 1024:
-                size_str = f"{file_info.total_size/(1024*1024):.1f} Mo"
-            else:
-                size_str = f"{file_info.total_size/(1024*1024*1024):.1f} Go"
-        else:
-            size_str = "Taille non disponible"
 
         title = "Vos fichiers ont été téléchargés"
         message = f"Vos fichiers ont été téléchargés le {download_time}."
 
-        html, text = create_email_template(title, message, files_summary, size_str)
+        html, text = create_email_template(title, message, files_summary, "")
         
         msg.attach(MIMEText(text, 'plain'))
         msg.attach(MIMEText(html, 'html'))
