@@ -733,7 +733,7 @@ def test_smtp():
 
         except Exception as e:
             app.logger.error(f"Erreur lors de la création du message de test : {str(e)}")
-            return jsonify({'error': f'Erreur lors de la création du message : {str(e)}'}), 500
+            return jsonify({'error': 'Erreur lors de la création du message.'}), 500
 
         # Tenter d'envoyer l'email
         if send_email_with_smtp(msg, smtp_config):
