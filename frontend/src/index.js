@@ -5,6 +5,7 @@ import App from './App';
 import Login from './Login';
 import PrivateRoute from './PrivateRoute';
 import SMTPSettings from './SMTPSettings';
+import Download from './Download';
 import './index.css';
 
 const backendUrl =
@@ -26,6 +27,7 @@ ReactDOM.render(
           }
         />
         <Route path="/smtp-settings" element={<SMTPSettings backendUrl={backendUrl} />} />
+        <Route path="/download/:transferId" element={<Download backendUrl={backendUrl} />} />
       </Routes>
     </Router>
   </React.StrictMode>,

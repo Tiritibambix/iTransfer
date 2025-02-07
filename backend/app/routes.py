@@ -581,6 +581,42 @@ def upload_file():
         if 'temp_dir' in locals() and os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
 
+@app.route('/transfer/<file_id>', methods=['GET'])
+def get_transfer_details(file_id):
+    try:
+        # Récupérer les informations du fichier depuis la base de données
+        file_info = FileUpload.query.get(file_id)
+        if not file_info:
+            app.logger.error(f"Fichier non trouvé: {file_id}")
+            return jsonify({'error': 'Fichier non trouvé'}), 404
+
+        # Vérifier l'expiration
+        if datetime.now() > file_info.expires_at:
+            app.logger.info(f"Tentative d'accès à un fichier expiré: {file_id}")
+            return jsonify({'error': 'Le lien de téléchargement a expiré'}), 410
+
+        # Construire le chemin du fichier
+        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_info.filename)
+        
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'Fichier non trouvé sur le serveur'}), 404
+
+        # Obtenir la taille du fichier
+        file_size = os.path.getsize(file_path)
+
+        # Retourner les informations du fichier
+        return jsonify({
+            'files': [{
+                'name': file_info.filename,
+                'size': file_size,
+                'expires_at': file_info.expires_at.isoformat()
+            }]
+        }), 200
+
+    except Exception as e:
+        app.logger.error(f"Erreur lors de la récupération des détails : {str(e)}")
+        return jsonify({'error': 'Une erreur est survenue'}), 500
+
 @app.route('/download/<file_id>', methods=['GET'])
 def download_file(file_id):
     try:
