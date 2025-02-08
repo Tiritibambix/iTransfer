@@ -1,4 +1,5 @@
 from . import db
+import json
 
 class FileUpload(db.Model):
     __tablename__ = 'file_upload'
@@ -10,3 +11,12 @@ class FileUpload(db.Model):
     downloaded = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=db.func.current_timestamp())
     expires_at = db.Column(db.DateTime, nullable=False)
+    files_list = db.Column(db.Text, nullable=True)  # Stocke la liste des fichiers en JSON
+
+    def set_files_list(self, files):
+        """Convertit et stocke la liste des fichiers en JSON"""
+        self.files_list = json.dumps(files) if files else None
+
+    def get_files_list(self):
+        """Récupère et désérialise la liste des fichiers"""
+        return json.loads(self.files_list) if self.files_list else []
