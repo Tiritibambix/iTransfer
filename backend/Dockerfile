@@ -34,5 +34,8 @@ COPY backend /app/
 # Exposer le port
 EXPOSE 5000
 
-# Commande pour démarrer l'application
-CMD ["python", "run.py"]
+# Variables d'environnement pour Gunicorn
+ENV PYTHONUNBUFFERED=1
+
+# Commande pour démarrer l'application avec Gunicorn
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "--access-logfile", "-", "--error-logfile", "-", "app:app"]
