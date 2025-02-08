@@ -45,7 +45,7 @@ function Download() {
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = files.length > 1 ? 'iTransfer_files.zip' : files[0].name;
+      a.download = files.length > 1 ? `iTransfer_${new Date().getFullYear().toString().slice(-2)}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}.zip` : files[0].name;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
