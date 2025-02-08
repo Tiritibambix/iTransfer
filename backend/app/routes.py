@@ -337,14 +337,24 @@ def send_download_notification(sender_email, file_id, smtp_config):
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
 
-        # Créer le résumé des fichiers
-        files_summary = f"- {file_info.filename}"
-        total_size = "Taille non disponible"  # La taille n'est pas stockée dans la base de données
+        # Récupérer la liste des fichiers stockée
+        files_list = file_info.get_files_list()
+        files_summary = ""
+        total_size = 0
+
+        if files_list:
+            for f in files_list:
+                files_summary += f"- {f['name']} ({format_size(f['size'])})\n"
+                total_size += f['size']
+            total_size_formatted = format_size(total_size)
+        else:
+            files_summary = f"- {file_info.filename}"
+            total_size_formatted = "Taille non disponible"
 
         title = "Vos fichiers ont été téléchargés"
         message = f"Vos fichiers ont été téléchargés le {download_time}."
 
-        html, text = create_email_template(title, message, files_summary, total_size)
+        html, text = create_email_template(title, message, files_summary, total_size_formatted)
         
         msg.attach(MIMEText(text, 'plain'))
         msg.attach(MIMEText(html, 'html'))
@@ -542,8 +552,14 @@ def upload_file():
         db.session.commit()
         app.logger.info(f"Fichier enregistré en base avec l'ID: {file_id}")
 
-        # Préparer le résumé des fichiers
-        files_summary = files_content
+        # Préparer le résumé des fichiers à partir de la liste stockée
+        files_list = new_file.get_files_list()
+        files_summary = ""
+        total_size = 0
+        for f in files_list:
+            files_summary += f"- {f['name']} ({format_size(f['size'])})\n"
+            total_size += f['size']
+        total_size_formatted = format_size(total_size)
 
         # Envoyer les notifications
         with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
@@ -552,11 +568,11 @@ def upload_file():
         notification_errors = []
 
         try:
-            if not send_recipient_notification_with_files(email, file_id, final_filename, files_summary, f"{total_size_mb:.2f} MB", smtp_config, sender_email):
+            if not send_recipient_notification_with_files(email, file_id, final_filename, files_summary, total_size_formatted, smtp_config, sender_email):
                 app.logger.error(f"Échec de l'envoi de la notification au destinataire: {email}")
                 notification_errors.append("destinataire")
             
-            if not send_sender_upload_confirmation_with_files(sender_email, file_id, final_filename, files_summary, f"{total_size_mb:.2f} MB", smtp_config, email):
+            if not send_sender_upload_confirmation_with_files(sender_email, file_id, final_filename, files_summary, total_size_formatted, smtp_config, email):
                 app.logger.error(f"Échec de l'envoi de la notification à l'expéditeur: {sender_email}")
                 notification_errors.append("expéditeur")
         except Exception as e:
