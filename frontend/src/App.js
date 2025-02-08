@@ -374,9 +374,6 @@ function App() {
           } else {
             showNotification("Les fichiers ont été uploadés et les notifications ont été envoyées avec succès !", "success");
           }
-          setUploadedItems([]);
-          setRecipientEmail('');
-          setSenderEmail('');
         } else {
           showNotification("Une erreur est survenue lors de l'upload. Veuillez vérifier que les emails sont valides et réessayer.", "error");
         }
@@ -396,6 +393,19 @@ function App() {
       setUploading(false);
       setIsCompressing(false);
     }
+  };
+
+  const resetUploadState = () => {
+    setProgress(0);
+    setCompressionProgress(0);
+    setIsCompressing(false);
+    setUploading(false);
+    setUploadedItems([]);
+    setRecipientEmail('');
+    setSenderEmail('');
+    setError(null);
+    setWarning(null);
+    setSuccess(false);
   };
 
   const showNotification = (message, type = 'info') => {
@@ -418,8 +428,11 @@ function App() {
             prefix = 'ℹ️ Info : ';
     }
     
-    // Afficher l'alerte
+    // Afficher l'alerte et réinitialiser si succès
     alert(prefix + message);
+    if (type === 'success') {
+      resetUploadState();
+    }
   };
 
   const formatFileSize = (bytes) => {
