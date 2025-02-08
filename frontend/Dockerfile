@@ -10,6 +10,9 @@ COPY frontend/package.json frontend/package-lock.json* ./
 # Installer les dépendances
 RUN npm install
 
+# Mettre à jour Babel pour éviter les conflits de version
+RUN npm install --save-dev @babel/core@latest
+
 # Copier tout le code source du frontend
 COPY frontend/ .
 
