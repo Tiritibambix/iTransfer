@@ -504,7 +504,10 @@ def upload_file():
         
         if needs_zip:
             # Créer le ZIP avec la même structure
-            final_filename = f"transfer_{file_id}.zip"
+            # Créer un nom de fichier avec la date et l'heure
+            now = datetime.now()
+            date_str = now.strftime("%y%m%d%H%M")
+            final_filename = f"iTransfer_{date_str}.zip"
             zip_path = os.path.join(app.config['UPLOAD_FOLDER'], final_filename)
             app.logger.info(f"Création du ZIP: {zip_path}")
 
