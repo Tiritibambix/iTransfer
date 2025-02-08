@@ -537,16 +537,16 @@ def upload_file():
 
         app.logger.info(f"Hash du fichier: {encrypted_data}")
 
-        # Préparer la liste des fichiers pour stockage
-        files_to_store = []
-        for file_info in file_list:
-            files_to_store.append({
+        # Préparer la liste des fichiers initiale avec les tailles et noms originaux
+        original_files = []
+        for file_info in files_list:
+            original_files.append({
                 'name': file_info['name'],
-                'size': file_info['size'],
-                'folder': file_info['folder']
+                'size': file_info['size']
             })
 
-        # Sauvegarder en base avec la liste des fichiers
+        # Sauvegarder en base avec la liste des fichiers originaux
+        # Créer l'entrée en base avec la liste des fichiers originaux
         new_file = FileUpload(
             id=file_id,
             filename=final_filename,
@@ -556,7 +556,7 @@ def upload_file():
             downloaded=False,
             expires_at=datetime.now() + timedelta(days=expiration_days)
         )
-        new_file.set_files_list(files_to_store)
+        new_file.set_files_list(original_files)
         db.session.add(new_file)
         db.session.commit()
         app.logger.info(f"Fichier enregistré en base avec l'ID: {file_id}")
@@ -574,16 +574,17 @@ def upload_file():
         notification_errors = []
 
         try:
-            # Préparer la liste formatée pour les notifications
+            # Récupérer la liste des fichiers stockée pour les notifications
+            stored_files = new_file.get_files_list()
             files_summary = ""
-            for file_info in files_list:
+            for file_info in stored_files:
                 files_summary += f"- {file_info['name']} ({format_size(file_info['size'])})\n"
 
             if not send_recipient_notification_with_files(email, file_id, final_filename, files_summary, total_size_formatted, smtp_config, sender_email):
                 app.logger.error(f"Échec de l'envoi de la notification au destinataire: {email}")
                 notification_errors.append("destinataire")
             
-            if not send_sender_upload_confirmation_with_files(sender_email, file_id, final_filename, files_list, total_size_formatted, smtp_config, email):
+            if not send_sender_upload_confirmation_with_files(sender_email, file_id, final_filename, stored_files, total_size_formatted, smtp_config, email):
                 app.logger.error(f"Échec de l'envoi de la notification à l'expéditeur: {sender_email}")
                 notification_errors.append("expéditeur")
         except Exception as e:
