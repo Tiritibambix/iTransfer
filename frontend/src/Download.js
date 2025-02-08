@@ -180,6 +180,7 @@ function Download() {
       <div style={{
         textAlign: 'center',
         marginTop: 'clamp(2rem, 4vw, 3rem)',
+        padding: '0 clamp(1rem, 3vw, 2rem)',
         color: 'var(--clr-primary-a40)',
         fontSize: '0.9rem',
         display: 'flex',
@@ -187,7 +188,7 @@ function Download() {
         alignItems: 'center',
         gap: '1rem'
       }}>
-        <p>
+        <p style={{ maxWidth: '600px', lineHeight: '1.6' }}>
           iTransfer est un logiciel libre et gratuit, respectueux de votre vie privée. Il est développé sous la licence GPL-3.0, garantissant transparence et liberté d'utilisation.
         </p>
         <a

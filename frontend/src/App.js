@@ -29,6 +29,25 @@ function App() {
     }
   }, []);
 
+  // Gestion de la prévention de fermeture pendant l'upload
+  useEffect(() => {
+    const handleBeforeUnload = (e) => {
+      if (isCompressing || (progress > 0 && progress < 100)) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+      }
+    };
+
+    if (isCompressing || (progress > 0 && progress < 100)) {
+      window.addEventListener('beforeunload', handleBeforeUnload);
+    }
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isCompressing, progress]);
+
   const processFilesAndFolders = async (items) => {
     const allFiles = [];
     
@@ -355,9 +374,6 @@ function App() {
           } else {
             showNotification("Les fichiers ont été uploadés et les notifications ont été envoyées avec succès !", "success");
           }
-          setUploadedItems([]);
-          setRecipientEmail('');
-          setSenderEmail('');
         } else {
           showNotification("Une erreur est survenue lors de l'upload. Veuillez vérifier que les emails sont valides et réessayer.", "error");
         }
@@ -377,6 +393,19 @@ function App() {
       setUploading(false);
       setIsCompressing(false);
     }
+  };
+
+  const resetUploadState = () => {
+    setProgress(0);
+    setCompressionProgress(0);
+    setIsCompressing(false);
+    setUploading(false);
+    setUploadedItems([]);
+    setRecipientEmail('');
+    setSenderEmail('');
+    setError(null);
+    setWarning(null);
+    setSuccess(false);
   };
 
   const showNotification = (message, type = 'info') => {
@@ -399,8 +428,11 @@ function App() {
             prefix = 'ℹ️ Info : ';
     }
     
-    // Afficher l'alerte
+    // Afficher l'alerte et réinitialiser si succès
     alert(prefix + message);
+    if (type === 'success') {
+      resetUploadState();
+    }
   };
 
   const formatFileSize = (bytes) => {
@@ -674,26 +706,55 @@ function App() {
         )}
 
         {(isCompressing || progress > 0) && (
-          <div className="progress-container">
-            <div 
-              className="progress-bar" 
-              style={{ 
-                width: `${isCompressing ? compressionProgress : progress}%` 
-              }} 
-            />
-            <div className="progress-info">
-              <span className="progress-text">
-                {isCompressing 
-                  ? `Compression : ${compressionProgress}%` 
-                  : `Upload : ${progress}%`}
+          <div style={{
+            backgroundColor: 'var(--clr-surface-a20)',
+            padding: 'clamp(1rem, 3vw, 1.5rem)',
+            borderRadius: '8px',
+            marginBottom: 'clamp(1rem, 3vw, 2rem)'
+          }}>
+            <div className="progress-container">
+              <div
+                className="progress-bar"
+                style={{
+                  width: `${isCompressing ? compressionProgress : progress}%`
+                }}
+              />
+              <div className="progress-info">
+                <span className="progress-text">
+                  {isCompressing
+                    ? `Compression : ${compressionProgress}%`
+                    : `Upload : ${progress}%`}
+                </span>
+                <button
+                  className="cancel-button"
+                  onClick={cancelUpload}
+                  aria-label="Annuler"
+                >
+                  Annuler
+                </button>
+              </div>
+            </div>
+            <div style={{
+              marginTop: '1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+              color: 'var(--clr-primary-a50)',
+              fontSize: '0.9rem',
+              padding: '0.5rem',
+              backgroundColor: 'var(--clr-surface-a30)',
+              borderRadius: '4px',
+              border: '1px solid var(--clr-primary-a20)'
+            }}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" style={{ flexShrink: 0 }}>
+                <path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm-1-7v2h2v-2h-2zm0-8v6h2V7h-2z"
+                  fill="currentColor"/>
+              </svg>
+              <span>
+                {isCompressing
+                  ? "Compression en cours. Veuillez ne pas fermer cette fenêtre."
+                  : "Transfert en cours. Veuillez ne pas fermer cette fenêtre."}
               </span>
-              <button 
-                className="cancel-button"
-                onClick={cancelUpload}
-                aria-label="Annuler"
-              >
-                Annuler
-              </button>
             </div>
           </div>
         )}
