@@ -287,7 +287,7 @@ def send_recipient_notification_with_files(recipient_email, file_id, file_name, 
         app.logger.error(f"Erreur lors de la préparation de l'email : {str(e)}")
         return False
 
-def send_sender_upload_confirmation_with_files(sender_email, file_id, file_name, files_summary, total_size, smtp_config, recipient_email):
+def send_sender_upload_confirmation_with_files(sender_email, file_id, file_name, files_list, total_size, smtp_config, recipient_email):
     """
     Envoie un email de confirmation à l'expéditeur avec le résumé des fichiers envoyés
     """
@@ -303,6 +303,11 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, file_name,
         msg['Subject'] = f"Confirmation de votre transfert de fichiers à {recipient_email}"
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
+
+        # Préparer le résumé des fichiers
+        files_summary = ""
+        for file_info in files_list:
+            files_summary += f"- {file_info['name']} ({format_size(file_info['size'])})\n"
 
         title = "Vos fichiers ont été envoyés"
         message = f"""Vos fichiers ont été envoyés avec succès à : {recipient_email}<br><br>Vous pouvez accéder à la page de téléchargement ici : {download_page_link}"""
@@ -337,19 +342,22 @@ def send_download_notification(sender_email, file_id, smtp_config):
         msg['Date'] = formatdate(localtime=True)
         msg['Message-ID'] = make_msgid()
 
-        # Récupérer la liste des fichiers stockée
+        # Récupérer la liste des fichiers et préparer le résumé
         files_list = file_info.get_files_list()
-        files_summary = ""
-        total_size = 0
-
-        if files_list:
+        if not files_list:
+            # Si pas de liste stockée, utiliser le fichier final
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_info.filename)
+            file_size = os.path.getsize(file_path)
+            files_summary = f"- {file_info.filename} ({format_size(file_size)})"
+            total_size_formatted = format_size(file_size)
+        else:
+            # Utiliser la liste complète des fichiers
+            total_size = 0
+            files_summary = ""
             for f in files_list:
                 files_summary += f"- {f['name']} ({format_size(f['size'])})\n"
                 total_size += f['size']
             total_size_formatted = format_size(total_size)
-        else:
-            files_summary = f"- {file_info.filename}"
-            total_size_formatted = "Taille non disponible"
 
         title = "Vos fichiers ont été téléchargés"
         message = f"Vos fichiers ont été téléchargés le {download_time}."
@@ -427,19 +435,20 @@ def upload_file():
         if not email or not sender_email:
             return jsonify({'error': 'Email addresses are required'}), 400
 
-        # Récupérer la liste des fichiers pour les emails
+        # Récupérer et valider la liste des fichiers
         files_list = json.loads(request.form.get('files_list', '[]'))
-        
+        if not files_list:
+            return jsonify({'error': 'Liste des fichiers invalide'}), 400
+
+        # Calculer la taille totale pour affichage
+        total_size = sum(file_info['size'] for file_info in files_list)
+        total_size_mb = total_size / (1024 * 1024)
+
         # Préparer le contenu des fichiers pour les emails
         files_content = ""
-        total_size = 0
         for file_info in files_list:
             size_mb = file_info['size'] / (1024 * 1024)
-            files_content += f"- {file_info['name']} ({size_mb:.2f} MB)\n"
-            total_size += file_info['size']
-        
-        total_size_mb = total_size / (1024 * 1024)
-        files_content += f"\nTaille totale : {total_size_mb:.2f} MB"
+            files_content += f"- {file_info['name']} ({format_size(file_info['size'])})\n"
 
         # Sauvegarder les fichiers
         file_id = str(uuid.uuid4())
@@ -552,13 +561,10 @@ def upload_file():
         db.session.commit()
         app.logger.info(f"Fichier enregistré en base avec l'ID: {file_id}")
 
-        # Préparer le résumé des fichiers à partir de la liste stockée
-        files_list = new_file.get_files_list()
+        # Préparer le résumé des fichiers à partir des données brutes
         files_summary = ""
-        total_size = 0
-        for f in files_list:
-            files_summary += f"- {f['name']} ({format_size(f['size'])})\n"
-            total_size += f['size']
+        for file_info in files_list:
+            files_summary += f"- {file_info['name']} ({format_size(file_info['size'])})\n"
         total_size_formatted = format_size(total_size)
 
         # Envoyer les notifications
@@ -568,11 +574,16 @@ def upload_file():
         notification_errors = []
 
         try:
+            # Préparer la liste formatée pour les notifications
+            files_summary = ""
+            for file_info in files_list:
+                files_summary += f"- {file_info['name']} ({format_size(file_info['size'])})\n"
+
             if not send_recipient_notification_with_files(email, file_id, final_filename, files_summary, total_size_formatted, smtp_config, sender_email):
                 app.logger.error(f"Échec de l'envoi de la notification au destinataire: {email}")
                 notification_errors.append("destinataire")
             
-            if not send_sender_upload_confirmation_with_files(sender_email, file_id, final_filename, files_summary, total_size_formatted, smtp_config, email):
+            if not send_sender_upload_confirmation_with_files(sender_email, file_id, final_filename, files_list, total_size_formatted, smtp_config, email):
                 app.logger.error(f"Échec de l'envoi de la notification à l'expéditeur: {sender_email}")
                 notification_errors.append("expéditeur")
         except Exception as e:
@@ -617,24 +628,28 @@ def get_transfer_details(file_id):
             app.logger.info(f"Tentative d'accès à un fichier expiré: {file_id}")
             return jsonify({'error': 'Le lien de téléchargement a expiré'}), 410
 
-        # Construire le chemin du fichier
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_info.filename)
-        
-        if not os.path.exists(file_path):
-            return jsonify({'error': 'Fichier non trouvé sur le serveur'}), 404
-
         # Récupérer la liste des fichiers stockée
         files_list = file_info.get_files_list()
-
-        # Si c'est un seul fichier sans liste stockée, créer une liste avec ce fichier
+        
         if not files_list:
+            # Si pas de liste stockée, vérifier si le fichier existe
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_info.filename)
+            if not os.path.exists(file_path):
+                return jsonify({'error': 'Fichier non trouvé sur le serveur'}), 404
+                
+            # Créer une liste avec le fichier unique
             file_size = os.path.getsize(file_path)
             files_list = [{
                 'name': file_info.filename,
                 'size': file_size
             }]
+        else:
+            # Vérifier si le fichier final existe (ZIP ou fichier unique)
+            file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_info.filename)
+            if not os.path.exists(file_path):
+                return jsonify({'error': 'Fichier non trouvé sur le serveur'}), 404
 
-        # Retourner les informations des fichiers
+        # Retourner la liste des fichiers avec les détails
         return jsonify({
             'files': files_list,
             'expires_at': file_info.expires_at.isoformat()

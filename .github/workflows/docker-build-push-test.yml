@@ -19,8 +19,8 @@ on:
 
 env:
   REGISTRY: docker.io
-  IMAGE_BACKEND: tiritibambix/itransfer-backend-test
-  IMAGE_FRONTEND: tiritibambix/itransfer-frontend-test
+  IMAGE_BACKEND: tiritibambix/itransfer-backend
+  IMAGE_FRONTEND: tiritibambix/itransfer-frontend
 
 jobs:
   setup:
@@ -81,8 +81,8 @@ jobs:
           push: true
           platforms: linux/amd64 #,linux/arm64
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:${{ needs.setup.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:test
+            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:${{ needs.setup.outputs.version }}-test
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
@@ -111,8 +111,8 @@ jobs:
           push: true
           platforms: linux/amd64 #,linux/arm64
           tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:${{ needs.setup.outputs.version }}
+            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:test
+            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:${{ needs.setup.outputs.version }}-test
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
