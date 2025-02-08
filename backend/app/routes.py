@@ -157,11 +157,13 @@ def create_email_template(title, message, file_summary, total_size, download_lin
                 background-color: #f8f9fa;
                 padding: 20px;
                 border-radius: 8px;
-                font-family: 'Courier New', monospace;
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
                 white-space: pre-wrap;
                 color: #170017;
                 border: 1px solid rgba(0, 0, 0, 0.05);
                 margin: 20px 0;
+                line-height: 1.8;
+                font-size: 15px;
             }}
             .total {{
                 margin-top: 20px;
