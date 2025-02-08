@@ -262,9 +262,10 @@ def send_recipient_notification_with_files(recipient_email, file_id, file_name, 
         expiration_date = file_info.expires_at.astimezone(timezone)
         expiration_formatted = expiration_date.strftime('%d/%m/%Y à %H:%M:%S')
 
-        backend_url = get_backend_url()
-        download_link = f"{backend_url}/download/{file_id}"
-        app.logger.info(f"Lien de téléchargement généré : {download_link}")
+        # Obtenir l'URL frontend depuis la variable d'environnement
+        frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500')
+        download_page_link = f"{frontend_url}/download/{file_id}"
+        app.logger.info(f"Lien vers la page de téléchargement généré : {download_page_link}")
 
         msg = MIMEMultipart('alternative')
         msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
@@ -274,9 +275,9 @@ def send_recipient_notification_with_files(recipient_email, file_id, file_name, 
         msg['Message-ID'] = make_msgid()
 
         title = "Vous avez reçu des fichiers"
-        message = f"""{sender_email} vous a envoyé des fichiers.<br><br>Ce lien expirera le {expiration_formatted}"""
+        message = f"""{sender_email} vous a envoyé des fichiers. Cliquez sur le bouton ci-dessous pour accéder à la page de téléchargement.<br><br>Ce lien expirera le {expiration_formatted}"""
 
-        html, text = create_email_template(title, message, files_summary, total_size, download_link)
+        html, text = create_email_template(title, message, files_summary, total_size, download_page_link)
         
         msg.attach(MIMEText(text, 'plain'))
         msg.attach(MIMEText(html, 'html'))
@@ -291,9 +292,10 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, file_name,
     Envoie un email de confirmation à l'expéditeur avec le résumé des fichiers envoyés
     """
     try:
-        backend_url = get_backend_url()
-        download_link = f"{backend_url}/download/{file_id}"
-        app.logger.info(f"Lien de téléchargement généré : {download_link}")
+        # Obtenir l'URL frontend depuis la variable d'environnement
+        frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500')
+        download_page_link = f"{frontend_url}/download/{file_id}"
+        app.logger.info(f"Lien vers la page de téléchargement généré : {download_page_link}")
 
         msg = MIMEMultipart('alternative')
         msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
@@ -303,7 +305,7 @@ def send_sender_upload_confirmation_with_files(sender_email, file_id, file_name,
         msg['Message-ID'] = make_msgid()
 
         title = "Vos fichiers ont été envoyés"
-        message = f"""Vos fichiers ont été envoyés avec succès à : {recipient_email}<br><br>Lien de téléchargement : {download_link}"""
+        message = f"""Vos fichiers ont été envoyés avec succès à : {recipient_email}<br><br>Vous pouvez accéder à la page de téléchargement ici : {download_page_link}"""
 
         html, text = create_email_template(title, message, files_summary, total_size)
         
