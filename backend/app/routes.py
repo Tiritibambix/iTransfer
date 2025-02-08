@@ -518,7 +518,16 @@ def upload_file():
 
         app.logger.info(f"Hash du fichier: {encrypted_data}")
 
-        # Sauvegarder en base
+        # Préparer la liste des fichiers pour stockage
+        files_to_store = []
+        for file_info in file_list:
+            files_to_store.append({
+                'name': file_info['name'],
+                'size': file_info['size'],
+                'folder': file_info['folder']
+            })
+
+        # Sauvegarder en base avec la liste des fichiers
         new_file = FileUpload(
             id=file_id,
             filename=final_filename,
@@ -528,18 +537,13 @@ def upload_file():
             downloaded=False,
             expires_at=datetime.now() + timedelta(days=expiration_days)
         )
+        new_file.set_files_list(files_to_store)
         db.session.add(new_file)
         db.session.commit()
         app.logger.info(f"Fichier enregistré en base avec l'ID: {file_id}")
 
         # Préparer le résumé des fichiers
         files_summary = files_content
-        
-        # Stocker les informations des fichiers pour la notification de téléchargement
-        app.config[f'files_summary_{file_id}'] = {
-            'summary': files_summary,
-            'total_size': f"Taille totale : {total_size}"
-        }
 
         # Envoyer les notifications
         with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
@@ -603,16 +607,21 @@ def get_transfer_details(file_id):
         if not os.path.exists(file_path):
             return jsonify({'error': 'Fichier non trouvé sur le serveur'}), 404
 
-        # Obtenir la taille du fichier
-        file_size = os.path.getsize(file_path)
+        # Récupérer la liste des fichiers stockée
+        files_list = file_info.get_files_list()
 
-        # Retourner les informations du fichier
-        return jsonify({
-            'files': [{
+        # Si c'est un seul fichier sans liste stockée, créer une liste avec ce fichier
+        if not files_list:
+            file_size = os.path.getsize(file_path)
+            files_list = [{
                 'name': file_info.filename,
-                'size': file_size,
-                'expires_at': file_info.expires_at.isoformat()
+                'size': file_size
             }]
+
+        # Retourner les informations des fichiers
+        return jsonify({
+            'files': files_list,
+            'expires_at': file_info.expires_at.isoformat()
         }), 200
 
     except Exception as e:
@@ -648,15 +657,20 @@ def download_file(file_id):
             with open(app.config['SMTP_CONFIG_PATH'], 'r') as config_file:
                 smtp_config = json.load(config_file)
 
-            # Récupérer le résumé des fichiers stocké lors de l'upload
-            stored_summary = app.config.get(f'files_summary_{file_id}')
-            if stored_summary:
-                files_summary = stored_summary['summary']
-                total_size_formatted = stored_summary['total_size']
-                # Nettoyer après utilisation
-                del app.config[f'files_summary_{file_id}']
+            # Récupérer la liste des fichiers depuis la base de données
+            files_list = file_info.get_files_list()
+            
+            # Préparer le résumé des fichiers
+            total_size = 0
+            files_summary = ""
+            
+            if files_list:
+                for f in files_list:
+                    files_summary += f"- {f['name']} ({format_size(f['size'])})\n"
+                    total_size += f['size']
+                total_size_formatted = format_size(total_size)
             else:
-                # Fallback si le résumé n'est pas trouvé
+                # Fallback pour un seul fichier
                 file_size = os.path.getsize(file_path)
                 files_summary = f"- {file_info.filename} ({format_size(file_size)})"
                 total_size_formatted = format_size(file_size)
