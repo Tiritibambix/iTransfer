@@ -374,40 +374,6 @@ def send_download_notification(sender_email, file_id, smtp_config):
         app.logger.error(f"Erreur lors de l'envoi de la notification de téléchargement: {str(e)}")
         return False
 
-def cleanup_expired_files():
-    try:
-        # Récupérer tous les fichiers expirés
-        expired_files = FileUpload.query.filter(FileUpload.expires_at < datetime.now()).all()
-        
-        for file in expired_files:
-            try:
-                # Supprimer le fichier physique
-                file_path = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-                if os.path.exists(file_path):
-                    os.remove(file_path)
-                    app.logger.info(f"Fichier expiré supprimé: {file_path}")
-                
-                # Supprimer l'entrée de la base de données
-                db.session.delete(file)
-                app.logger.info(f"Entrée de base de données supprimée pour le fichier: {file.id}")
-            except Exception as e:
-                app.logger.error(f"Erreur lors de la suppression du fichier {file.id}: {str(e)}")
-        
-        db.session.commit()
-        app.logger.info("Nettoyage des fichiers expirés terminé")
-    except Exception as e:
-        app.logger.error(f"Erreur lors du nettoyage des fichiers expirés: {str(e)}")
-
-def run_scheduler():
-    schedule.every(12).hours.do(cleanup_expired_files)
-    while True:
-        schedule.run_pending()
-        time.sleep(3600)  # Attendre 1 heure
-
-# Démarrer le scheduler dans un thread séparé
-scheduler_thread = threading.Thread(target=run_scheduler, daemon=True)
-scheduler_thread.start()
-
 @app.route('/upload', methods=['POST', 'OPTIONS'])
 def upload_file():
     if request.method == 'OPTIONS':
