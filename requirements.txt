@@ -12,5 +12,5 @@ mysqlclient==2.2.7
 flask_migrate==4.1.0
 PyJWT==2.10.1
 python-magic==0.4.27
-pytz==2025.1
+pytz==2025.2
 schedule==1.2.2
