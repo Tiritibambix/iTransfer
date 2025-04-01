@@ -351,6 +351,7 @@ docker-compose up -d
 │   │   ├── index.css        # Global styles
 │   │   ├── index.js         # React entry point
 └── requirements.txt         # Python dependencies
+```
 
 The project follows a typical client-server architecture:
 
