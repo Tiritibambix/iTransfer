@@ -647,7 +647,7 @@ def download_file(file_id):
 
         # Construire le chemin du fichier
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_info.filename)
-        
+
         if not os.path.exists(file_path):
             return jsonify({'error': 'Fichier non trouvé sur le serveur'}), 404
 
@@ -662,11 +662,11 @@ def download_file(file_id):
 
             # Récupérer la liste des fichiers depuis la base de données
             files_list = file_info.get_files_list()
-            
+
             # Préparer le résumé des fichiers
             total_size = 0
             files_summary = ""
-            
+
             if files_list:
                 for f in files_list:
                     files_summary += f"- {f['name']} ({format_size(f['size'])})\n"
@@ -678,14 +678,21 @@ def download_file(file_id):
                 files_summary = f"- {file_info.filename} ({format_size(file_size)})"
                 total_size_formatted = format_size(file_size)
 
-            # Envoyer une notification à l'expéditeur
-            send_download_notification(file_info.sender_email, file_id, smtp_config)
+            # Envoyer une notification à l'expéditeur de manière asynchrone
+            threading.Thread(target=send_download_notification, args=(file_info.sender_email, file_id, smtp_config)).start()
 
-        # Envoyer le fichier
-        return send_file(
-            file_path,
-            as_attachment=True,
-            download_name=os.path.basename(file_info.filename)
+        # Envoyer le fichier de manière asynchrone
+        def generate():
+            with open(file_path, 'rb') as f:
+                while chunk := f.read(8192):
+                    yield chunk
+
+        return Response(
+            generate(),
+            mimetype='application/octet-stream',
+            headers={
+                'Content-Disposition': f'attachment; filename={os.path.basename(file_info.filename)}'
+            }
         )
 
     except Exception as e:
