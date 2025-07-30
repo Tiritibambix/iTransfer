@@ -692,7 +692,7 @@ def download_file(file_id):
                     yield chunk
 
         return Response(
-            generate(),
+            stream_with_context(generate()),
             mimetype='application/octet-stream',
             headers={
                 'Content-Disposition': f'attachment; filename={os.path.basename(file_info.filename)}'
