@@ -3,7 +3,7 @@ import uuid
 import hashlib
 import smtplib
 import json
-from flask import request, jsonify, send_file
+from flask import request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -679,7 +679,11 @@ def download_file(file_id):
                 total_size_formatted = format_size(file_size)
 
             # Envoyer une notification à l'expéditeur de manière asynchrone
-            threading.Thread(target=send_download_notification, args=(file_info.sender_email, file_id, smtp_config)).start()
+            def notify_sender():
+                with app.app_context():
+                    send_download_notification(file_info.sender_email, file_id, smtp_config)
+
+            threading.Thread(target=notify_sender).start()
 
         # Envoyer le fichier de manière asynchrone
         def generate():
