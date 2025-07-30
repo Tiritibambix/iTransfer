@@ -686,9 +686,9 @@ def download_file(file_id):
             threading.Thread(target=notify_sender).start()
 
         # Envoyer le fichier de manière asynchrone
-        def generate():
-            with open(file_path, 'rb') as f:
-                while chunk := f.read(8192):
+        async def generate():
+            async with aiofiles.open(file_path, 'rb') as f:
+                while chunk := await f.read(8192):
                     yield chunk
 
         return Response(
