@@ -3,7 +3,7 @@ import uuid
 import hashlib
 import smtplib
 import json
-from flask import request, jsonify, send_file, Response, stream_with_context
+from flask import request, jsonify, send_file
 from werkzeug.utils import secure_filename
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -647,7 +647,7 @@ def download_file(file_id):
 
         # Construire le chemin du fichier
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], file_info.filename)
-
+        
         if not os.path.exists(file_path):
             return jsonify({'error': 'Fichier non trouvé sur le serveur'}), 404
 
@@ -662,11 +662,11 @@ def download_file(file_id):
 
             # Récupérer la liste des fichiers depuis la base de données
             files_list = file_info.get_files_list()
-
+            
             # Préparer le résumé des fichiers
             total_size = 0
             files_summary = ""
-
+            
             if files_list:
                 for f in files_list:
                     files_summary += f"- {f['name']} ({format_size(f['size'])})\n"
@@ -678,25 +678,14 @@ def download_file(file_id):
                 files_summary = f"- {file_info.filename} ({format_size(file_size)})"
                 total_size_formatted = format_size(file_size)
 
-            # Envoyer une notification à l'expéditeur de manière asynchrone
-            def notify_sender():
-                with app.app_context():
-                    send_download_notification(file_info.sender_email, file_id, smtp_config)
+            # Envoyer une notification à l'expéditeur
+            send_download_notification(file_info.sender_email, file_id, smtp_config)
 
-            threading.Thread(target=notify_sender).start()
-
-        # Envoyer le fichier de manière asynchrone
-        async def generate():
-            async with aiofiles.open(file_path, 'rb') as f:
-                while chunk := await f.read(8192):
-                    yield chunk
-
-        return Response(
-            stream_with_context(generate()),
-            mimetype='application/octet-stream',
-            headers={
-                'Content-Disposition': f'attachment; filename={os.path.basename(file_info.filename)}'
-            }
+        # Envoyer le fichier
+        return send_file(
+            file_path,
+            as_attachment=True,
+            download_name=os.path.basename(file_info.filename)
         )
 
     except Exception as e:
