@@ -1,22 +1,10 @@
-name: Build and Push Multi-Arch Docker Images (Test)
+name: Build and Push Docker Images (Test)
 
 # Security note: same pinning recommendation as docker-build-push.yml.
+# Triggered manually from any branch; builds linux/amd64 only and pushes
+# images tagged ":test".
 
 on:
-  push:
-    branches:
-      - test
-    paths-ignore:
-      - 'LICENSE'
-      - 'README.md'
-      - 'TODO.md'
-  pull_request:
-    branches:
-      - test
-    paths-ignore:
-      - 'LICENSE'
-      - 'README.md'
-      - 'TODO.md'
   workflow_dispatch:
 
 permissions:
@@ -28,29 +16,8 @@ env:
   IMAGE_FRONTEND: tiritibambix/itransfer-frontend
 
 jobs:
-  setup:
-    runs-on: ubuntu-24.04
-    permissions:
-      contents: read
-    outputs:
-      version: ${{ steps.version.outputs.version }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v6
-
-      - name: Extract version from Git
-        id: version
-        run: echo "version=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v4
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
   audit:
     runs-on: ubuntu-24.04
-    needs: setup
     permissions:
       contents: read
     steps:
@@ -68,7 +35,7 @@ jobs:
 
   build-push-backend:
     runs-on: ubuntu-24.04
-    needs: [setup, audit]
+    needs: audit
     permissions:
       contents: read
     steps:
@@ -84,23 +51,21 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push multi-arch backend image
+      - name: Build and push backend image (amd64, :test)
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./backend/Dockerfile
           push: true
           platforms: linux/amd64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:test
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:${{ needs.setup.outputs.version }}-test
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
 
   build-push-frontend:
     runs-on: ubuntu-24.04
-    needs: [setup, audit]
+    needs: audit
     permissions:
       contents: read
     steps:
@@ -116,16 +81,14 @@ jobs:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build and push multi-arch frontend image
+      - name: Build and push frontend image (amd64, :test)
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./frontend/Dockerfile
           push: true
           platforms: linux/amd64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:test
-            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:${{ needs.setup.outputs.version }}-test
+          tags: ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:test
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
