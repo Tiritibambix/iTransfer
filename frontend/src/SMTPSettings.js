@@ -64,6 +64,7 @@ const SMTPSettings = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`,
         },
         body: JSON.stringify(smtpSettings),
       });
@@ -93,6 +94,7 @@ const SMTPSettings = () => {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken') || ''}`,
         }
       });
 

@@ -358,6 +358,7 @@ function App() {
 
       const xhr = new XMLHttpRequest();
       xhr.open('POST', `${backendUrl}/upload`, true);
+      xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('authToken') || ''}`);
       
       xhr.upload.onprogress = (event) => {
         if (event.lengthComputable) {

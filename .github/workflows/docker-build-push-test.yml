@@ -1,4 +1,6 @@
-name: Build and Push Multi-Arch Docker Images
+name: Build and Push Multi-Arch Docker Images (Test)
+
+# Security note: same pinning recommendation as docker-build-push.yml.
 
 on:
   push:
@@ -17,6 +19,9 @@ on:
       - 'TODO.md'
   workflow_dispatch:
 
+permissions:
+  contents: read
+
 env:
   REGISTRY: docker.io
   IMAGE_BACKEND: tiritibambix/itransfer-backend
@@ -25,6 +30,8 @@ env:
 jobs:
   setup:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -44,6 +51,8 @@ jobs:
   audit:
     runs-on: ubuntu-24.04
     needs: setup
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -60,6 +69,8 @@ jobs:
   build-push-backend:
     runs-on: ubuntu-24.04
     needs: [setup, audit]
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -79,7 +90,7 @@ jobs:
           context: .
           file: ./backend/Dockerfile
           push: true
-          platforms: linux/amd64 #,linux/arm64
+          platforms: linux/amd64
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:test
             ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:${{ needs.setup.outputs.version }}-test
@@ -90,6 +101,8 @@ jobs:
   build-push-frontend:
     runs-on: ubuntu-24.04
     needs: [setup, audit]
+    permissions:
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -109,33 +122,10 @@ jobs:
           context: .
           file: ./frontend/Dockerfile
           push: true
-          platforms: linux/amd64 #,linux/arm64
+          platforms: linux/amd64
           tags: |
             ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:test
             ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:${{ needs.setup.outputs.version }}-test
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
-
-#  update-dockerhub-description:
-#    runs-on: ubuntu-24.04
-#    needs: [build-push-backend, build-push-frontend]
-#    steps:
-#      - name: Checkout repository
-#        uses: actions/checkout@v6
-#      
-#      - name: Update Backend Docker Hub Description
-#       uses: peter-evans/dockerhub-description@v5
-#      with:
-#        username: ${{ secrets.DOCKER_USERNAME }}
-#        password: ${{ secrets.DOCKER_PASSWORD }}
-#        repository: ${{ env.IMAGE_BACKEND }}
-#        readme-filepath: ./README.md
-#        
-#    - name: Update Frontend Docker Hub Description
-#      uses: peter-evans/dockerhub-description@v5
-#      with:
-#        username: ${{ secrets.DOCKER_USERNAME }}
-#        password: ${{ secrets.DOCKER_PASSWORD }}
-#        repository: ${{ env.IMAGE_FRONTEND }}
-#        readme-filepath: ./README.md
