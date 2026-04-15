@@ -564,3 +564,53 @@ tbody tr:hover { background: rgba(105,58,103,0.05); }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* ---- SMTP grid (2 cols on wide, 1 col on mobile) ---- */
+.smtp-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--sp-4);
+}
+
+/* Full-width fields: server spans 2, password spans 2, sender spans 2 */
+.smtp-grid .field:nth-child(1) { grid-column: 1 / -1; }
+.smtp-grid .field:nth-child(4) { grid-column: 1 / -1; }
+.smtp-grid .field:nth-child(5) { grid-column: 1 / -1; }
+
+.smtp-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: var(--sp-3);
+  margin-top: var(--sp-2);
+}
+
+@media (max-width: 600px) {
+  .smtp-grid { grid-template-columns: 1fr; }
+  .smtp-grid .field:nth-child(1),
+  .smtp-grid .field:nth-child(4),
+  .smtp-grid .field:nth-child(5) { grid-column: 1; }
+  .smtp-actions { flex-direction: column; }
+  .smtp-actions .btn { width: 100%; }
+}
+
+/* ---- Transfer mobile cards ---- */
+.transfer-cards {
+  display: none;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+
+.transfer-card {
+  background: var(--clr-surface-2);
+  border: 1px solid rgba(105,58,103,0.15);
+  border-radius: var(--radius-md);
+  padding: var(--sp-4);
+}
+
+@media (max-width: 768px) {
+  .hide-mobile-table { display: none; }
+  .transfer-cards { display: flex; }
+}
+
+/* ---- Wider container for admin ---- */
+.container--wide { max-width: 1200px; }

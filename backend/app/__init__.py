@@ -170,10 +170,12 @@ def _cleanup_expired_files() -> None:
 
 def _run_scheduler() -> None:
     with app.app_context():
+        # Run once at startup to catch files that expired while the container was down.
+        _cleanup_expired_files()
         schedule.every(12).hours.do(_cleanup_expired_files)
         while True:
             schedule.run_pending()
-            time.sleep(3600)
+            time.sleep(60)  # Check every minute so scheduled jobs fire on time
 
 
 threading.Thread(target=_run_scheduler, daemon=True, name='itransfer-cleanup').start()
