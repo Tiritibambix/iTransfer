@@ -598,7 +598,7 @@ def save_smtp_settings():
             'smtp_password': data['smtpPassword'],
             'smtp_sender_email': data['smtpSenderEmail'],
         }
-        app.logger.info("SMTP config updated: %s", _safe_smtp_config_summary(smtp_config))
+        app.logger.info("SMTP config updated")
         config_path = app.config['SMTP_CONFIG_PATH']
         os.makedirs(os.path.dirname(config_path), exist_ok=True)
         with open(config_path, 'w', encoding='utf-8') as fh:
