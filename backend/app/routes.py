@@ -57,6 +57,65 @@ def _safe_smtp_config_summary(cfg: dict) -> dict:
     return redacted
 
 
+def _sender_domain(smtp_config: dict) -> str:
+    """Extract the domain part of smtp_sender_email."""
+    sender = smtp_config.get('smtp_sender_email', '')
+    if '@' in sender:
+        return sender.split('@', 1)[1]
+    return 'localhost'
+
+
+def _build_message(
+    smtp_config: dict,
+    to_addr: str,
+    subject: str,
+    text_body: str,
+    html_body: str,
+    reply_to: str | None = None,
+) -> MIMEMultipart:
+    """
+    Build a MIME message with headers tuned for deliverability.
+
+    Sets:
+    - From with a friendly name aligned with smtp_sender_email
+    - Message-ID anchored to the sender domain (not the container hostname)
+    - Date in RFC 2822 form
+    - Reply-To when the conversational reply should go to a different address
+      (e.g. the iTransfer sender of the file, not the no-reply mailbox)
+    - Auto-Submitted: auto-generated to signal this is a system notification
+    - Precedence: bulk to lower the chance of vacation auto-replies bouncing
+    - X-Mailer for traceability
+    - List-Unsubscribe + List-Unsubscribe-Post; Gmail and Yahoo expect these
+      on transactional mail since their 2024 sender requirements update.
+      We point at a mailto: with an unsubscribe subject because iTransfer has
+      no web unsubscribe endpoint; the address simply needs to exist on the
+      sender mailbox to avoid a delivery penalty.
+
+    Bodies are attached as text/plain first, text/html last, so MIME-aware
+    clients prefer the HTML version.
+    """
+    sender_email = smtp_config.get('smtp_sender_email', '')
+    domain = _sender_domain(smtp_config)
+
+    msg = MIMEMultipart('alternative')
+    msg['From'] = formataddr(("iTransfer", sender_email))
+    msg['To'] = to_addr
+    msg['Subject'] = subject
+    msg['Date'] = formatdate(localtime=True)
+    msg['Message-ID'] = make_msgid(domain=domain)
+    if reply_to:
+        msg['Reply-To'] = reply_to
+    msg['Auto-Submitted'] = 'auto-generated'
+    msg['Precedence'] = 'bulk'
+    msg['X-Mailer'] = 'iTransfer'
+    msg['List-Unsubscribe'] = f'<mailto:{sender_email}?subject=unsubscribe>'
+    msg['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click'
+
+    msg.attach(MIMEText(text_body, 'plain', 'utf-8'))
+    msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+    return msg
+
+
 def send_email_with_smtp(msg, smtp_config) -> bool:
     server = None
     try:
@@ -156,13 +215,6 @@ def _send_recipient_notification(recipient_email, file_id, files_summary, total_
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500').rstrip('/')
         download_page_link = f"{frontend_url}/download/{file_id}"
 
-        msg = MIMEMultipart('alternative')
-        msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
-        msg['To'] = recipient_email
-        msg['Subject'] = f"{sender_email} vous envoie des fichiers"
-        msg['Date'] = formatdate(localtime=True)
-        msg['Message-ID'] = make_msgid()
-
         title = "Vous avez recu des fichiers"
         message = (
             f"{sender_email} vous a envoye des fichiers. Cliquez sur le bouton "
@@ -170,8 +222,14 @@ def _send_recipient_notification(recipient_email, file_id, files_summary, total_
             f"Ce lien expirera le {expiration_formatted}"
         )
         html, text = create_email_template(title, message, files_summary, total_size, download_page_link)
-        msg.attach(MIMEText(text, 'plain'))
-        msg.attach(MIMEText(html, 'html'))
+        msg = _build_message(
+            smtp_config=smtp_config,
+            to_addr=recipient_email,
+            subject=f"{sender_email} vous envoie des fichiers",
+            text_body=text,
+            html_body=html,
+            reply_to=sender_email,
+        )
         return send_email_with_smtp(msg, smtp_config)
     except Exception:
         app.logger.exception("Failed to prepare recipient notification")
@@ -183,13 +241,6 @@ def _send_sender_confirmation(sender_email, file_id, files_list, total_size, smt
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500').rstrip('/')
         download_page_link = f"{frontend_url}/download/{file_id}"
 
-        msg = MIMEMultipart('alternative')
-        msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
-        msg['To'] = sender_email
-        msg['Subject'] = f"Confirmation de votre transfert a {recipient_email}"
-        msg['Date'] = formatdate(localtime=True)
-        msg['Message-ID'] = make_msgid()
-
         files_summary = ""
         for f in files_list:
             files_summary += f"- {f['name']} ({format_size(f['size'])})\n"
@@ -200,8 +251,13 @@ def _send_sender_confirmation(sender_email, file_id, files_list, total_size, smt
             f"Page de telechargement : {download_page_link}"
         )
         html, text = create_email_template(title, message, files_summary, total_size)
-        msg.attach(MIMEText(text, 'plain'))
-        msg.attach(MIMEText(html, 'html'))
+        msg = _build_message(
+            smtp_config=smtp_config,
+            to_addr=sender_email,
+            subject=f"Confirmation de votre transfert a {recipient_email}",
+            text_body=text,
+            html_body=html,
+        )
         return send_email_with_smtp(msg, smtp_config)
     except Exception:
         app.logger.exception("Failed to prepare sender confirmation")
@@ -216,13 +272,6 @@ def _send_download_notification(sender_email, file_id, smtp_config):
         if not file_info:
             app.logger.error("File not found for download notification: %s", file_id)
             return False
-
-        msg = MIMEMultipart('alternative')
-        msg['Subject'] = "Vos fichiers ont ete telecharges"
-        msg['From'] = formataddr(("iTransfer", smtp_config.get('smtp_sender_email', '')))
-        msg['To'] = sender_email
-        msg['Date'] = formatdate(localtime=True)
-        msg['Message-ID'] = make_msgid()
 
         files_list = file_info.get_files_list()
         if files_list:
@@ -241,8 +290,13 @@ def _send_download_notification(sender_email, file_id, smtp_config):
         title = "Vos fichiers ont ete telecharges"
         message = f"Vos fichiers ont ete telecharges le {download_time}."
         html, text = create_email_template(title, message, files_summary, total_formatted)
-        msg.attach(MIMEText(text, 'plain'))
-        msg.attach(MIMEText(html, 'html'))
+        msg = _build_message(
+            smtp_config=smtp_config,
+            to_addr=sender_email,
+            subject="Vos fichiers ont ete telecharges",
+            text_body=text,
+            html_body=html,
+        )
         return send_email_with_smtp(msg, smtp_config)
     except Exception:
         app.logger.exception("Failed to send download notification")
@@ -541,14 +595,13 @@ def test_smtp():
             "Testing SMTP: %s", _safe_smtp_config_summary(smtp_config)
         )
 
-        msg = MIMEMultipart('alternative')
-        msg['From'] = formataddr(("iTransfer", smtp_config['smtp_sender_email']))
-        msg['To'] = smtp_config['smtp_sender_email']
-        msg['Subject'] = "Test de configuration SMTP"
-        msg['Date'] = formatdate(localtime=True)
-        msg['Message-ID'] = make_msgid()
-        msg.attach(MIMEText("Test SMTP iTransfer.", 'plain'))
-        msg.attach(MIMEText("<p>Test SMTP iTransfer.</p>", 'html'))
+        msg = _build_message(
+            smtp_config=smtp_config,
+            to_addr=smtp_config['smtp_sender_email'],
+            subject="Test de configuration SMTP",
+            text_body="Test SMTP iTransfer.",
+            html_body="<p>Test SMTP iTransfer.</p>",
+        )
 
         if send_email_with_smtp(msg, smtp_config):
             return jsonify({'message': 'SMTP test OK'}), 200
