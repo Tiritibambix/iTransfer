@@ -3,33 +3,81 @@ HTTP routes.
 
 Security posture:
 * No client-facing response ever contains ``str(exc)`` or ``traceback`` data.
-  All error replies are generic strings; full diagnostic info goes to the
-  server log via ``logger.exception``.
 * Every filesystem path derived from user input is routed through
-  ``paths.safe_join`` / ``paths.safe_stored_filename`` which validate the
-  result stays inside the configured root directory.
+  ``paths.safe_join`` / ``paths.safe_stored_filename``.
 * Protected endpoints require a JWT issued by /login.
 * SMTP credentials are never logged.
+* Rate limiting via in-process token bucket (no Redis dependency).
+* Recipient/sender emails are validated before any processing.
 """
 import hashlib
 import json
 import os
+import re
 import shutil
 import smtplib
+import threading
+import time
 import uuid
 import zipfile
+from collections import defaultdict
 from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr, formatdate, make_msgid
+from queue import Empty, Queue
 
 import pytz
-from flask import current_app, jsonify, request, send_from_directory
+from flask import Response, current_app, jsonify, request, send_from_directory, stream_with_context
 
 from . import app, db
 from .auth import issue_token, require_auth
 from .models import FileUpload
 from .paths import UnsafePathError, safe_join, safe_stored_filename
+
+
+# -------------------------------------------------------------------------
+# Rate limiting (token bucket, in-process)
+# -------------------------------------------------------------------------
+_rate_buckets: dict[str, dict] = defaultdict(lambda: {'tokens': 10, 'last': time.monotonic()})
+_rate_lock = threading.Lock()
+
+RATE_LIMIT_UPLOAD = 5      # requests
+RATE_LIMIT_WINDOW = 60     # seconds
+RATE_LIMIT_LOGIN  = 10
+
+
+def _rate_limit(key: str, limit: int = RATE_LIMIT_UPLOAD, window: int = RATE_LIMIT_WINDOW) -> bool:
+    """Return True if the request is allowed, False if rate-limited."""
+    with _rate_lock:
+        bucket = _rate_buckets[key]
+        now = time.monotonic()
+        elapsed = now - bucket['last']
+        bucket['tokens'] = min(limit, bucket['tokens'] + elapsed * (limit / window))
+        bucket['last'] = now
+        if bucket['tokens'] >= 1:
+            bucket['tokens'] -= 1
+            return True
+        return False
+
+
+def _client_key() -> str:
+    """Best-effort client identifier for rate limiting."""
+    if app.config['PROXY_COUNT'] > 0:
+        forwarded = request.headers.get('X-Forwarded-For', '')
+        ip = forwarded.split(',')[0].strip() if forwarded else request.remote_addr
+    else:
+        ip = request.remote_addr
+    return ip or 'unknown'
+
+
+# -------------------------------------------------------------------------
+# Email validation
+# -------------------------------------------------------------------------
+_EMAIL_RE = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+
+def _valid_email(addr: str) -> bool:
+    return bool(addr and isinstance(addr, str) and _EMAIL_RE.match(addr.strip()) and len(addr) <= 254)
 
 
 # -------------------------------------------------------------------------
@@ -44,56 +92,25 @@ def format_size(num_bytes: float) -> str:
 
 
 def _load_smtp_config():
-    """Return parsed SMTP config, or raise FileNotFoundError."""
     path = app.config['SMTP_CONFIG_PATH']
     with open(path, 'r', encoding='utf-8') as fh:
         return json.load(fh)
 
 
 def _safe_smtp_config_summary(cfg: dict) -> dict:
-    """Return a copy of cfg safe to log (password redacted)."""
     redacted = {k: v for k, v in cfg.items() if k != 'smtp_password'}
     redacted['smtp_password'] = '***redacted***'
     return redacted
 
 
 def _sender_domain(smtp_config: dict) -> str:
-    """Extract the domain part of smtp_sender_email."""
     sender = smtp_config.get('smtp_sender_email', '')
     if '@' in sender:
         return sender.split('@', 1)[1]
     return 'localhost'
 
 
-def _build_message(
-    smtp_config: dict,
-    to_addr: str,
-    subject: str,
-    text_body: str,
-    html_body: str,
-    reply_to: str | None = None,
-) -> MIMEMultipart:
-    """
-    Build a MIME message with headers tuned for deliverability.
-
-    Sets:
-    - From with a friendly name aligned with smtp_sender_email
-    - Message-ID anchored to the sender domain (not the container hostname)
-    - Date in RFC 2822 form
-    - Reply-To when the conversational reply should go to a different address
-      (e.g. the iTransfer sender of the file, not the no-reply mailbox)
-    - Auto-Submitted: auto-generated to signal this is a system notification
-    - Precedence: bulk to lower the chance of vacation auto-replies bouncing
-    - X-Mailer for traceability
-    - List-Unsubscribe + List-Unsubscribe-Post; Gmail and Yahoo expect these
-      on transactional mail since their 2024 sender requirements update.
-      We point at a mailto: with an unsubscribe subject because iTransfer has
-      no web unsubscribe endpoint; the address simply needs to exist on the
-      sender mailbox to avoid a delivery penalty.
-
-    Bodies are attached as text/plain first, text/html last, so MIME-aware
-    clients prefer the HTML version.
-    """
+def _build_message(smtp_config, to_addr, subject, text_body, html_body, reply_to=None):
     sender_email = smtp_config.get('smtp_sender_email', '')
     domain = _sender_domain(smtp_config)
 
@@ -121,10 +138,8 @@ def send_email_with_smtp(msg, smtp_config) -> bool:
     try:
         port = int(smtp_config['smtp_port'])
         if port == 465:
-            app.logger.info("Sending via SMTP_SSL on port %d", port)
             server = smtplib.SMTP_SSL(smtp_config['smtp_server'], port)
         else:
-            app.logger.info("Sending via SMTP+STARTTLS on port %d", port)
             server = smtplib.SMTP(smtp_config['smtp_server'], port)
             server.starttls()
         server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
@@ -138,7 +153,7 @@ def send_email_with_smtp(msg, smtp_config) -> bool:
             try:
                 server.quit()
             except Exception:
-                app.logger.exception("Error closing SMTP connection")
+                pass
 
 
 def get_backend_url() -> str:
@@ -150,9 +165,6 @@ def get_backend_url() -> str:
             elif not backend_url.startswith('https://'):
                 backend_url = 'https://' + backend_url
         return backend_url
-    if not request:
-        proto = 'https' if app.config['FORCE_HTTPS'] else 'http'
-        return f'{proto}://localhost:5500'
     proto = 'https' if app.config['FORCE_HTTPS'] else request.scheme
     if app.config['PROXY_COUNT'] > 0 and request.headers.get('X-Forwarded-Proto'):
         proto = request.headers.get('X-Forwarded-Proto')
@@ -168,16 +180,16 @@ def create_email_template(title, message, file_summary, total_size, download_lin
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <style>
-            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif; line-height: 1.6; color: #170017; margin: 0; padding: 0; background-color: #f5f5f5; }}
-            .container {{ max-width: 600px; margin: 20px auto; padding: 0; background-color: #ffffff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05); }}
-            .header {{ text-align: center; padding: 30px 0; background: #693a67; border-radius: 12px 12px 0 0; }}
-            .header h1 {{ color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; letter-spacing: 0.5px; }}
-            .content {{ padding: 30px; background-color: #ffffff; }}
-            .message h2 {{ color: #693a67; margin: 0 0 15px 0; font-size: 22px; font-weight: 500; }}
-            .files {{ background-color: #f8f9fa; padding: 20px; border-radius: 8px; white-space: pre-wrap; color: #170017; border: 1px solid rgba(0, 0, 0, 0.05); margin: 20px 0; line-height: 1.8; font-size: 15px; }}
-            .total {{ margin-top: 20px; padding: 15px 20px; background-color: #693a67; color: #ffffff; border-radius: 8px; font-weight: 500; font-size: 16px; }}
-            .footer {{ text-align: center; padding: 20px; color: #5a4e5a; font-size: 14px; border-top: 1px solid rgba(0, 0, 0, 0.05); }}
-            .download-btn {{ display: inline-block; margin: 20px 0; padding: 12px 24px; background-color: #693a67; color: #ffffff !important; text-decoration: none; border-radius: 6px; font-weight: 500; text-align: center; }}
+            body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #170017; margin: 0; padding: 0; background-color: #f5f5f5; }}
+            .container {{ max-width: 600px; margin: 20px auto; background-color: #ffffff; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }}
+            .header {{ text-align: center; padding: 30px; background: linear-gradient(135deg, #400040, #693a67); border-radius: 12px 12px 0 0; }}
+            .header h1 {{ color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; letter-spacing: 1px; }}
+            .content {{ padding: 30px; }}
+            .message h2 {{ color: #693a67; margin: 0 0 15px; font-size: 20px; font-weight: 500; }}
+            .files {{ background-color: #f8f9fa; padding: 20px; border-radius: 8px; white-space: pre-wrap; border: 1px solid rgba(0,0,0,0.05); margin: 20px 0; line-height: 1.8; font-size: 14px; }}
+            .total {{ margin-top: 20px; padding: 12px 20px; background: linear-gradient(135deg, #400040, #693a67); color: #ffffff; border-radius: 8px; font-weight: 500; }}
+            .footer {{ text-align: center; padding: 20px; color: #5a4e5a; font-size: 13px; border-top: 1px solid rgba(0,0,0,0.05); }}
+            .download-btn {{ display: inline-block; margin: 20px 0; padding: 14px 28px; background: linear-gradient(135deg, #693a67, #7e547b); color: #ffffff !important; text-decoration: none; border-radius: 8px; font-weight: 500; }}
         </style>
     </head>
     <body>
@@ -185,19 +197,19 @@ def create_email_template(title, message, file_summary, total_size, download_lin
             <div class="header"><h1>iTransfer</h1></div>
             <div class="content">
                 <div class="message"><h2>{title}</h2><p>{message}</p></div>
-                {f'<a href="{download_link}" class="download-btn">Telecharger les fichiers</a>' if download_link else ''}
+                {f'<a href="{download_link}" class="download-btn">Télécharger les fichiers</a>' if download_link else ''}
                 <div class="files">{file_summary}</div>
                 <div class="total">{total_size}</div>
             </div>
-            <div class="footer"><p>Envoye via iTransfer</p></div>
+            <div class="footer"><p>Envoyé via iTransfer</p></div>
         </div>
     </body>
     </html>
     """
     text = (
         f"{title}\n\n{message}\n\n"
-        f"{'Lien de telechargement : ' + download_link if download_link else ''}\n\n"
-        f"Resume des fichiers :\n{file_summary}\n\nTaille totale : {total_size}\n"
+        f"{'Lien de téléchargement : ' + download_link if download_link else ''}\n\n"
+        f"Résumé des fichiers :\n{file_summary}\n\nTaille totale : {total_size}\n"
     )
     return html, text
 
@@ -206,30 +218,21 @@ def _send_recipient_notification(recipient_email, file_id, files_summary, total_
     try:
         file_info = FileUpload.query.get(file_id)
         if not file_info:
-            app.logger.error("File not found for notification: %s", file_id)
             return False
-
         tz = pytz.timezone(app.config.get('TIMEZONE', 'Europe/Paris'))
-        expiration_formatted = file_info.expires_at.astimezone(tz).strftime('%d/%m/%Y a %H:%M:%S')
-
+        expiration_formatted = file_info.expires_at.astimezone(tz).strftime('%d/%m/%Y à %H:%M:%S')
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500').rstrip('/')
         download_page_link = f"{frontend_url}/download/{file_id}"
-
-        title = "Vous avez recu des fichiers"
+        title = "Vous avez reçu des fichiers"
         message = (
-            f"{sender_email} vous a envoye des fichiers. Cliquez sur le bouton "
-            f"ci-dessous pour acceder a la page de telechargement.<br><br>"
+            f"{sender_email} vous a envoyé des fichiers. Cliquez sur le bouton "
+            f"ci-dessous pour accéder à la page de téléchargement.<br><br>"
             f"Ce lien expirera le {expiration_formatted}"
         )
         html, text = create_email_template(title, message, files_summary, total_size, download_page_link)
-        msg = _build_message(
-            smtp_config=smtp_config,
-            to_addr=recipient_email,
-            subject=f"{sender_email} vous envoie des fichiers",
-            text_body=text,
-            html_body=html,
-            reply_to=sender_email,
-        )
+        msg = _build_message(smtp_config, recipient_email,
+                             f"{sender_email} vous envoie des fichiers",
+                             text, html, reply_to=sender_email)
         return send_email_with_smtp(msg, smtp_config)
     except Exception:
         app.logger.exception("Failed to prepare recipient notification")
@@ -240,24 +243,16 @@ def _send_sender_confirmation(sender_email, file_id, files_list, total_size, smt
     try:
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500').rstrip('/')
         download_page_link = f"{frontend_url}/download/{file_id}"
-
-        files_summary = ""
-        for f in files_list:
-            files_summary += f"- {f['name']} ({format_size(f['size'])})\n"
-
-        title = "Vos fichiers ont ete envoyes"
+        files_summary = "".join(f"- {f['name']} ({format_size(f['size'])})\n" for f in files_list)
+        title = "Vos fichiers ont été envoyés"
         message = (
-            f"Vos fichiers ont ete envoyes a : {recipient_email}<br><br>"
-            f"Page de telechargement : {download_page_link}"
+            f"Vos fichiers ont été envoyés à : {recipient_email}<br><br>"
+            f"Page de téléchargement : {download_page_link}"
         )
         html, text = create_email_template(title, message, files_summary, total_size)
-        msg = _build_message(
-            smtp_config=smtp_config,
-            to_addr=sender_email,
-            subject=f"Confirmation de votre transfert a {recipient_email}",
-            text_body=text,
-            html_body=html,
-        )
+        msg = _build_message(smtp_config, sender_email,
+                             f"Confirmation de votre transfert à {recipient_email}",
+                             text, html)
         return send_email_with_smtp(msg, smtp_config)
     except Exception:
         app.logger.exception("Failed to prepare sender confirmation")
@@ -267,18 +262,14 @@ def _send_sender_confirmation(sender_email, file_id, files_list, total_size, smt
 def _send_download_notification(sender_email, file_id, smtp_config):
     try:
         tz = pytz.timezone(app.config.get('TIMEZONE', 'Europe/Paris'))
-        download_time = datetime.now(tz).strftime('%d/%m/%Y a %H:%M:%S (%Z)')
+        download_time = datetime.now(tz).strftime('%d/%m/%Y à %H:%M:%S (%Z)')
         file_info = FileUpload.query.get(file_id)
         if not file_info:
-            app.logger.error("File not found for download notification: %s", file_id)
             return False
-
         files_list = file_info.get_files_list()
         if files_list:
             total = sum(f['size'] for f in files_list)
-            files_summary = "".join(
-                f"- {f['name']} ({format_size(f['size'])})\n" for f in files_list
-            )
+            files_summary = "".join(f"- {f['name']} ({format_size(f['size'])})\n" for f in files_list)
             total_formatted = format_size(total)
         else:
             stored_name = safe_stored_filename(file_info.filename)
@@ -286,17 +277,11 @@ def _send_download_notification(sender_email, file_id, smtp_config):
             size = os.path.getsize(stored_path)
             files_summary = f"- {stored_name} ({format_size(size)})"
             total_formatted = format_size(size)
-
-        title = "Vos fichiers ont ete telecharges"
-        message = f"Vos fichiers ont ete telecharges le {download_time}."
+        title = "Vos fichiers ont été téléchargés"
+        message = f"Vos fichiers ont été téléchargés le {download_time}."
         html, text = create_email_template(title, message, files_summary, total_formatted)
-        msg = _build_message(
-            smtp_config=smtp_config,
-            to_addr=sender_email,
-            subject="Vos fichiers ont ete telecharges",
-            text_body=text,
-            html_body=html,
-        )
+        msg = _build_message(smtp_config, sender_email,
+                             "Vos fichiers ont été téléchargés", text, html)
         return send_email_with_smtp(msg, smtp_config)
     except Exception:
         app.logger.exception("Failed to send download notification")
@@ -311,6 +296,9 @@ def login():
     if request.method == 'OPTIONS':
         return jsonify({'message': 'ok'}), 200
 
+    if not _rate_limit(_client_key(), limit=RATE_LIMIT_LOGIN):
+        return jsonify({'error': 'Too many requests'}), 429
+
     data = request.get_json(silent=True) or {}
     username = data.get('username', '')
     password = data.get('password', '')
@@ -318,7 +306,7 @@ def login():
     expected_pass = app.config.get('ADMIN_PASSWORD')
 
     if not expected_user or not expected_pass:
-        app.logger.error("Admin credentials not configured; refusing all logins")
+        app.logger.error("Admin credentials not configured")
         return jsonify({'error': 'Server not configured'}), 503
 
     if username == expected_user and password == expected_pass:
@@ -332,6 +320,9 @@ def upload_file():
     if request.method == 'OPTIONS':
         return jsonify({'message': 'ok'}), 200
 
+    if not _rate_limit(_client_key()):
+        return jsonify({'error': 'Too many requests'}), 429
+
     upload_root = app.config['UPLOAD_FOLDER']
     temp_dir = None
     zip_path = None
@@ -341,17 +332,20 @@ def upload_file():
 
         files = request.files.getlist('files[]')
         paths = request.form.getlist('paths[]')
-        email = request.form.get('email')
-        sender_email = request.form.get('sender_email')
+        email = (request.form.get('email') or '').strip()
+        sender_email = (request.form.get('sender_email') or '').strip()
+
+        if not _valid_email(email):
+            return jsonify({'error': 'Invalid recipient email address'}), 400
+        if not _valid_email(sender_email):
+            return jsonify({'error': 'Invalid sender email address'}), 400
+
         try:
             expiration_days = int(request.form.get('expiration_days', '7'))
         except ValueError:
             expiration_days = 7
         if expiration_days not in (3, 5, 7, 10):
             expiration_days = 7
-
-        if not email or not sender_email:
-            return jsonify({'error': 'Email addresses are required'}), 400
 
         try:
             files_list = json.loads(request.form.get('files_list', '[]'))
@@ -363,7 +357,6 @@ def upload_file():
         total_size = sum(int(f.get('size', 0)) for f in files_list)
 
         file_id = str(uuid.uuid4())
-        # temp dir name is a UUID, no user input
         temp_dir = os.path.join(upload_root, 'temp', file_id)
         os.makedirs(temp_dir, exist_ok=True)
 
@@ -372,13 +365,10 @@ def upload_file():
             if not uploaded_file.filename:
                 continue
             try:
-                # The candidate is resolved inside temp_dir, never above it.
-                # paths.safe_join fully sanitises raw_path (CodeQL sanitiser).
                 target_path = safe_join(temp_dir, raw_path)
             except UnsafePathError:
                 app.logger.warning("Rejected unsafe upload path")
                 return jsonify({'error': 'Invalid file path'}), 400
-
             os.makedirs(os.path.dirname(target_path), exist_ok=True)
             uploaded_file.save(target_path)
             file_list.append({
@@ -424,34 +414,26 @@ def upload_file():
         db.session.add(record)
         db.session.commit()
 
-        files_summary = "".join(
-            f"- {f['name']} ({format_size(f['size'])})\n" for f in original_files
-        )
+        files_summary = "".join(f"- {f['name']} ({format_size(f['size'])})\n" for f in original_files)
         total_formatted = format_size(total_size)
 
         notification_errors = []
         try:
             smtp_config = _load_smtp_config()
-            if not _send_recipient_notification(
-                email, file_id, files_summary, total_formatted, smtp_config, sender_email
-            ):
+            if not _send_recipient_notification(email, file_id, files_summary, total_formatted, smtp_config, sender_email):
                 notification_errors.append("destinataire")
-            if not _send_sender_confirmation(
-                sender_email, file_id, original_files, total_formatted, smtp_config, email
-            ):
-                notification_errors.append("expediteur")
+            if not _send_sender_confirmation(sender_email, file_id, original_files, total_formatted, smtp_config, email):
+                notification_errors.append("expéditeur")
         except FileNotFoundError:
-            app.logger.error("SMTP config missing, skipping notifications")
-            notification_errors.append("smtp non configure")
+            app.logger.error("SMTP config missing")
+            notification_errors.append("smtp non configuré")
         except Exception:
             app.logger.exception("Notification dispatch failed")
             notification_errors.append("erreur interne")
 
         response = {'success': True, 'file_id': file_id, 'message': 'Upload OK'}
         if notification_errors:
-            response['warning'] = (
-                "Notifications non envoyees : " + ", ".join(notification_errors)
-            )
+            response['warning'] = "Notifications non envoyées : " + ", ".join(notification_errors)
         return jsonify(response), 200
 
     except UnsafePathError:
@@ -463,7 +445,7 @@ def upload_file():
             try:
                 os.remove(zip_path)
             except OSError:
-                app.logger.exception("Could not remove partial zip")
+                pass
         return jsonify({'error': 'Upload failed'}), 500
     finally:
         if temp_dir and os.path.exists(temp_dir):
@@ -479,8 +461,6 @@ def get_transfer_details(file_id):
         if datetime.utcnow() > record.expires_at:
             return jsonify({'error': 'Link expired'}), 410
 
-        # Verify the stored file still exists on disk, routed through
-        # safe_join to guarantee the lookup stays inside UPLOAD_FOLDER.
         stored_name = safe_stored_filename(record.filename)
         file_path = safe_join(app.config['UPLOAD_FOLDER'], stored_name)
         if not os.path.exists(file_path):
@@ -493,9 +473,9 @@ def get_transfer_details(file_id):
         return jsonify({
             'files': files_list,
             'expires_at': record.expires_at.isoformat(),
+            'sender_email': record.sender_email,
         }), 200
     except UnsafePathError:
-        app.logger.warning("Unsafe stored filename for %s", file_id)
         return jsonify({'error': 'Not found'}), 404
     except Exception:
         app.logger.exception("transfer details failed")
@@ -512,8 +492,6 @@ def download_file(file_id):
             return jsonify({'error': 'Link expired'}), 410
 
         stored_name = safe_stored_filename(record.filename)
-        # safe_join is the CodeQL sanitiser: stored_name is rebuilt from basename
-        # and rejected if it contains anything beyond [A-Za-z0-9._-].
         file_path = safe_join(app.config['UPLOAD_FOLDER'], stored_name)
         if not os.path.exists(file_path):
             return jsonify({'error': 'File missing on server'}), 404
@@ -525,13 +503,10 @@ def download_file(file_id):
                 smtp_config = _load_smtp_config()
                 _send_download_notification(record.sender_email, file_id, smtp_config)
             except FileNotFoundError:
-                app.logger.info("SMTP not configured, skipping download notification")
+                pass
             except Exception:
                 app.logger.exception("Failed to send download notification")
 
-        # send_from_directory performs its own path traversal check against
-        # the directory argument. Passing stored_name (already sanitised)
-        # makes this the belt-and-braces version.
         return send_from_directory(
             app.config['UPLOAD_FOLDER'],
             stored_name,
@@ -539,11 +514,66 @@ def download_file(file_id):
             download_name=stored_name,
         )
     except UnsafePathError:
-        app.logger.warning("Unsafe stored filename in download for %s", file_id)
         return jsonify({'error': 'Not found'}), 404
     except Exception:
         app.logger.exception("Download failed")
         return jsonify({'error': 'Download failed'}), 500
+
+
+# -------------------------------------------------------------------------
+# Admin routes
+# -------------------------------------------------------------------------
+@app.route('/api/transfers', methods=['GET', 'OPTIONS'])
+@require_auth
+def list_transfers():
+    if request.method == 'OPTIONS':
+        return jsonify({'message': 'ok'}), 200
+    try:
+        records = FileUpload.query.order_by(FileUpload.created_at.desc()).all()
+        result = []
+        for r in records:
+            files_list = r.get_files_list()
+            total_size = sum(f.get('size', 0) for f in files_list)
+            result.append({
+                'id': r.id,
+                'filename': r.filename,
+                'sender_email': r.sender_email,
+                'recipient_email': r.email,
+                'created_at': r.created_at.isoformat() if r.created_at else None,
+                'expires_at': r.expires_at.isoformat(),
+                'downloaded': r.downloaded,
+                'file_count': len(files_list),
+                'total_size': total_size,
+                'expired': datetime.utcnow() > r.expires_at,
+            })
+        return jsonify(result), 200
+    except Exception:
+        app.logger.exception("list_transfers failed")
+        return jsonify({'error': 'Internal error'}), 500
+
+
+@app.route('/api/transfers/<file_id>', methods=['DELETE', 'OPTIONS'])
+@require_auth
+def delete_transfer(file_id):
+    if request.method == 'OPTIONS':
+        return jsonify({'message': 'ok'}), 200
+    try:
+        record = FileUpload.query.get(file_id)
+        if not record:
+            return jsonify({'error': 'Not found'}), 404
+        try:
+            stored_name = safe_stored_filename(record.filename)
+            file_path = safe_join(app.config['UPLOAD_FOLDER'], stored_name)
+            if os.path.exists(file_path):
+                os.remove(file_path)
+        except (UnsafePathError, OSError):
+            app.logger.exception("Could not delete file for transfer %s", file_id)
+        db.session.delete(record)
+        db.session.commit()
+        return jsonify({'message': 'Deleted'}), 200
+    except Exception:
+        app.logger.exception("delete_transfer failed")
+        return jsonify({'error': 'Internal error'}), 500
 
 
 @app.route('/api/save-smtp-settings', methods=['POST', 'OPTIONS'])
@@ -558,6 +588,9 @@ def save_smtp_settings():
             if not data.get(field):
                 return jsonify({'error': f'Missing field: {field}'}), 400
 
+        if not _valid_email(data['smtpSenderEmail']):
+            return jsonify({'error': 'Invalid sender email'}), 400
+
         smtp_config = {
             'smtp_server': data['smtpServer'],
             'smtp_port': data['smtpPort'],
@@ -565,20 +598,36 @@ def save_smtp_settings():
             'smtp_password': data['smtpPassword'],
             'smtp_sender_email': data['smtpSenderEmail'],
         }
-        # Log only a redacted view (no password)
         app.logger.info("SMTP config updated: %s", _safe_smtp_config_summary(smtp_config))
-
-        # SMTP_CONFIG_PATH is validated at Config load time to live inside
-        # DATA_FOLDER, so writing to it cannot escape that directory.
         config_path = app.config['SMTP_CONFIG_PATH']
         os.makedirs(os.path.dirname(config_path), exist_ok=True)
         with open(config_path, 'w', encoding='utf-8') as fh:
             json.dump(smtp_config, fh, indent=2)
-
         return jsonify({'message': 'SMTP config saved'}), 200
     except Exception:
         app.logger.exception("Failed to save SMTP config")
         return jsonify({'error': 'Could not save SMTP config'}), 500
+
+
+@app.route('/api/get-smtp-settings', methods=['GET', 'OPTIONS'])
+@require_auth
+def get_smtp_settings():
+    if request.method == 'OPTIONS':
+        return jsonify({'message': 'ok'}), 200
+    try:
+        cfg = _load_smtp_config()
+        return jsonify({
+            'smtpServer': cfg.get('smtp_server', ''),
+            'smtpPort': cfg.get('smtp_port', ''),
+            'smtpUser': cfg.get('smtp_user', ''),
+            'smtpSenderEmail': cfg.get('smtp_sender_email', ''),
+            # password intentionally omitted
+        }), 200
+    except FileNotFoundError:
+        return jsonify({}), 200
+    except Exception:
+        app.logger.exception("get_smtp_settings failed")
+        return jsonify({'error': 'Internal error'}), 500
 
 
 @app.route('/api/test-smtp', methods=['POST', 'OPTIONS'])
@@ -591,10 +640,6 @@ def test_smtp():
             smtp_config = _load_smtp_config()
         except FileNotFoundError:
             return jsonify({'error': 'SMTP config not found'}), 404
-        app.logger.info(
-            "Testing SMTP: %s", _safe_smtp_config_summary(smtp_config)
-        )
-
         msg = _build_message(
             smtp_config=smtp_config,
             to_addr=smtp_config['smtp_sender_email'],
@@ -602,7 +647,6 @@ def test_smtp():
             text_body="Test SMTP iTransfer.",
             html_body="<p>Test SMTP iTransfer.</p>",
         )
-
         if send_email_with_smtp(msg, smtp_config):
             return jsonify({'message': 'SMTP test OK'}), 200
         return jsonify({'error': 'SMTP test failed'}), 500
