@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import banner from './assets/iTransfer Bannière.png'
+import banner from './assets/banner.png'
 
 const backendUrl = window.BACKEND_URL
 

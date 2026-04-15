@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import banner from './assets/iTransfer Bannière.png'
+import banner from './assets/banner.png'
 
 const backendUrl = window.BACKEND_URL
 
