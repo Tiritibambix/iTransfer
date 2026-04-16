@@ -13,7 +13,7 @@ function formatSize(bytes) {
 
 function formatDate(iso) {
   if (!iso) return '—'
-  return new Date(iso).toLocaleString('fr-FR', {
+  return new Date(iso).toLocaleString('en-GB', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
@@ -48,13 +48,13 @@ function TransfersTab({ token }) {
     })
       .then(r => r.json())
       .then(data => { setTransfers(data); setLoading(false) })
-      .catch(() => { setToast({ message: 'Erreur de chargement.', type: 'error' }); setLoading(false) })
+      .catch(() => { setToast({ message: 'Failed to load transfers.', type: 'error' }); setLoading(false) })
   }, [token])
 
   useEffect(() => { load() }, [load])
 
   const handleDelete = async (id) => {
-    if (!confirm('Supprimer ce transfert et son fichier ?')) return
+    if (!confirm('Delete this transfer and its file?')) return
     setDeleting(id)
     try {
       const r = await fetch(`${backendUrl}/api/transfers/${id}`, {
@@ -63,12 +63,12 @@ function TransfersTab({ token }) {
       })
       if (r.ok) {
         setTransfers(prev => prev.filter(t => t.id !== id))
-        setToast({ message: 'Transfert supprimé.', type: 'success' })
+        setToast({ message: 'Transfer deleted.', type: 'success' })
       } else {
-        setToast({ message: 'Erreur lors de la suppression.', type: 'error' })
+        setToast({ message: 'Failed to delete transfer.', type: 'error' })
       }
     } catch {
-      setToast({ message: 'Erreur réseau.', type: 'error' })
+      setToast({ message: 'Network error.', type: 'error' })
     } finally {
       setDeleting(null)
     }
@@ -83,20 +83,20 @@ function TransfersTab({ token }) {
 
       <div className="flex items-center justify-between mb-6" style={{ flexWrap: 'wrap', gap: 'var(--sp-3)' }}>
         <p className="text-sm text-muted">
-          {active.length} actif{active.length !== 1 ? 's' : ''} · {expired.length} expiré{expired.length !== 1 ? 's' : ''}
+          {active.length} active · {expired.length} expired
         </p>
         <button className="btn btn--ghost btn--sm" onClick={load} disabled={loading}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/>
           </svg>
-          Actualiser
+          Refresh
         </button>
       </div>
 
       {loading ? (
         <div className="text-center mt-6"><span className="spinner" style={{ width: 28, height: 28 }} /></div>
       ) : transfers.length === 0 ? (
-        <div className="text-center text-muted mt-6">Aucun transfert.</div>
+        <div className="text-center text-muted mt-6">No transfers yet.</div>
       ) : (
         <div className="transfer-list">
           {transfers.map(t => (
@@ -104,10 +104,10 @@ function TransfersTab({ token }) {
               <div className="transfer-card__header">
                 <span>
                   {t.expired
-                    ? <span className="badge badge--muted">Expiré</span>
+                    ? <span className="badge badge--muted">Expired</span>
                     : t.downloaded
-                      ? <span className="badge badge--success">Téléchargé</span>
-                      : <span className="badge badge--muted">En attente</span>
+                      ? <span className="badge badge--success">Downloaded</span>
+                      : <span className="badge badge--muted">Pending</span>
                   }
                 </span>
                 <div className="flex gap-2">
@@ -117,10 +117,11 @@ function TransfersTab({ token }) {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn--ghost btn--sm"
-                      title="Voir la page de téléchargement"
+                      title="Open download page"
                     >
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/>
+                        <polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>
                       </svg>
                     </a>
                   )}
@@ -128,12 +129,13 @@ function TransfersTab({ token }) {
                     className="btn btn--danger btn--sm"
                     onClick={() => handleDelete(t.id)}
                     disabled={deleting === t.id}
-                    aria-label="Supprimer"
+                    aria-label="Delete"
                   >
                     {deleting === t.id
                       ? <span className="spinner" style={{ width: 12, height: 12 }} />
                       : <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+                          <polyline points="3 6 5 6 21 6"/>
+                          <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
                         </svg>
                     }
                   </button>
@@ -141,23 +143,23 @@ function TransfersTab({ token }) {
               </div>
               <div className="transfer-card__body">
                 <div className="transfer-card__row">
-                  <span className="transfer-card__label">De</span>
+                  <span className="transfer-card__label">From</span>
                   <span className="transfer-card__value">{t.sender_email}</span>
                 </div>
                 <div className="transfer-card__row">
-                  <span className="transfer-card__label">À</span>
+                  <span className="transfer-card__label">To</span>
                   <span className="transfer-card__value">{t.recipient_email}</span>
                 </div>
                 <div className="transfer-card__row">
-                  <span className="transfer-card__label">Fichiers</span>
+                  <span className="transfer-card__label">Files</span>
                   <span className="transfer-card__value">{t.file_count} · {formatSize(t.total_size)}</span>
                 </div>
                 <div className="transfer-card__row">
-                  <span className="transfer-card__label">Créé</span>
+                  <span className="transfer-card__label">Created</span>
                   <span className="transfer-card__value">{formatDate(t.created_at)}</span>
                 </div>
                 <div className="transfer-card__row">
-                  <span className="transfer-card__label">Expire</span>
+                  <span className="transfer-card__label">Expires</span>
                   <span className="transfer-card__value">{formatDate(t.expires_at)}</span>
                 </div>
               </div>
@@ -171,7 +173,9 @@ function TransfersTab({ token }) {
 
 // ---- Tab: SMTP ----
 function SmtpTab({ token }) {
-  const [cfg, setCfg] = useState({ smtpServer: '', smtpPort: '', smtpUser: '', smtpPassword: '', smtpSenderEmail: '' })
+  const [cfg, setCfg] = useState({
+    smtpServer: '', smtpPort: '', smtpUser: '', smtpPassword: '', smtpSenderEmail: ''
+  })
   const [toast, setToast] = useState(null)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
@@ -194,10 +198,10 @@ function SmtpTab({ token }) {
         body: JSON.stringify(cfg),
       })
       const data = await r.json()
-      if (r.ok) setToast({ message: 'Configuration sauvegardée.', type: 'success' })
-      else setToast({ message: data.error || 'Erreur.', type: 'error' })
+      if (r.ok) setToast({ message: 'Configuration saved.', type: 'success' })
+      else setToast({ message: data.error || 'Error saving configuration.', type: 'error' })
     } catch {
-      setToast({ message: 'Erreur réseau.', type: 'error' })
+      setToast({ message: 'Network error.', type: 'error' })
     } finally {
       setSaving(false)
     }
@@ -211,10 +215,10 @@ function SmtpTab({ token }) {
         headers: { Authorization: `Bearer ${token}` },
       })
       const data = await r.json()
-      if (r.ok) setToast({ message: 'Test réussi ! Vérifiez votre boîte mail.', type: 'success' })
-      else setToast({ message: data.error || 'Test échoué.', type: 'error' })
+      if (r.ok) setToast({ message: 'Test successful! Check your inbox.', type: 'success' })
+      else setToast({ message: data.error || 'Test failed.', type: 'error' })
     } catch {
-      setToast({ message: 'Erreur réseau.', type: 'error' })
+      setToast({ message: 'Network error.', type: 'error' })
     } finally {
       setTesting(false)
     }
@@ -237,17 +241,17 @@ function SmtpTab({ token }) {
     <div>
       {toast && <Toast {...toast} onClose={() => setToast(null)} />}
       <div className="smtp-grid">
-        {field('Serveur SMTP', 'smtpServer', 'text', 'ssl0.ovh.net')}
+        {field('SMTP Server', 'smtpServer', 'text', 'ssl0.ovh.net')}
         {field('Port', 'smtpPort', 'text', '465')}
-        {field('Utilisateur', 'smtpUser', 'text', 'user@domain.com')}
-        {field('Mot de passe', 'smtpPassword', 'password', '••••••••')}
-        {field('Email expéditeur', 'smtpSenderEmail', 'email', 'no-reply@domain.com')}
+        {field('Username', 'smtpUser', 'text', 'user@domain.com')}
+        {field('Password', 'smtpPassword', 'password', '••••••••')}
+        {field('Sender email', 'smtpSenderEmail', 'email', 'no-reply@domain.com')}
         <div className="smtp-actions">
           <button className="btn btn--primary" style={{ flex: 1 }} onClick={handleSave} disabled={saving}>
-            {saving ? <><span className="spinner" />Sauvegarde…</> : 'Enregistrer'}
+            {saving ? <><span className="spinner" />Saving…</> : 'Save'}
           </button>
           <button className="btn btn--ghost" style={{ flex: 1 }} onClick={handleTest} disabled={testing}>
-            {testing ? <><span className="spinner" />Test…</> : 'Tester'}
+            {testing ? <><span className="spinner" />Testing…</> : 'Test'}
           </button>
         </div>
       </div>
@@ -274,10 +278,10 @@ export default function Admin() {
           <img src={banner} alt="iTransfer" className="app-logo" />
           <div className="flex gap-2">
             <button className="btn btn--ghost btn--sm" onClick={() => navigate('/')}>
-              ← Retour
+              ← Back
             </button>
             <button className="btn btn--danger btn--sm" onClick={logout}>
-              Déconnexion
+              Sign out
             </button>
           </div>
         </header>
@@ -286,10 +290,10 @@ export default function Admin() {
           <div className="card__body">
             <div className="tabs">
               <button className={`tab${tab === 'transfers' ? ' tab--active' : ''}`} onClick={() => setTab('transfers')}>
-                Transferts
+                Transfers
               </button>
               <button className={`tab${tab === 'smtp' ? ' tab--active' : ''}`} onClick={() => setTab('smtp')}>
-                Configuration SMTP
+                SMTP Settings
               </button>
             </div>
 

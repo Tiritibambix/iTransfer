@@ -19,7 +19,7 @@ function Toast({ message, type = 'info', onClose }) {
   return (
     <div className={`toast toast--${type} mb-4`} role="alert">
       <span style={{ flex: 1 }}>{message}</span>
-      <button className="file-item__remove" onClick={onClose} aria-label="Fermer">✕</button>
+      <button className="file-item__remove" onClick={onClose} aria-label="Close">✕</button>
     </div>
   )
 }
@@ -70,13 +70,18 @@ export default function App() {
     const collected = []
     const readEntry = async (entry, basePath = '') => {
       if (entry.isFile) {
-        await new Promise(res => entry.file(f => { f._path = basePath ? `${basePath}/${f.name}` : f.name; collected.push(f); res() }))
+        await new Promise(res => entry.file(f => {
+          f._path = basePath ? `${basePath}/${f.name}` : f.name
+          collected.push(f); res()
+        }))
       } else if (entry.isDirectory) {
         const reader = entry.createReader()
         await new Promise(res => {
           const read = () => reader.readEntries(async entries => {
             if (!entries.length) return res()
-            await Promise.all(entries.map(en => readEntry(en, basePath ? `${basePath}/${entry.name}` : entry.name)))
+            await Promise.all(entries.map(en =>
+              readEntry(en, basePath ? `${basePath}/${entry.name}` : entry.name)
+            ))
             read()
           })
           read()
@@ -104,9 +109,9 @@ export default function App() {
   const removeItem = (idx) => setItems(prev => prev.filter((_, i) => i !== idx))
 
   const handleUpload = async () => {
-    if (!items.length) return showToast('Sélectionnez au moins un fichier.', 'warning')
-    if (!recipientEmail) return showToast('Email destinataire requis.', 'warning')
-    if (!senderEmail) return showToast('Votre email est requis.', 'warning')
+    if (!items.length) return showToast('Please select at least one file.', 'warning')
+    if (!recipientEmail) return showToast('Recipient email is required.', 'warning')
+    if (!senderEmail) return showToast('Your email is required.', 'warning')
 
     const fd = new FormData()
     fd.append('email', recipientEmail)
@@ -121,20 +126,25 @@ export default function App() {
     xhrRef.current = xhr
     xhr.open('POST', `${backendUrl}/upload`, true)
     xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('authToken') || ''}`)
-    xhr.upload.onprogress = (e) => { if (e.lengthComputable) setUploadPct(Math.round(e.loaded * 100 / e.total)) }
+    xhr.upload.onprogress = (e) => {
+      if (e.lengthComputable) setUploadPct(Math.round(e.loaded * 100 / e.total))
+    }
     xhr.onload = () => {
       setUploading(false)
       if (xhr.status === 200) {
         const res = JSON.parse(xhr.responseText)
-        showToast(res.warning ? 'Fichiers envoyés, mais les emails ont échoué.' : 'Transfert effectué !', res.warning ? 'warning' : 'success')
+        showToast(
+          res.warning ? 'Files sent, but email notifications failed.' : 'Transfer complete!',
+          res.warning ? 'warning' : 'success'
+        )
         setItems([]); setRecipientEmail(''); setSenderEmail(''); setUploadPct(0)
       } else {
-        let msg = 'Erreur lors du transfert.'
+        let msg = 'Transfer failed.'
         try { msg = JSON.parse(xhr.responseText).error || msg } catch {}
         showToast(msg, 'error')
       }
     }
-    xhr.onerror = () => { setUploading(false); showToast('Erreur réseau.', 'error') }
+    xhr.onerror = () => { setUploading(false); showToast('Network error. Check your connection.', 'error') }
     xhr.send(fd)
   }
 
@@ -161,24 +171,25 @@ export default function App() {
 
             <div className="row-2col">
               <div className="field">
-                <label className="field__label">Email destinataire</label>
-                <input className="input" type="email" placeholder="destinataire@exemple.com"
+                <label className="field__label">Recipient email</label>
+                <input className="input" type="email" placeholder="recipient@example.com"
                   value={recipientEmail} onChange={e => setRecipientEmail(e.target.value)} disabled={uploading} />
               </div>
               <div className="field">
-                <label className="field__label">Votre email</label>
-                <input className="input" type="email" placeholder="vous@exemple.com"
+                <label className="field__label">Your email</label>
+                <input className="input" type="email" placeholder="you@example.com"
                   value={senderEmail} onChange={e => setSenderEmail(e.target.value)} disabled={uploading} />
               </div>
             </div>
 
             <div className="field">
-              <label className="field__label">Expiration du lien</label>
-              <select className="input" value={expirationDays} onChange={e => setExpirationDays(parseInt(e.target.value))} disabled={uploading}>
-                <option value="3">3 jours</option>
-                <option value="5">5 jours</option>
-                <option value="7">7 jours</option>
-                <option value="10">10 jours</option>
+              <label className="field__label">Link expiration</label>
+              <select className="input" value={expirationDays}
+                onChange={e => setExpirationDays(parseInt(e.target.value))} disabled={uploading}>
+                <option value="3">3 days</option>
+                <option value="5">5 days</option>
+                <option value="7">7 days</option>
+                <option value="10">10 days</option>
               </select>
             </div>
 
@@ -191,22 +202,25 @@ export default function App() {
               onClick={!uploading ? handleClick : undefined}
               role="button" tabIndex={0}
               onKeyDown={e => e.key === 'Enter' && !uploading && handleClick()}
+              aria-label="File drop zone"
             >
               <svg className="drop-zone__icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M24 8v24M14 18l10-10 10 10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M8 36h32" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
               </svg>
-              <p className="drop-zone__title">Glissez vos fichiers ici</p>
-              <p className="drop-zone__sub">ou cliquez pour sélectionner</p>
+              <p className="drop-zone__title">Drop your files here</p>
+              <p className="drop-zone__sub">or click to select</p>
             </div>
 
             {items.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="section-title" style={{ margin: 0 }}>
-                    {items.length} fichier{items.length > 1 ? 's' : ''} — {formatSize(totalSize)}
+                    {items.length} file{items.length > 1 ? 's' : ''} — {formatSize(totalSize)}
                   </p>
-                  <button className="btn btn--ghost btn--sm" onClick={() => setItems([])} disabled={uploading}>Tout effacer</button>
+                  <button className="btn btn--ghost btn--sm" onClick={() => setItems([])} disabled={uploading}>
+                    Clear all
+                  </button>
                 </div>
                 <div className="file-list">
                   {items.map((item, idx) => (
@@ -223,7 +237,7 @@ export default function App() {
             {uploading && (
               <div className="progress-wrap">
                 <div className="progress-label">
-                  <span className="progress-label__text">Envoi en cours…</span>
+                  <span className="progress-label__text">Uploading…</span>
                   <span className="progress-label__pct">{uploadPct}%</span>
                 </div>
                 <div className="progress-track">
@@ -233,16 +247,19 @@ export default function App() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
                   </svg>
-                  <span style={{ flex: 1 }}>Ne fermez pas cette fenêtre.</span>
-                  <button className="btn btn--danger btn--sm" onClick={cancelUpload}>Annuler</button>
+                  <span style={{ flex: 1 }}>Do not close this window during the transfer.</span>
+                  <button className="btn btn--danger btn--sm" onClick={cancelUpload}>Cancel</button>
                 </div>
               </div>
             )}
 
-            <button className="btn btn--primary btn--full btn--lg" onClick={handleUpload} disabled={uploading || !items.length}>
+            <button className="btn btn--primary btn--full btn--lg" onClick={handleUpload}
+              disabled={uploading || !items.length}>
               {uploading
-                ? <><span className="spinner" />Envoi en cours…</>
-                : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>Envoyer</>
+                ? <><span className="spinner" />Uploading…</>
+                : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>
+                  </svg>Send</>
               }
             </button>
 

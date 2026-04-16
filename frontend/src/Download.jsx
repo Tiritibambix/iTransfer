@@ -12,7 +12,7 @@ function formatSize(bytes) {
 
 function formatDate(iso) {
   if (!iso) return ''
-  return new Date(iso).toLocaleString('fr-FR', {
+  return new Date(iso).toLocaleString('en-GB', {
     day: '2-digit', month: '2-digit', year: 'numeric',
     hour: '2-digit', minute: '2-digit',
   })
@@ -31,10 +31,15 @@ export default function Download() {
   useEffect(() => {
     fetch(`${backendUrl}/transfer/${transferId}`)
       .then(r => {
-        if (!r.ok) throw new Error(r.status === 410 ? 'Ce lien a expiré.' : 'Lien invalide ou introuvable.')
+        if (!r.ok) throw new Error(r.status === 410 ? 'This link has expired.' : 'Invalid or unknown link.')
         return r.json()
       })
-      .then(data => { setFiles(data.files || []); setExpiresAt(data.expires_at); setSenderEmail(data.sender_email); setLoading(false) })
+      .then(data => {
+        setFiles(data.files || [])
+        setExpiresAt(data.expires_at)
+        setSenderEmail(data.sender_email)
+        setLoading(false)
+      })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [transferId])
 
@@ -42,7 +47,7 @@ export default function Download() {
     setDownloading(true)
     try {
       const r = await fetch(`${backendUrl}/download/${transferId}`)
-      if (!r.ok) throw new Error('Erreur lors du téléchargement.')
+      if (!r.ok) throw new Error('Download failed.')
       const blob = await r.blob()
       const cd = r.headers.get('Content-Disposition') || ''
       const match = cd.match(/filename="?([^"]+)"?/)
@@ -88,7 +93,7 @@ export default function Download() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
                       <path d="M20 4H4a2 2 0 00-2 2v12a2 2 0 002 2h16a2 2 0 002-2V6a2 2 0 00-2-2z"/><path d="M22 6l-10 7L2 6"/>
                     </svg>
-                    <span>Envoyé par <strong>{senderEmail}</strong></span>
+                    <span>Sent by <strong>{senderEmail}</strong></span>
                   </div>
                 )}
                 {expiresAt && (
@@ -96,7 +101,7 @@ export default function Download() {
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
                       <circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/>
                     </svg>
-                    <span>Expire le {formatDate(expiresAt)}</span>
+                    <span>Expires on {formatDate(expiresAt)}</span>
                   </div>
                 )}
               </div>
@@ -105,7 +110,7 @@ export default function Download() {
 
               <div>
                 <p className="section-title">
-                  {files.length} fichier{files.length > 1 ? 's' : ''} — {formatSize(totalSize)}
+                  {files.length} file{files.length > 1 ? 's' : ''} — {formatSize(totalSize)}
                 </p>
                 <div className="file-list">
                   {files.map((f, i) => (
@@ -125,16 +130,16 @@ export default function Download() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
                     <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/>
                   </svg>
-                  Téléchargement lancé. Vérifiez votre dossier de téléchargements.
+                  Download started. Check your downloads folder.
                 </div>
               )}
 
               <button className="btn btn--primary btn--full btn--lg" onClick={handleDownload} disabled={downloading}>
                 {downloading
-                  ? <><span className="spinner" />Préparation…</>
+                  ? <><span className="spinner" />Preparing…</>
                   : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                       <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>Télécharger {files.length > 1 ? 'les fichiers' : 'le fichier'}</>
+                    </svg>Download {files.length > 1 ? 'files' : 'file'}</>
                 }
               </button>
 
@@ -143,12 +148,12 @@ export default function Download() {
         )}
 
         <div className="page-footer">
-          <p>iTransfer est un logiciel libre distribué sous licence GPL-3.0.</p>
+          <p>iTransfer is free software distributed under the GPL-3.0 license.</p>
           <a href="https://github.com/tiritibambix/iTransfer/" target="_blank" rel="noopener noreferrer" className="footer-link">
             <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor">
               <path fillRule="evenodd" d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"/>
             </svg>
-            Voir sur GitHub
+            View on GitHub
           </a>
         </div>
 

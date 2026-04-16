@@ -26,12 +26,12 @@ export default function Login() {
         localStorage.setItem('authToken', data.token)
         navigate('/')
       } else if (r.status === 429) {
-        setError('Trop de tentatives. Réessayez dans un moment.')
+        setError('Too many attempts. Please wait a moment.')
       } else {
-        setError('Identifiants incorrects.')
+        setError('Invalid credentials.')
       }
     } catch {
-      setError('Impossible de contacter le serveur.')
+      setError('Unable to reach the server.')
     } finally {
       setLoading(false)
     }
@@ -48,17 +48,17 @@ export default function Login() {
         <div className="card">
           <div className="card__body flex-col gap-4">
             <h1 className="text-center" style={{ fontSize: 'var(--font-lg)', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>
-              Connexion
+              Sign in
             </h1>
 
             <form onSubmit={handleSubmit} className="flex-col gap-4">
               <div className="field">
-                <label className="field__label" htmlFor="username">Nom d'utilisateur</label>
+                <label className="field__label" htmlFor="username">Username</label>
                 <input id="username" className="input" type="text" autoComplete="username"
                   value={username} onChange={e => setUsername(e.target.value)} disabled={loading} required />
               </div>
               <div className="field">
-                <label className="field__label" htmlFor="password">Mot de passe</label>
+                <label className="field__label" htmlFor="password">Password</label>
                 <input id="password" className="input" type="password" autoComplete="current-password"
                   value={password} onChange={e => setPassword(e.target.value)} disabled={loading} required />
               </div>
@@ -66,7 +66,7 @@ export default function Login() {
               {error && <div className="toast toast--error">{error}</div>}
 
               <button type="submit" className="btn btn--primary btn--full btn--lg" disabled={loading}>
-                {loading ? <><span className="spinner" />Connexion…</> : 'Se connecter'}
+                {loading ? <><span className="spinner" />Signing in…</> : 'Sign in'}
               </button>
             </form>
           </div>

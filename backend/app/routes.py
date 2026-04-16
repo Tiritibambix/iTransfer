@@ -25,8 +25,6 @@ from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import formataddr, formatdate, make_msgid
-from queue import Empty, Queue
-
 import pytz
 from flask import Response, current_app, jsonify, request, send_from_directory, stream_with_context
 
@@ -197,19 +195,19 @@ def create_email_template(title, message, file_summary, total_size, download_lin
             <div class="header"><h1>iTransfer</h1></div>
             <div class="content">
                 <div class="message"><h2>{title}</h2><p>{message}</p></div>
-                {f'<a href="{download_link}" class="download-btn">Télécharger les fichiers</a>' if download_link else ''}
+                {f'<a href="{download_link}" class="download-btn">Download files</a>' if download_link else ''}
                 <div class="files">{file_summary}</div>
                 <div class="total">{total_size}</div>
             </div>
-            <div class="footer"><p>Envoyé via iTransfer</p></div>
+            <div class="footer"><p>Sent via iTransfer</p></div>
         </div>
     </body>
     </html>
     """
     text = (
         f"{title}\n\n{message}\n\n"
-        f"{'Lien de téléchargement : ' + download_link if download_link else ''}\n\n"
-        f"Résumé des fichiers :\n{file_summary}\n\nTaille totale : {total_size}\n"
+        f"{'Download link: ' + download_link if download_link else ''}\n\n"
+        f"File summary:\n{file_summary}\n\nTotal size: {total_size}\n"
     )
     return html, text
 
@@ -220,18 +218,18 @@ def _send_recipient_notification(recipient_email, file_id, files_summary, total_
         if not file_info:
             return False
         tz = pytz.timezone(app.config.get('TIMEZONE', 'Europe/Paris'))
-        expiration_formatted = file_info.expires_at.astimezone(tz).strftime('%d/%m/%Y à %H:%M:%S')
+        expiration_formatted = file_info.expires_at.astimezone(tz).strftime('%d/%m/%Y at %H:%M:%S')
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500').rstrip('/')
         download_page_link = f"{frontend_url}/download/{file_id}"
-        title = "Vous avez reçu des fichiers"
+        title = "You have received files"
         message = (
-            f"{sender_email} vous a envoyé des fichiers. Cliquez sur le bouton "
-            f"ci-dessous pour accéder à la page de téléchargement.<br><br>"
-            f"Ce lien expirera le {expiration_formatted}"
+            f"{sender_email} sent you files. Click the button below "
+            f"to access the download page.<br><br>"
+            f"This link will expire on {expiration_formatted}"
         )
         html, text = create_email_template(title, message, files_summary, total_size, download_page_link)
         msg = _build_message(smtp_config, recipient_email,
-                             f"{sender_email} vous envoie des fichiers",
+                             f"{sender_email} sent you files",
                              text, html, reply_to=sender_email)
         return send_email_with_smtp(msg, smtp_config)
     except Exception:
@@ -244,14 +242,14 @@ def _send_sender_confirmation(sender_email, file_id, files_list, total_size, smt
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500').rstrip('/')
         download_page_link = f"{frontend_url}/download/{file_id}"
         files_summary = "".join(f"- {f['name']} ({format_size(f['size'])})\n" for f in files_list)
-        title = "Vos fichiers ont été envoyés"
+        title = "Your files have been sent"
         message = (
-            f"Vos fichiers ont été envoyés à : {recipient_email}<br><br>"
-            f"Page de téléchargement : {download_page_link}"
+            f"Your files have been sent to: {recipient_email}<br><br>"
+            f"Download page: {download_page_link}"
         )
         html, text = create_email_template(title, message, files_summary, total_size)
         msg = _build_message(smtp_config, sender_email,
-                             f"Confirmation de votre transfert à {recipient_email}",
+                             f"Transfer confirmation to {recipient_email}",
                              text, html)
         return send_email_with_smtp(msg, smtp_config)
     except Exception:
@@ -262,7 +260,7 @@ def _send_sender_confirmation(sender_email, file_id, files_list, total_size, smt
 def _send_download_notification(sender_email, file_id, smtp_config):
     try:
         tz = pytz.timezone(app.config.get('TIMEZONE', 'Europe/Paris'))
-        download_time = datetime.now(tz).strftime('%d/%m/%Y à %H:%M:%S (%Z)')
+        download_time = datetime.now(tz).strftime('%d/%m/%Y at %H:%M:%S (%Z)')
         file_info = FileUpload.query.get(file_id)
         if not file_info:
             return False
@@ -277,11 +275,11 @@ def _send_download_notification(sender_email, file_id, smtp_config):
             size = os.path.getsize(stored_path)
             files_summary = f"- {stored_name} ({format_size(size)})"
             total_formatted = format_size(size)
-        title = "Vos fichiers ont été téléchargés"
-        message = f"Vos fichiers ont été téléchargés le {download_time}."
+        title = "Your files have been downloaded"
+        message = f"Your files were downloaded on {download_time}."
         html, text = create_email_template(title, message, files_summary, total_formatted)
         msg = _build_message(smtp_config, sender_email,
-                             "Vos fichiers ont été téléchargés", text, html)
+                             "Your files have been downloaded", text, html)
         return send_email_with_smtp(msg, smtp_config)
     except Exception:
         app.logger.exception("Failed to send download notification")
@@ -421,19 +419,19 @@ def upload_file():
         try:
             smtp_config = _load_smtp_config()
             if not _send_recipient_notification(email, file_id, files_summary, total_formatted, smtp_config, sender_email):
-                notification_errors.append("destinataire")
+                notification_errors.append("recipient")
             if not _send_sender_confirmation(sender_email, file_id, original_files, total_formatted, smtp_config, email):
-                notification_errors.append("expéditeur")
+                notification_errors.append("sender")
         except FileNotFoundError:
             app.logger.error("SMTP config missing")
-            notification_errors.append("smtp non configuré")
+            notification_errors.append("smtp not configured")
         except Exception:
             app.logger.exception("Notification dispatch failed")
-            notification_errors.append("erreur interne")
+            notification_errors.append("internal error")
 
         response = {'success': True, 'file_id': file_id, 'message': 'Upload OK'}
         if notification_errors:
-            response['warning'] = "Notifications non envoyées : " + ", ".join(notification_errors)
+            response['warning'] = "Notifications failed: " + ", ".join(notification_errors)
         return jsonify(response), 200
 
     except UnsafePathError:
@@ -643,7 +641,7 @@ def test_smtp():
         msg = _build_message(
             smtp_config=smtp_config,
             to_addr=smtp_config['smtp_sender_email'],
-            subject="Test de configuration SMTP",
+            subject="SMTP configuration test",
             text_body="Test SMTP iTransfer.",
             html_body="<p>Test SMTP iTransfer.</p>",
         )
