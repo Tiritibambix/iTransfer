@@ -16,7 +16,6 @@ function Toast({ message, type = 'info', onClose }) {
     const t = setTimeout(onClose, 6000)
     return () => clearTimeout(t)
   }, [onClose])
-
   return (
     <div className={`toast toast--${type} mb-4`} role="alert">
       <span style={{ flex: 1 }}>{message}</span>
@@ -33,23 +32,17 @@ export default function App() {
   const [expirationDays, setExpirationDays] = useState(7)
   const [dragActive, setDragActive] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [phase, setPhase] = useState('') // 'uploading' | 'done'
   const [uploadPct, setUploadPct] = useState(0)
   const [toast, setToast] = useState(null)
   const xhrRef = useRef(null)
 
-  // Notification permission
   useEffect(() => {
-    if ('Notification' in window && Notification.permission === 'default') {
+    if ('Notification' in window && Notification.permission === 'default')
       Notification.requestPermission()
-    }
   }, [])
 
-  // Prevent accidental close during upload
   useEffect(() => {
-    const handler = (e) => {
-      if (uploading) { e.preventDefault(); e.returnValue = '' }
-    }
+    const handler = (e) => { if (uploading) { e.preventDefault(); e.returnValue = '' } }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [uploading])
@@ -58,7 +51,6 @@ export default function App() {
     setToast({ message, type, id: Date.now() })
   }, [])
 
-  // ---- File ingestion ----
   const ingestFiles = useCallback((rawFiles) => {
     const processed = rawFiles.map(f => ({
       file: f,
@@ -73,17 +65,12 @@ export default function App() {
   }, [])
 
   const handleDrop = useCallback(async (e) => {
-    e.preventDefault()
-    e.stopPropagation()
+    e.preventDefault(); e.stopPropagation()
     setDragActive(false)
     const collected = []
     const readEntry = async (entry, basePath = '') => {
       if (entry.isFile) {
-        await new Promise(res => entry.file(f => {
-          f._path = basePath ? `${basePath}/${f.name}` : f.name
-          collected.push(f)
-          res()
-        }))
+        await new Promise(res => entry.file(f => { f._path = basePath ? `${basePath}/${f.name}` : f.name; collected.push(f); res() }))
       } else if (entry.isDirectory) {
         const reader = entry.createReader()
         await new Promise(res => {
@@ -109,15 +96,13 @@ export default function App() {
 
   const handleClick = () => {
     const input = document.createElement('input')
-    input.type = 'file'
-    input.multiple = true
+    input.type = 'file'; input.multiple = true
     input.onchange = e => ingestFiles(Array.from(e.target.files))
     input.click()
   }
 
   const removeItem = (idx) => setItems(prev => prev.filter((_, i) => i !== idx))
 
-  // ---- Upload ----
   const handleUpload = async () => {
     if (!items.length) return showToast('Sélectionnez au moins un fichier.', 'warning')
     if (!recipientEmail) return showToast('Email destinataire requis.', 'warning')
@@ -128,129 +113,68 @@ export default function App() {
     fd.append('sender_email', senderEmail)
     fd.append('expiration_days', expirationDays)
     fd.append('files_list', JSON.stringify(items.map(i => ({ name: i.path, size: i.size }))))
-    items.forEach(i => {
-      fd.append('files[]', i.file)
-      fd.append('paths[]', i.path)
-    })
+    items.forEach(i => { fd.append('files[]', i.file); fd.append('paths[]', i.path) })
 
-    setUploading(true)
-    setPhase('uploading')
-    setUploadPct(0)
+    setUploading(true); setUploadPct(0)
 
     const xhr = new XMLHttpRequest()
     xhrRef.current = xhr
     xhr.open('POST', `${backendUrl}/upload`, true)
     xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('authToken') || ''}`)
-
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) setUploadPct(Math.round(e.loaded * 100 / e.total))
-    }
-
+    xhr.upload.onprogress = (e) => { if (e.lengthComputable) setUploadPct(Math.round(e.loaded * 100 / e.total)) }
     xhr.onload = () => {
       setUploading(false)
-      setPhase('done')
       if (xhr.status === 200) {
         const res = JSON.parse(xhr.responseText)
-        if (res.warning) {
-          showToast('Fichiers envoyés, mais les emails de notification ont échoué.', 'warning')
-        } else {
-          showToast('Transfert effectué ! Les notifications ont été envoyées.', 'success')
-        }
-        setItems([])
-        setRecipientEmail('')
-        setSenderEmail('')
-        setUploadPct(0)
-        setPhase('')
+        showToast(res.warning ? 'Fichiers envoyés, mais les emails ont échoué.' : 'Transfert effectué !', res.warning ? 'warning' : 'success')
+        setItems([]); setRecipientEmail(''); setSenderEmail(''); setUploadPct(0)
       } else {
         let msg = 'Erreur lors du transfert.'
         try { msg = JSON.parse(xhr.responseText).error || msg } catch {}
         showToast(msg, 'error')
       }
     }
-
-    xhr.onerror = () => {
-      setUploading(false)
-      setPhase('')
-      showToast('Erreur réseau. Vérifiez votre connexion.', 'error')
-    }
-
+    xhr.onerror = () => { setUploading(false); showToast('Erreur réseau.', 'error') }
     xhr.send(fd)
   }
 
-  const cancelUpload = () => {
-    xhrRef.current?.abort()
-    setUploading(false)
-    setPhase('')
-    setUploadPct(0)
-  }
-
+  const cancelUpload = () => { xhrRef.current?.abort(); setUploading(false); setUploadPct(0) }
   const totalSize = items.reduce((acc, i) => acc + i.size, 0)
 
   return (
     <div className="page">
-      <div className="container glow-accent">
-        {/* Header */}
+      <div className="container">
         <header className="app-header">
           <img src={banner} alt="iTransfer" className="app-logo" />
-          <div className="flex gap-2">
-            <button className="btn btn--ghost btn--sm" onClick={() => navigate('/admin')}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/>
-              </svg>
-              Admin
-            </button>
-          </div>
+          <button className="btn btn--ghost btn--sm" onClick={() => navigate('/admin')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/>
+            </svg>
+            Admin
+          </button>
         </header>
 
-        {/* Toast */}
-        {toast && (
-          <Toast
-            key={toast.id}
-            message={toast.message}
-            type={toast.type}
-            onClose={() => setToast(null)}
-          />
-        )}
+        {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
-        {/* Main card */}
         <div className="card mb-6">
           <div className="card__body flex-col gap-6">
 
-            {/* Emails */}
-            <div className="flex gap-4" style={{ flexWrap: 'wrap' }}>
-              <div className="field" style={{ flex: 1, minWidth: '200px' }}>
+            <div className="row-2col">
+              <div className="field">
                 <label className="field__label">Email destinataire</label>
-                <input
-                  className="input"
-                  type="email"
-                  placeholder="destinataire@exemple.com"
-                  value={recipientEmail}
-                  onChange={e => setRecipientEmail(e.target.value)}
-                  disabled={uploading}
-                />
+                <input className="input" type="email" placeholder="destinataire@exemple.com"
+                  value={recipientEmail} onChange={e => setRecipientEmail(e.target.value)} disabled={uploading} />
               </div>
-              <div className="field" style={{ flex: 1, minWidth: '200px' }}>
+              <div className="field">
                 <label className="field__label">Votre email</label>
-                <input
-                  className="input"
-                  type="email"
-                  placeholder="vous@exemple.com"
-                  value={senderEmail}
-                  onChange={e => setSenderEmail(e.target.value)}
-                  disabled={uploading}
-                />
+                <input className="input" type="email" placeholder="vous@exemple.com"
+                  value={senderEmail} onChange={e => setSenderEmail(e.target.value)} disabled={uploading} />
               </div>
             </div>
 
-            {/* Expiration */}
             <div className="field">
               <label className="field__label">Expiration du lien</label>
-              <select
-                className="input"
-                value={expirationDays}
-                onChange={e => setExpirationDays(parseInt(e.target.value))}
-                disabled={uploading}
-              >
+              <select className="input" value={expirationDays} onChange={e => setExpirationDays(parseInt(e.target.value))} disabled={uploading}>
                 <option value="3">3 jours</option>
                 <option value="5">5 jours</option>
                 <option value="7">7 jours</option>
@@ -258,7 +182,6 @@ export default function App() {
               </select>
             </div>
 
-            {/* Drop zone */}
             <div
               className={`drop-zone${dragActive ? ' drop-zone--active' : ''}`}
               onDragEnter={e => { e.preventDefault(); setDragActive(true) }}
@@ -266,10 +189,8 @@ export default function App() {
               onDragOver={e => e.preventDefault()}
               onDrop={handleDrop}
               onClick={!uploading ? handleClick : undefined}
-              role="button"
-              tabIndex={0}
+              role="button" tabIndex={0}
               onKeyDown={e => e.key === 'Enter' && !uploading && handleClick()}
-              aria-label="Zone de dépôt de fichiers"
             >
               <svg className="drop-zone__icon" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <path d="M24 8v24M14 18l10-10 10 10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
@@ -279,74 +200,56 @@ export default function App() {
               <p className="drop-zone__sub">ou cliquez pour sélectionner</p>
             </div>
 
-            {/* File list */}
             {items.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="section-title" style={{ margin: 0 }}>
                     {items.length} fichier{items.length > 1 ? 's' : ''} — {formatSize(totalSize)}
                   </p>
-                  <button className="btn btn--ghost btn--sm" onClick={() => setItems([])} disabled={uploading}>
-                    Tout effacer
-                  </button>
+                  <button className="btn btn--ghost btn--sm" onClick={() => setItems([])} disabled={uploading}>Tout effacer</button>
                 </div>
                 <div className="file-list">
                   {items.map((item, idx) => (
                     <div key={idx} className="file-item">
                       <span className="file-item__name" title={item.path}>{item.path}</span>
                       <span className="file-item__size">{formatSize(item.size)}</span>
-                      <button className="file-item__remove" onClick={() => removeItem(idx)} disabled={uploading} aria-label="Supprimer">✕</button>
+                      <button className="file-item__remove" onClick={() => removeItem(idx)} disabled={uploading}>✕</button>
                     </div>
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Progress */}
             {uploading && (
               <div className="progress-wrap">
                 <div className="progress-label">
-                  <span className="progress-label__text">
-                    {phase === 'uploading' ? 'Envoi en cours…' : 'Traitement…'}
-                  </span>
+                  <span className="progress-label__text">Envoi en cours…</span>
                   <span className="progress-label__pct">{uploadPct}%</span>
                 </div>
                 <div className="progress-track">
                   <div className="progress-bar" style={{ width: `${uploadPct}%` }} />
                 </div>
                 <div className="toast toast--info" style={{ marginTop: 0 }}>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0, marginTop: 2 }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
                   </svg>
-                  <span>Ne fermez pas cette fenêtre pendant le transfert.</span>
+                  <span style={{ flex: 1 }}>Ne fermez pas cette fenêtre.</span>
                   <button className="btn btn--danger btn--sm" onClick={cancelUpload}>Annuler</button>
                 </div>
               </div>
             )}
 
-            {/* Send button */}
-            <button
-              className="btn btn--primary btn--full btn--lg"
-              onClick={handleUpload}
-              disabled={uploading || !items.length}
-            >
+            <button className="btn btn--primary btn--full btn--lg" onClick={handleUpload} disabled={uploading || !items.length}>
               {uploading
                 ? <><span className="spinner" />Envoi en cours…</>
-                : <>
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>
-                    </svg>
-                    Envoyer
-                  </>
+                : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/></svg>Envoyer</>
               }
             </button>
 
           </div>
         </div>
 
-        <p className="text-center text-xs text-faint">
-          iTransfer · open-source · GPL-3.0
-        </p>
+        <p className="text-center text-xs text-faint">iTransfer · open-source · GPL-3.0</p>
       </div>
     </div>
   )
