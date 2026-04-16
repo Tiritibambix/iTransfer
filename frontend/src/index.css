@@ -612,9 +612,9 @@ tbody tr:hover { background: rgba(105,58,103,0.05); }
   .smtp-actions .btn { width: 100%; }
 }
 
-/* ---- Transfer mobile cards ---- */
-.transfer-cards {
-  display: none;
+/* ---- Transfer cards (always cards, no table) ---- */
+.transfer-list {
+  display: flex;
   flex-direction: column;
   gap: var(--sp-3);
 }
@@ -623,12 +623,49 @@ tbody tr:hover { background: rgba(105,58,103,0.05); }
   background: var(--clr-surface-2);
   border: 1px solid rgba(105,58,103,0.15);
   border-radius: var(--radius-md);
-  padding: var(--sp-4);
+  overflow: hidden;
+  transition: border-color var(--t-fast);
 }
 
-@media (max-width: 768px) {
-  .hide-mobile-table { display: none; }
-  .transfer-cards { display: flex; }
+.transfer-card--expired {
+  opacity: 0.6;
+}
+
+.transfer-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3) var(--sp-4);
+  background: var(--clr-surface-3);
+  border-bottom: 1px solid rgba(105,58,103,0.1);
+}
+
+.transfer-card__body {
+  padding: var(--sp-3) var(--sp-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.transfer-card__row {
+  display: flex;
+  gap: var(--sp-3);
+  font-size: var(--font-sm);
+  min-width: 0;
+}
+
+.transfer-card__label {
+  color: var(--clr-text-muted);
+  flex-shrink: 0;
+  width: 52px;
+}
+
+.transfer-card__value {
+  color: var(--clr-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
 }
 
 
