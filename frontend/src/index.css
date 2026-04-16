@@ -130,16 +130,31 @@ body::before {
   min-height: 100vh;
 }
 
-/* Single source of truth for container widths — never use inline maxWidth */
-.container         { width: 100%; max-width: 720px; }
-.container--narrow { width: 100%; max-width: 480px; }
-.container--wide   { width: 100%; max-width: 1100px; }
+/* All pages share the same content width for visual consistency */
+.container,
+.container--narrow,
+.container--wide {
+  width: 100%;
+  max-width: 720px;
+  /* Fluid padding so content never touches viewport edges */
+  padding-left: var(--sp-4);
+  padding-right: var(--sp-4);
+}
 
-@media (max-width: 600px) {
-  .page { padding: var(--sp-4) var(--sp-3); }
+@media (max-width: 768px) {
   .container,
   .container--narrow,
   .container--wide { max-width: 100%; }
+}
+
+@media (max-width: 480px) {
+  .page { padding: var(--sp-3) var(--sp-2); }
+  .container,
+  .container--narrow,
+  .container--wide {
+    padding-left: var(--sp-3);
+    padding-right: var(--sp-3);
+  }
 }
 
 /* ---- Card ---- */
