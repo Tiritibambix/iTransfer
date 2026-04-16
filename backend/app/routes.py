@@ -72,10 +72,30 @@ def _client_key() -> str:
 # -------------------------------------------------------------------------
 # Email validation
 # -------------------------------------------------------------------------
-_EMAIL_RE = re.compile(r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+# ReDoS-safe pattern: fixed-length character classes with no nested
+# quantifiers. Each segment is bounded so catastrophic backtracking
+# cannot occur on adversarial input (CodeQL py/polynomial-redos).
+_EMAIL_LOCAL  = re.compile(r'^[A-Za-z0-9._%+\-]{1,64}$')
+_EMAIL_DOMAIN = re.compile(r'^[A-Za-z0-9.\-]{1,253}$')
+_EMAIL_TLD    = re.compile(r'^[A-Za-z]{2,}$')
+
 
 def _valid_email(addr: str) -> bool:
-    return bool(addr and isinstance(addr, str) and _EMAIL_RE.match(addr.strip()) and len(addr) <= 254)
+    """Validate an email address without risk of ReDoS."""
+    if not addr or not isinstance(addr, str):
+        return False
+    addr = addr.strip()
+    if len(addr) > 254 or '@' not in addr:
+        return False
+    local, _, rest = addr.partition('@')
+    if '.' not in rest:
+        return False
+    domain, _, tld = rest.rpartition('.')
+    return bool(
+        _EMAIL_LOCAL.match(local)
+        and _EMAIL_DOMAIN.match(domain)
+        and _EMAIL_TLD.match(tld)
+    )
 
 
 # -------------------------------------------------------------------------
