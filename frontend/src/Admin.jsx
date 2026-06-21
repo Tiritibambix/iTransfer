@@ -200,7 +200,7 @@ function ResultRow({ label, result }) {
   return (
     <div className="transfer-card__row">
       <span className="transfer-card__label">{label}</span>
-      <span className="transfer-card__value">
+      <span className="transfer-card__value transfer-card__value--wrap">
         <span className={`badge ${cls}`}>{result.status.toUpperCase()}</span>{' '}
         {result.message}
       </span>
@@ -323,7 +323,7 @@ function SmtpTab({ token }) {
             DNS records drift over time -- re-run this rather than relying on a
             check you did a while ago, especially after any DNS or registrar change.
           </p>
-          <div className="field">
+          <div className="field mb-4">
             <label className="field__label">DKIM selector (optional)</label>
             <input
               className="input"

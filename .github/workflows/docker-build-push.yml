@@ -9,8 +9,10 @@ name: Build and Push Multi-Arch Docker Images
 
 on:
   push:
-    branches:
-      - main
+    # No branches filter: every branch gets built and pushed, each tagged
+    # with its own branch name (see the metadata steps below) so branch
+    # builds never collide with each other or overwrite :latest, which
+    # stays reserved for the default branch.
     paths-ignore:
       - 'LICENSE'
       - 'README.md'
@@ -40,20 +42,36 @@ jobs:
     permissions:
       contents: read
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      backend_tags: ${{ steps.meta_backend.outputs.tags }}
+      backend_labels: ${{ steps.meta_backend.outputs.labels }}
+      frontend_tags: ${{ steps.meta_frontend.outputs.tags }}
+      frontend_labels: ${{ steps.meta_frontend.outputs.labels }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Extract version from Git
-        id: version
-        run: echo "version=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v4
+      # :latest only on the default branch; every branch also gets a tag
+      # named after itself (slashes/uppercase normalized by the action) plus
+      # a short-SHA tag for traceability back to the exact commit.
+      - name: Extract Docker metadata (backend)
+        id: meta_backend
+        uses: docker/metadata-action@v5
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=sha,format=short
+
+      - name: Extract Docker metadata (frontend)
+        id: meta_frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}
+          tags: |
+            type=raw,value=latest,enable={{is_default_branch}}
+            type=ref,event=branch
+            type=sha,format=short
 
   audit:
     runs-on: ubuntu-24.04
@@ -98,9 +116,8 @@ jobs:
           file: ./backend/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}:${{ needs.setup.outputs.version }}
+          tags: ${{ needs.setup.outputs.backend_tags }}
+          labels: ${{ needs.setup.outputs.backend_labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
@@ -130,9 +147,8 @@ jobs:
           file: ./frontend/Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
-          tags: |
-            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:latest
-            ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}:${{ needs.setup.outputs.version }}
+          tags: ${{ needs.setup.outputs.frontend_tags }}
+          labels: ${{ needs.setup.outputs.frontend_labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           provenance: false
@@ -140,6 +156,9 @@ jobs:
   update-dockerhub-description:
     runs-on: ubuntu-24.04
     needs: [build-push-backend, build-push-frontend]
+    # Only the default branch should own the public Docker Hub description --
+    # branch builds push their own image tags but must not overwrite it.
+    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     permissions:
       contents: read
     steps:

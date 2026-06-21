@@ -668,6 +668,15 @@ tbody tr:hover { background: rgba(105,58,103,0.05); }
   flex: 1;
 }
 
+/* For values that can run long (e.g. deliverability check messages) and
+   must stay fully readable instead of being clipped to one line. */
+.transfer-card__value--wrap {
+  overflow: visible;
+  text-overflow: initial;
+  white-space: normal;
+  word-break: break-word;
+}
+
 
 
 /* ---- Page variants ---- */
