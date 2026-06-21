@@ -88,8 +88,8 @@ function TransfersTab({ token }) {
     }
   }
 
-  const active = (Array.isArray(transfers) ? transfers : []).filter(t => !t.expired)
-  const expired = (Array.isArray(transfers) ? transfers : []).filter(t => t.expired)
+  const active = transfers.filter(t => !t.expired)
+  const expired = transfers.filter(t => t.expired)
 
   return (
     <div>
