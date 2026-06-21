@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import banner from './assets/banner.png'
+import { getToken } from './storage'
 
 const backendUrl = window.BACKEND_URL
 
@@ -125,7 +126,7 @@ export default function App() {
     const xhr = new XMLHttpRequest()
     xhrRef.current = xhr
     xhr.open('POST', `${backendUrl}/upload`, true)
-    xhr.setRequestHeader('Authorization', `Bearer ${localStorage.getItem('authToken') || ''}`)
+    xhr.setRequestHeader('Authorization', `Bearer ${getToken() || ''}`)
     xhr.upload.onprogress = (e) => {
       if (e.lengthComputable) setUploadPct(Math.round(e.loaded * 100 / e.total))
     }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import banner from './assets/banner.png'
+import { setToken } from './storage'
 
 const backendUrl = window.BACKEND_URL
 
@@ -23,8 +24,11 @@ export default function Login() {
       })
       if (r.ok) {
         const data = await r.json()
-        localStorage.setItem('authToken', data.token)
-        navigate('/')
+        if (setToken(data.token)) {
+          navigate('/')
+        } else {
+          setError('Your browser is blocking local storage for this site, so the session can’t be saved. Check your privacy/tracking-protection settings and allow storage for this site.')
+        }
       } else if (r.status === 429) {
         setError('Too many attempts. Please wait a moment.')
       } else {

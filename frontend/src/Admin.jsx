@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import banner from './assets/banner.png'
+import { getToken, clearToken } from './storage'
 
 const backendUrl = window.BACKEND_URL
 
@@ -355,11 +356,11 @@ function SmtpTab({ token }) {
 // ---- Main Admin page ----
 export default function Admin() {
   const navigate = useNavigate()
-  const token = localStorage.getItem('authToken') || ''
+  const token = getToken() || ''
   const [tab, setTab] = useState('transfers')
 
   const logout = () => {
-    localStorage.removeItem('authToken')
+    clearToken()
     navigate('/login')
   }
 
