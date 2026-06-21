@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import banner from './assets/banner.png'
 import { getToken, clearToken } from './storage'
+import { authFetch } from './api'
 
 const backendUrl = window.BACKEND_URL
 
@@ -56,11 +57,11 @@ function TransfersTab({ token }) {
 
   const load = useCallback(() => {
     setLoading(true)
-    fetch(`${backendUrl}/api/transfers`, {
+    authFetch(`${backendUrl}/api/transfers`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(r => r.json())
-      .then(data => { setTransfers(data); setLoading(false) })
+      .then(r => r.ok ? r.json() : Promise.reject())
+      .then(data => { setTransfers(Array.isArray(data) ? data : []); setLoading(false) })
       .catch(() => { setToast({ message: 'Failed to load transfers.', type: 'error' }); setLoading(false) })
   }, [token])
 
@@ -70,7 +71,7 @@ function TransfersTab({ token }) {
     if (!confirm('Delete this transfer and its file?')) return
     setDeleting(id)
     try {
-      const r = await fetch(`${backendUrl}/api/transfers/${id}`, {
+      const r = await authFetch(`${backendUrl}/api/transfers/${id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -87,8 +88,8 @@ function TransfersTab({ token }) {
     }
   }
 
-  const active = transfers.filter(t => !t.expired)
-  const expired = transfers.filter(t => t.expired)
+  const active = (Array.isArray(transfers) ? transfers : []).filter(t => !t.expired)
+  const expired = (Array.isArray(transfers) ? transfers : []).filter(t => t.expired)
 
   return (
     <div>
@@ -222,18 +223,18 @@ function SmtpTab({ token }) {
   const [checkResult, setCheckResult] = useState(null)
 
   useEffect(() => {
-    fetch(`${backendUrl}/api/get-smtp-settings`, {
+    authFetch(`${backendUrl}/api/get-smtp-settings`, {
       headers: { Authorization: `Bearer ${token}` },
     })
-      .then(r => r.json())
-      .then(data => setCfg(prev => ({ ...prev, ...data })))
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data) setCfg(prev => ({ ...prev, ...data })) })
       .catch(() => {})
   }, [token])
 
   const handleSave = async () => {
     setSaving(true)
     try {
-      const r = await fetch(`${backendUrl}/api/save-smtp-settings`, {
+      const r = await authFetch(`${backendUrl}/api/save-smtp-settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(cfg),
@@ -251,7 +252,7 @@ function SmtpTab({ token }) {
   const handleTest = async () => {
     setTesting(true)
     try {
-      const r = await fetch(`${backendUrl}/api/test-smtp`, {
+      const r = await authFetch(`${backendUrl}/api/test-smtp`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
       })
@@ -269,7 +270,7 @@ function SmtpTab({ token }) {
     setChecking(true)
     setCheckResult(null)
     try {
-      const r = await fetch(`${backendUrl}/api/check-deliverability`, {
+      const r = await authFetch(`${backendUrl}/api/check-deliverability`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ dkim_selector: dkimSelector }),

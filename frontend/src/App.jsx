@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import banner from './assets/banner.png'
-import { getToken } from './storage'
+import { getToken, clearToken } from './storage'
 
 const backendUrl = window.BACKEND_URL
 
@@ -135,6 +135,9 @@ export default function App() {
       if (xhr.status === 200) {
         showToast('Transfer complete!', 'success')
         setItems([]); setRecipientEmail(''); setSenderEmail(''); setUploadPct(0)
+      } else if (xhr.status === 401) {
+        clearToken()
+        window.location.assign('/login')
       } else {
         let msg = 'Transfer failed.'
         try { msg = JSON.parse(xhr.responseText).error || msg } catch {}
