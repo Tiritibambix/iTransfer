@@ -132,11 +132,7 @@ export default function App() {
     xhr.onload = () => {
       setUploading(false)
       if (xhr.status === 200) {
-        const res = JSON.parse(xhr.responseText)
-        showToast(
-          res.warning ? 'Files sent, but email notifications failed.' : 'Transfer complete!',
-          res.warning ? 'warning' : 'success'
-        )
+        showToast('Transfer complete!', 'success')
         setItems([]); setRecipientEmail(''); setSenderEmail(''); setUploadPct(0)
       } else {
         let msg = 'Transfer failed.'

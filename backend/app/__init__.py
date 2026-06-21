@@ -13,13 +13,14 @@ import logging
 import os
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
 from logging.handlers import RotatingFileHandler
 
 import schedule
 from flask import Flask, jsonify
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import exc
+from sqlalchemy import exc, inspect, text
 from werkzeug.exceptions import HTTPException
 
 
@@ -106,10 +107,66 @@ def _wait_for_db(max_retries: int = 10, delay: int = 2) -> None:
             current_delay = min(current_delay * 2, 30)
 
 
+def _ensure_notification_columns() -> None:
+    """Idempotently add notification-tracking columns to file_upload for
+    instances upgrading from a schema that predates this feature.
+    db.create_all() only creates missing tables, it never alters existing
+    ones, so this defensive step is required on every startup. Each ALTER
+    is additive-only (nullable, no data rewrite) and individually
+    existence-checked, so it is safe to run unconditionally and repeatedly.
+    """
+    inspector = inspect(db.engine)
+    if 'file_upload' not in inspector.get_table_names():
+        return  # create_all() just made it fresh with all columns already
+
+    wanted = {
+        'notification_status_recipient': 'VARCHAR(16)',
+        'notification_error_recipient': 'VARCHAR(500)',
+        'notification_status_sender': 'VARCHAR(16)',
+        'notification_error_sender': 'VARCHAR(500)',
+        'notification_status_download': 'VARCHAR(16)',
+        'notification_error_download': 'VARCHAR(500)',
+    }
+
+    is_mysql = db.engine.dialect.name in ('mysql', 'mariadb')
+    lock_acquired = False
+    try:
+        if is_mysql:
+            # Guard against the 4 Gunicorn worker processes racing to ALTER
+            # the same table concurrently at startup.
+            with db.engine.connect() as conn:
+                lock_acquired = bool(conn.execute(
+                    text("SELECT GET_LOCK('itransfer_schema_migration', 10)")
+                ).scalar())
+
+        # Re-inspect after acquiring the lock: another worker may have
+        # already finished the migration while we waited.
+        existing = {col['name'] for col in inspect(db.engine).get_columns('file_upload')}
+        missing = {name: ddl for name, ddl in wanted.items() if name not in existing}
+        if not missing:
+            return
+
+        for name, ddl in missing.items():
+            try:
+                with db.engine.begin() as conn:
+                    app.logger.info("Migrating schema: adding column %s to file_upload", name)
+                    conn.execute(text(f"ALTER TABLE file_upload ADD COLUMN {name} {ddl} DEFAULT NULL"))
+            except exc.OperationalError:
+                # Another worker process won the race despite the advisory
+                # lock (e.g. GET_LOCK timed out under heavy contention) and
+                # already added this column -- not a real failure.
+                app.logger.info("Column %s already exists, skipping", name)
+    finally:
+        if lock_acquired:
+            with db.engine.connect() as conn:
+                conn.execute(text("SELECT RELEASE_LOCK('itransfer_schema_migration')"))
+
+
 with app.app_context():
     _wait_for_db()
     from . import models  # noqa: F401  (register models before create_all)
     db.create_all()
+    _ensure_notification_columns()
 
 
 # -------------------------------------------------------------------------
@@ -126,6 +183,19 @@ def _handle_http(error):
 def _handle_unexpected(error):
     app.logger.exception("Unhandled exception")
     return jsonify({'error': 'An internal error has occurred'}), 500
+
+
+# -------------------------------------------------------------------------
+# Background email executor
+# -------------------------------------------------------------------------
+# Bounds concurrent SMTP connections per worker process (this is one pool
+# per Gunicorn worker, not shared across the 4 worker processes -- fine at
+# this app's volume, see notification dispatch in routes.py). A bounded
+# pool (rather than a bare thread per email) caps how many concurrent
+# connections get opened against the self-hoster's SMTP relay account if
+# uploads burst, which several providers rate-limit or temp-block on.
+# Defined before importing routes, which imports this module by name.
+email_executor = ThreadPoolExecutor(max_workers=4, thread_name_prefix='itransfer-mail')
 
 
 # -------------------------------------------------------------------------

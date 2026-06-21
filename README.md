@@ -21,8 +21,8 @@ This application has been coded with the help of AI and is provided as-is. While
 - Upload files or folders via drag & drop
 - Automatic ZIP packaging for multiple files, direct download for single files
 - Configurable link expiration: 3, 5, 7 or 10 days
-- Email notifications: recipient on upload, sender on upload and on download
-- Admin panel: list and delete transfers, configure SMTP
+- Email notifications: recipient on upload, sender on upload and on download — sent in the background with automatic retry on transient SMTP failures
+- Admin panel: list and delete transfers (with per-notification delivery status), configure SMTP, DNS-based deliverability checker (SPF/DMARC/DKIM)
 - JWT authentication on protected routes
 - Rate limiting on login and upload endpoints
 - Server-side email validation
@@ -47,6 +47,7 @@ This application has been coded with the help of AI and is provided as-is. While
 │   │   ├── __init__.py      # App factory, scheduler, CORS
 │   │   ├── auth.py          # JWT helpers
 │   │   ├── config.py        # Configuration
+│   │   ├── deliverability.py # SPF/DMARC/DKIM DNS checks
 │   │   ├── models.py        # Database models
 │   │   ├── paths.py         # Path sanitization (CodeQL sanitizer)
 │   │   └── routes.py        # API endpoints
@@ -190,11 +191,49 @@ server {
 
 ## SMTP Configuration
 
-Configure SMTP from the admin panel (`/admin` → SMTP tab) or directly via environment variables. The backend supports any SMTP server with SSL (port 465) or STARTTLS (port 587).
+Configure SMTP from the admin panel (`/admin` → SMTP tab). The backend supports any SMTP server with SSL (port 465) or STARTTLS (port 587).
 
 Tested with OVH, Gmail, Office 365 and generic SMTP.
 
-For reliable delivery to Gmail/Yahoo, your domain needs SPF, DKIM and DMARC records. Without them, messages will be rejected.
+### Domain authentication (SPF, DKIM, DMARC)
+
+Gmail and Yahoo reject or spam-folder unauthenticated mail since February 2024. iTransfer relays through *your own* SMTP account — it never sends mail directly — so the records below must exist on the domain of the **sender email** configured in the SMTP tab (the part after the `@`), not on iTransfer's own infrastructure.
+
+**SPF** authorizes your SMTP provider to send mail "as" your domain. Add one TXT record at your domain's apex (`@`):
+
+```
+v=spf1 include:<your-provider's-SPF-include> ~all
+```
+
+| Provider | SPF include |
+|---|---|
+| OVH | `include:mx.ovh.com` |
+| Gmail / Google Workspace | `include:_spf.google.com` |
+| Office 365 | `include:spf.protection.outlook.com` |
+
+If more than one service sends mail "as" your domain (iTransfer, your regular mailbox, a marketing tool, etc.), combine them into a **single** SPF record with multiple `include:` mechanisms — never publish two separate `v=spf1` TXT records, this silently breaks SPF entirely (RFC 7208 treats it as a hard PermError). The admin panel's deliverability checker (below) explicitly detects and flags this.
+
+**DMARC** tells receivers what to do when SPF/DKIM fail. Add one TXT record at `_dmarc.yourdomain.tld`:
+
+```
+v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@yourdomain.tld
+```
+
+- `p=none` — monitoring only, offers no actual protection (a stale leftover from initial DMARC rollout is common — check this hasn't stayed at `none` for years).
+- `p=quarantine` — failing mail goes to spam. Recommended starting point.
+- `p=reject` — failing mail is rejected outright. Strongest, move here once `quarantine` hasn't caused issues with legitimate mail.
+
+**DKIM** cryptographically signs outgoing mail. DKIM is configured and signed by *your SMTP provider*, not by iTransfer — iTransfer only relays through your authenticated SMTP account, it does not sign messages itself. Enable it and find your selector in your provider's control panel:
+
+| Provider | Where to enable DKIM |
+|---|---|
+| OVH | Web Cloud panel → Emails → DKIM (per-domain toggle) |
+| Gmail / Google Workspace | Admin console → Apps → Google Workspace → Gmail → Authenticate email |
+| Office 365 | Microsoft 365 Defender → Policies & rules → Email authentication settings → DKIM |
+
+### Re-verify, don't rely on memory
+
+DNS records drift: a registrar UI change can silently overwrite a TXT record, another service added later can introduce a second conflicting SPF record, or a DMARC policy set to `p=none` years ago may never have been tightened. "I checked this a while ago" is not the same as "this is correct right now." Use the **Check deliverability** button in the admin SMTP tab to re-run live SPF/DMARC/(optional DKIM) DNS lookups any time mail seems to be landing in spam — especially after any DNS or registrar change, and periodically even if nothing else changed.
 
 ## Environment Variables
 
@@ -210,10 +249,18 @@ For reliable delivery to Gmail/Yahoo, your domain needs SPF, DKIM and DMARC reco
 | `FORCE_HTTPS` | no | `true` | Enforce HTTPS in generated URLs |
 | `PROXY_COUNT` | no | `1` | Number of reverse proxies in front |
 
+## Upgrading
+
+Newer versions may add columns to the database schema automatically on startup (additive only — existing data is never dropped or rewritten). As with any schema change, back up `./db_data` before pulling a new image version.
+
 ## Troubleshooting
 
-**Files not received / emails rejected**
-Check SPF, DKIM and DMARC records on your sending domain. Most major providers (Gmail, Yahoo) reject unauthenticated mail since early 2024.
+**Files not received / emails rejected, or landing in spam**
+
+1. Open the admin panel → SMTP tab → **Check deliverability**. This runs live DNS lookups against your sender domain for SPF and DMARC (and DKIM if you supply your provider's selector), and explicitly calls out a missing record, a misconfigured DMARC policy, or the "multiple SPF records" mistake.
+2. If the checker reports a problem, see [Domain authentication](#domain-authentication-spf-dkim-dmarc) above for exact record syntax per provider.
+3. Re-run the checker after any DNS/registrar change — don't assume a past check is still valid; records can be overwritten by a registrar UI change or by another service adding a conflicting record.
+4. Check the admin "Transfers" tab: each transfer shows per-notification send status (recipient / sender / download alert) with the last SMTP error on hover, so you can tell whether an email was actually attempted and what failed.
 
 **Database not initializing**
 Make sure `backend/init.sql` exists before the first `docker compose up`. If the DB volume already exists without the table, run:

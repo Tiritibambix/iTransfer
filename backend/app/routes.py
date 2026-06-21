@@ -28,8 +28,9 @@ from email.utils import formataddr, formatdate, make_msgid
 import pytz
 from flask import Response, current_app, jsonify, request, send_from_directory, stream_with_context
 
-from . import app, db
+from . import app, db, email_executor
 from .auth import issue_token, require_auth
+from .deliverability import check_dkim, check_dmarc, check_spf
 from .models import FileUpload
 from .paths import UnsafePathError, safe_join, safe_stored_filename
 
@@ -78,6 +79,7 @@ def _client_key() -> str:
 _EMAIL_LOCAL  = re.compile(r'^[A-Za-z0-9._%+\-]{1,64}$')
 _EMAIL_DOMAIN = re.compile(r'^[A-Za-z0-9.\-]{1,253}$')
 _EMAIL_TLD    = re.compile(r'^[A-Za-z]{2,}$')
+_DKIM_SELECTOR = re.compile(r'^[A-Za-z0-9_\-]{1,63}$')
 
 
 def _valid_email(addr: str) -> bool:
@@ -151,27 +153,78 @@ def _build_message(smtp_config, to_addr, subject, text_body, html_body, reply_to
     return msg
 
 
-def send_email_with_smtp(msg, smtp_config) -> bool:
+class _TransientSMTPError(Exception):
+    """An SMTP failure worth retrying (network blip, 4xx temporary reject)."""
+
+
+class _PermanentSMTPError(Exception):
+    """An SMTP failure that will not succeed on retry (bad auth, 5xx, bad recipient)."""
+
+
+_SMTP_TIMEOUT = 20  # seconds; a hung connection would otherwise block a worker thread forever
+
+
+def send_email_with_smtp(msg, smtp_config) -> None:
+    """Single delivery attempt. Raises _TransientSMTPError or
+    _PermanentSMTPError on failure so callers can decide whether to retry."""
     server = None
     try:
         port = int(smtp_config['smtp_port'])
         if port == 465:
-            server = smtplib.SMTP_SSL(smtp_config['smtp_server'], port)
+            server = smtplib.SMTP_SSL(smtp_config['smtp_server'], port, timeout=_SMTP_TIMEOUT)
         else:
-            server = smtplib.SMTP(smtp_config['smtp_server'], port)
+            server = smtplib.SMTP(smtp_config['smtp_server'], port, timeout=_SMTP_TIMEOUT)
             server.starttls()
         server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
         server.send_message(msg)
-        return True
-    except Exception:
-        app.logger.exception("SMTP send failed")
-        return False
+    except (smtplib.SMTPAuthenticationError, smtplib.SMTPRecipientsRefused) as e:
+        raise _PermanentSMTPError(str(e)) from e
+    except smtplib.SMTPResponseException as e:
+        # 4xx = temporary failure (greylisting, rate limit) -> retry.
+        # 5xx = permanent failure (policy reject, bad address) -> don't.
+        if 400 <= e.smtp_code < 500:
+            raise _TransientSMTPError(f"SMTP {e.smtp_code}: {e.smtp_error}") from e
+        raise _PermanentSMTPError(f"SMTP {e.smtp_code}: {e.smtp_error}") from e
+    except (smtplib.SMTPServerDisconnected, ConnectionError, OSError) as e:
+        # Pure connectivity failures (refused/unreachable/timed out) with no
+        # SMTP response to classify -- always worth retrying. Note:
+        # SMTPConnectError *is* a SMTPResponseException (it fires after a
+        # non-220 banner) so it's already handled by the code-based branch
+        # above, not here.
+        raise _TransientSMTPError(str(e)) from e
+    except Exception as e:
+        # Unclassified failure: treat as permanent rather than retry-looping
+        # on something that is more likely a bug than a transient blip.
+        raise _PermanentSMTPError(str(e)) from e
     finally:
         if server:
             try:
                 server.quit()
             except Exception:
                 pass
+
+
+def send_email_with_retry(msg, smtp_config, max_attempts: int = 3) -> tuple[bool, str | None]:
+    """Send with bounded retries and exponential backoff, but only for
+    transient failures. Returns (success, last_error_message_or_None)."""
+    delay = 2
+    last_error = None
+    for attempt in range(1, max_attempts + 1):
+        try:
+            send_email_with_smtp(msg, smtp_config)
+            return True, None
+        except _PermanentSMTPError as e:
+            app.logger.warning("Permanent SMTP failure, not retrying: %s", e)
+            return False, str(e)[:500]
+        except _TransientSMTPError as e:
+            last_error = str(e)[:500]
+            app.logger.warning(
+                "Transient SMTP failure (attempt %d/%d): %s", attempt, max_attempts, e
+            )
+            if attempt < max_attempts:
+                time.sleep(delay)
+                delay *= 2
+    return False, last_error
 
 
 def get_backend_url() -> str:
@@ -190,7 +243,8 @@ def get_backend_url() -> str:
     return f"{proto}://{host}"
 
 
-def create_email_template(title, message, file_summary, total_size, download_link=None):
+def create_email_template(title, message, file_summary, total_size, download_link=None, sender_domain=None):
+    footer_domain_line = f'<p>Sent on behalf of {sender_domain}</p>' if sender_domain else ''
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -219,7 +273,7 @@ def create_email_template(title, message, file_summary, total_size, download_lin
                 <div class="files">{file_summary}</div>
                 <div class="total">{total_size}</div>
             </div>
-            <div class="footer"><p>Sent via iTransfer</p></div>
+            <div class="footer"><p>Sent via iTransfer</p>{footer_domain_line}</div>
         </div>
     </body>
     </html>
@@ -228,15 +282,17 @@ def create_email_template(title, message, file_summary, total_size, download_lin
         f"{title}\n\n{message}\n\n"
         f"{'Download link: ' + download_link if download_link else ''}\n\n"
         f"File summary:\n{file_summary}\n\nTotal size: {total_size}\n"
+        f"{'Sent on behalf of ' + sender_domain if sender_domain else ''}\n"
     )
     return html, text
 
 
 def _send_recipient_notification(recipient_email, file_id, files_summary, total_size, smtp_config, sender_email):
+    """Build and send the recipient notification. Returns (success, error)."""
     try:
         file_info = FileUpload.query.get(file_id)
         if not file_info:
-            return False
+            return False, "transfer not found"
         tz = pytz.timezone(app.config.get('TIMEZONE', 'Europe/Paris'))
         expiration_formatted = file_info.expires_at.astimezone(tz).strftime('%d/%m/%Y at %H:%M:%S')
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500').rstrip('/')
@@ -247,17 +303,21 @@ def _send_recipient_notification(recipient_email, file_id, files_summary, total_
             f"to access the download page.<br><br>"
             f"This link will expire on {expiration_formatted}"
         )
-        html, text = create_email_template(title, message, files_summary, total_size, download_page_link)
+        html, text = create_email_template(
+            title, message, files_summary, total_size, download_page_link,
+            sender_domain=_sender_domain(smtp_config),
+        )
         msg = _build_message(smtp_config, recipient_email,
                              f"{sender_email} sent you files",
                              text, html, reply_to=sender_email)
-        return send_email_with_smtp(msg, smtp_config)
+        return send_email_with_retry(msg, smtp_config)
     except Exception:
         app.logger.exception("Failed to prepare recipient notification")
-        return False
+        return False, "internal error"
 
 
 def _send_sender_confirmation(sender_email, file_id, files_list, total_size, smtp_config, recipient_email):
+    """Build and send the sender confirmation. Returns (success, error)."""
     try:
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500').rstrip('/')
         download_page_link = f"{frontend_url}/download/{file_id}"
@@ -267,23 +327,27 @@ def _send_sender_confirmation(sender_email, file_id, files_list, total_size, smt
             f"Your files have been sent to: {recipient_email}<br><br>"
             f"Download page: {download_page_link}"
         )
-        html, text = create_email_template(title, message, files_summary, total_size)
+        html, text = create_email_template(
+            title, message, files_summary, total_size,
+            sender_domain=_sender_domain(smtp_config),
+        )
         msg = _build_message(smtp_config, sender_email,
                              f"Transfer confirmation to {recipient_email}",
                              text, html)
-        return send_email_with_smtp(msg, smtp_config)
+        return send_email_with_retry(msg, smtp_config)
     except Exception:
         app.logger.exception("Failed to prepare sender confirmation")
-        return False
+        return False, "internal error"
 
 
 def _send_download_notification(sender_email, file_id, smtp_config):
+    """Build and send the download notification. Returns (success, error)."""
     try:
         tz = pytz.timezone(app.config.get('TIMEZONE', 'Europe/Paris'))
         download_time = datetime.now(tz).strftime('%d/%m/%Y at %H:%M:%S (%Z)')
         file_info = FileUpload.query.get(file_id)
         if not file_info:
-            return False
+            return False, "transfer not found"
         files_list = file_info.get_files_list()
         if files_list:
             total = sum(f['size'] for f in files_list)
@@ -297,13 +361,76 @@ def _send_download_notification(sender_email, file_id, smtp_config):
             total_formatted = format_size(size)
         title = "Your files have been downloaded"
         message = f"Your files were downloaded on {download_time}."
-        html, text = create_email_template(title, message, files_summary, total_formatted)
+        html, text = create_email_template(
+            title, message, files_summary, total_formatted,
+            sender_domain=_sender_domain(smtp_config),
+        )
         msg = _build_message(smtp_config, sender_email,
                              "Your files have been downloaded", text, html)
-        return send_email_with_smtp(msg, smtp_config)
+        return send_email_with_retry(msg, smtp_config)
     except Exception:
-        app.logger.exception("Failed to send download notification")
-        return False
+        app.logger.exception("Failed to prepare download notification")
+        return False, "internal error"
+
+
+# -------------------------------------------------------------------------
+# Background notification tasks
+#
+# Submitted to `email_executor` instead of being called inline from the
+# request handlers, so a slow/unreachable SMTP server no longer delays the
+# upload/download HTTP response. Each task runs outside the request
+# context, so it must push its own app context to use app.logger/app.config
+# and the DB session, and must call db.session.remove() at the end since
+# the executor's worker threads are reused across many tasks (Flask-
+# SQLAlchemy's scoped session is keyed by thread id).
+# -------------------------------------------------------------------------
+def _send_recipient_notification_task(file_id, recipient_email, files_summary, total_size, smtp_config, sender_email):
+    with app.app_context():
+        try:
+            success, error = _send_recipient_notification(
+                recipient_email, file_id, files_summary, total_size, smtp_config, sender_email
+            )
+            record = FileUpload.query.get(file_id)
+            if record:
+                record.notification_status_recipient = 'sent' if success else 'failed'
+                record.notification_error_recipient = error
+                db.session.commit()
+        except Exception:
+            app.logger.exception("Recipient notification task failed for %s", file_id)
+        finally:
+            db.session.remove()
+
+
+def _send_sender_confirmation_task(file_id, sender_email, files_list, total_size, smtp_config, recipient_email):
+    with app.app_context():
+        try:
+            success, error = _send_sender_confirmation(
+                sender_email, file_id, files_list, total_size, smtp_config, recipient_email
+            )
+            record = FileUpload.query.get(file_id)
+            if record:
+                record.notification_status_sender = 'sent' if success else 'failed'
+                record.notification_error_sender = error
+                db.session.commit()
+        except Exception:
+            app.logger.exception("Sender confirmation task failed for %s", file_id)
+        finally:
+            db.session.remove()
+
+
+def _send_download_notification_task(file_id, sender_email, smtp_config):
+    with app.app_context():
+        try:
+            success, error = _send_download_notification(sender_email, file_id, smtp_config)
+            record = FileUpload.query.get(file_id)
+            if record:
+                record.notification_status_download = 'sent' if success else 'failed'
+                record.notification_error_download = error
+                db.session.commit()
+        except Exception:
+            app.logger.exception("Download notification task failed for %s", file_id)
+        finally:
+            db.session.remove()
 
 
 # -------------------------------------------------------------------------
@@ -435,24 +562,30 @@ def upload_file():
         files_summary = "".join(f"- {f['name']} ({format_size(f['size'])})\n" for f in original_files)
         total_formatted = format_size(total_size)
 
-        notification_errors = []
         try:
             smtp_config = _load_smtp_config()
-            if not _send_recipient_notification(email, file_id, files_summary, total_formatted, smtp_config, sender_email):
-                notification_errors.append("recipient")
-            if not _send_sender_confirmation(sender_email, file_id, original_files, total_formatted, smtp_config, email):
-                notification_errors.append("sender")
+            record.notification_status_recipient = 'pending'
+            record.notification_status_sender = 'pending'
+            db.session.commit()
+            email_executor.submit(
+                _send_recipient_notification_task, file_id, email, files_summary,
+                total_formatted, smtp_config, sender_email,
+            )
+            email_executor.submit(
+                _send_sender_confirmation_task, file_id, sender_email, original_files,
+                total_formatted, smtp_config, email,
+            )
         except FileNotFoundError:
-            app.logger.error("SMTP config missing")
-            notification_errors.append("smtp not configured")
+            app.logger.error("SMTP config missing; notifications not dispatched for %s", file_id)
+            record.notification_status_recipient = 'failed'
+            record.notification_error_recipient = 'SMTP not configured'
+            record.notification_status_sender = 'failed'
+            record.notification_error_sender = 'SMTP not configured'
+            db.session.commit()
         except Exception:
-            app.logger.exception("Notification dispatch failed")
-            notification_errors.append("internal error")
+            app.logger.exception("Notification dispatch failed for %s", file_id)
 
-        response = {'success': True, 'file_id': file_id, 'message': 'Upload OK'}
-        if notification_errors:
-            response['warning'] = "Notifications failed: " + ", ".join(notification_errors)
-        return jsonify(response), 200
+        return jsonify({'success': True, 'file_id': file_id, 'message': 'Upload OK'}), 200
 
     except UnsafePathError:
         app.logger.warning("Unsafe path in upload request")
@@ -516,14 +649,21 @@ def download_file(file_id):
 
         if not record.downloaded:
             record.downloaded = True
-            db.session.commit()
             try:
                 smtp_config = _load_smtp_config()
-                _send_download_notification(record.sender_email, file_id, smtp_config)
+                record.notification_status_download = 'pending'
+                db.session.commit()
+                email_executor.submit(
+                    _send_download_notification_task, file_id, record.sender_email, smtp_config,
+                )
             except FileNotFoundError:
-                pass
+                app.logger.error("SMTP config missing; download notification not dispatched for %s", file_id)
+                record.notification_status_download = 'failed'
+                record.notification_error_download = 'SMTP not configured'
+                db.session.commit()
             except Exception:
-                app.logger.exception("Failed to send download notification")
+                app.logger.exception("Failed to dispatch download notification for %s", file_id)
+                db.session.commit()
 
         return send_from_directory(
             app.config['UPLOAD_FOLDER'],
@@ -563,6 +703,11 @@ def list_transfers():
                 'file_count': len(files_list),
                 'total_size': total_size,
                 'expired': datetime.utcnow() > r.expires_at,
+                'notifications': {
+                    'recipient': {'status': r.notification_status_recipient, 'error': r.notification_error_recipient},
+                    'sender': {'status': r.notification_status_sender, 'error': r.notification_error_sender},
+                    'download': {'status': r.notification_status_download, 'error': r.notification_error_download},
+                },
             })
         return jsonify(result), 200
     except Exception:
@@ -665,9 +810,40 @@ def test_smtp():
             text_body="Test SMTP iTransfer.",
             html_body="<p>Test SMTP iTransfer.</p>",
         )
-        if send_email_with_smtp(msg, smtp_config):
+        success, error = send_email_with_retry(msg, smtp_config)
+        if success:
             return jsonify({'message': 'SMTP test OK'}), 200
-        return jsonify({'error': 'SMTP test failed'}), 500
+        return jsonify({'error': error or 'SMTP test failed'}), 500
     except Exception:
         app.logger.exception("SMTP test error")
         return jsonify({'error': 'SMTP test failed'}), 500
+
+
+@app.route('/api/check-deliverability', methods=['POST', 'OPTIONS'])
+@require_auth
+def check_deliverability():
+    if request.method == 'OPTIONS':
+        return jsonify({'message': 'ok'}), 200
+    try:
+        try:
+            smtp_config = _load_smtp_config()
+        except FileNotFoundError:
+            return jsonify({'error': 'SMTP not configured yet'}), 404
+
+        domain = _sender_domain(smtp_config)
+        data = request.get_json(silent=True) or {}
+        selector = (data.get('dkim_selector') or '').strip()
+        if selector and not _DKIM_SELECTOR.match(selector):
+            return jsonify({'error': 'Invalid DKIM selector format'}), 400
+
+        result = {
+            'domain': domain,
+            'spf': check_spf(domain),
+            'dmarc': check_dmarc(domain),
+        }
+        if selector:
+            result['dkim'] = check_dkim(domain, selector)
+        return jsonify(result), 200
+    except Exception:
+        app.logger.exception("Deliverability check failed")
+        return jsonify({'error': 'Deliverability check failed'}), 500

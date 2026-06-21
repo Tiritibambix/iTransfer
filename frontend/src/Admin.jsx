@@ -32,6 +32,18 @@ function Toast({ message, type, onClose }) {
   )
 }
 
+// Notification outcome badge: status is null (never attempted), 'pending',
+// 'sent', or 'failed'. The error message (if any) shows as a hover tooltip.
+function NotifBadge({ label, n }) {
+  const cls = n.status === 'sent' ? 'badge--success'
+            : n.status === 'failed' ? 'badge--error'
+            : 'badge--muted'
+  const text = n.status === 'sent' ? `${label} ✓`
+             : n.status === 'failed' ? `${label} ✗`
+             : `${label} …`
+  return <span className={`badge ${cls}`} title={n.error || ''}>{text}</span>
+}
+
 // ---- Tab: Transfers ----
 function TransfersTab({ token }) {
   const [transfers, setTransfers] = useState([])
@@ -162,11 +174,36 @@ function TransfersTab({ token }) {
                   <span className="transfer-card__label">Expires</span>
                   <span className="transfer-card__value">{formatDate(t.expires_at)}</span>
                 </div>
+                <div className="transfer-card__row">
+                  <span className="transfer-card__label">Notifications</span>
+                  <span className="transfer-card__value flex gap-2" style={{ flexWrap: 'wrap' }}>
+                    <NotifBadge label="Recipient" n={t.notifications.recipient} />
+                    <NotifBadge label="Sender" n={t.notifications.sender} />
+                    {t.downloaded && <NotifBadge label="Download alert" n={t.notifications.download} />}
+                  </span>
+                </div>
               </div>
             </div>
           ))}
         </div>
       )}
+    </div>
+  )
+}
+
+// Deliverability check result row: status is 'pass', 'warn', or 'fail'.
+function ResultRow({ label, result }) {
+  if (!result) return null
+  const cls = result.status === 'pass' ? 'badge--success'
+            : result.status === 'warn' ? 'badge--muted'
+            : 'badge--error'
+  return (
+    <div className="transfer-card__row">
+      <span className="transfer-card__label">{label}</span>
+      <span className="transfer-card__value">
+        <span className={`badge ${cls}`}>{result.status.toUpperCase()}</span>{' '}
+        {result.message}
+      </span>
     </div>
   )
 }
@@ -179,6 +216,9 @@ function SmtpTab({ token }) {
   const [toast, setToast] = useState(null)
   const [saving, setSaving] = useState(false)
   const [testing, setTesting] = useState(false)
+  const [dkimSelector, setDkimSelector] = useState('')
+  const [checking, setChecking] = useState(false)
+  const [checkResult, setCheckResult] = useState(null)
 
   useEffect(() => {
     fetch(`${backendUrl}/api/get-smtp-settings`, {
@@ -224,6 +264,25 @@ function SmtpTab({ token }) {
     }
   }
 
+  const handleCheckDeliverability = async () => {
+    setChecking(true)
+    setCheckResult(null)
+    try {
+      const r = await fetch(`${backendUrl}/api/check-deliverability`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ dkim_selector: dkimSelector }),
+      })
+      const data = await r.json()
+      if (r.ok) setCheckResult(data)
+      else setToast({ message: data.error || 'Check failed.', type: 'error' })
+    } catch {
+      setToast({ message: 'Network error.', type: 'error' })
+    } finally {
+      setChecking(false)
+    }
+  }
+
   const field = (label, key, type = 'text', placeholder = '') => (
     <div className="field">
       <label className="field__label">{label}</label>
@@ -253,6 +312,40 @@ function SmtpTab({ token }) {
           <button className="btn btn--ghost" style={{ flex: 1 }} onClick={handleTest} disabled={testing}>
             {testing ? <><span className="spinner" />Testing…</> : 'Test'}
           </button>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 'var(--sp-6)' }}>
+        <div className="card__body">
+          <p className="text-sm text-muted mb-4">
+            Re-check SPF/DMARC (and DKIM, if you provide your provider's selector)
+            for <strong>{cfg.smtpSenderEmail?.split('@')[1] || 'your domain'}</strong>.
+            DNS records drift over time -- re-run this rather than relying on a
+            check you did a while ago, especially after any DNS or registrar change.
+          </p>
+          <div className="field">
+            <label className="field__label">DKIM selector (optional)</label>
+            <input
+              className="input"
+              type="text"
+              placeholder="e.g. selector1, google, default"
+              value={dkimSelector}
+              onChange={e => setDkimSelector(e.target.value)}
+            />
+          </div>
+          <button className="btn btn--primary" onClick={handleCheckDeliverability} disabled={checking}>
+            {checking ? <><span className="spinner" />Checking…</> : 'Check deliverability'}
+          </button>
+
+          {checkResult && (
+            <div className="transfer-card mt-4">
+              <div className="transfer-card__body">
+                <ResultRow label="SPF" result={checkResult.spf} />
+                <ResultRow label="DMARC" result={checkResult.dmarc} />
+                {checkResult.dkim && <ResultRow label="DKIM" result={checkResult.dkim} />}
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
