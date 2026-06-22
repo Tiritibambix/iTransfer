@@ -55,7 +55,7 @@ jobs:
       # a short-SHA tag for traceability back to the exact commit.
       - name: Extract Docker metadata (backend)
         id: meta_backend
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_BACKEND }}
           tags: |
@@ -65,7 +65,7 @@ jobs:
 
       - name: Extract Docker metadata (frontend)
         id: meta_frontend
-        uses: docker/metadata-action@v5
+        uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_FRONTEND }}
           tags: |
