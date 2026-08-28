@@ -813,7 +813,7 @@ def test_smtp():
         success, error = send_email_with_retry(msg, smtp_config)
         if success:
             return jsonify({'message': 'SMTP test OK'}), 200
-        return jsonify({'error': error or 'SMTP test failed'}), 500
+        return jsonify({'error': 'SMTP test failed'}), 500
     except Exception:
         app.logger.exception("SMTP test error")
         return jsonify({'error': 'SMTP test failed'}), 500
