@@ -178,24 +178,29 @@ def send_email_with_smtp(msg, smtp_config) -> None:
         server.login(smtp_config['smtp_user'], smtp_config['smtp_password'])
         server.send_message(msg)
     except (smtplib.SMTPAuthenticationError, smtplib.SMTPRecipientsRefused) as e:
-        raise _PermanentSMTPError(str(e)) from e
+        # Fixed, safe category message -- never the raw exception text, which
+        # can include server hostnames/ports or other internal detail. The
+        # original exception is still chained (`from e`) for server-side logs.
+        raise _PermanentSMTPError("SMTP authentication or recipient rejection") from e
     except smtplib.SMTPResponseException as e:
         # 4xx = temporary failure (greylisting, rate limit) -> retry.
         # 5xx = permanent failure (policy reject, bad address) -> don't.
+        # The numeric SMTP code is a protocol-level status, not sensitive
+        # detail (akin to an HTTP status code) -- safe to surface as-is.
         if 400 <= e.smtp_code < 500:
-            raise _TransientSMTPError(f"SMTP {e.smtp_code}: {e.smtp_error}") from e
-        raise _PermanentSMTPError(f"SMTP {e.smtp_code}: {e.smtp_error}") from e
+            raise _TransientSMTPError(f"SMTP temporary failure (code {e.smtp_code})") from e
+        raise _PermanentSMTPError(f"SMTP permanent failure (code {e.smtp_code})") from e
     except (smtplib.SMTPServerDisconnected, ConnectionError, OSError) as e:
         # Pure connectivity failures (refused/unreachable/timed out) with no
         # SMTP response to classify -- always worth retrying. Note:
         # SMTPConnectError *is* a SMTPResponseException (it fires after a
         # non-220 banner) so it's already handled by the code-based branch
         # above, not here.
-        raise _TransientSMTPError(str(e)) from e
+        raise _TransientSMTPError("SMTP connection failed") from e
     except Exception as e:
         # Unclassified failure: treat as permanent rather than retry-looping
         # on something that is more likely a bug than a transient blip.
-        raise _PermanentSMTPError(str(e)) from e
+        raise _PermanentSMTPError("unexpected SMTP failure") from e
     finally:
         if server:
             try:
@@ -214,12 +219,15 @@ def send_email_with_retry(msg, smtp_config, max_attempts: int = 3) -> tuple[bool
             send_email_with_smtp(msg, smtp_config)
             return True, None
         except _PermanentSMTPError as e:
-            app.logger.warning("Permanent SMTP failure, not retrying: %s", e)
-            return False, str(e)[:500]
+            # %s on e.__cause__ logs the original smtplib exception detail
+            # (hostnames, full SMTP response text, etc.) server-side only;
+            # the client/DB-facing message stays the sanitized str(e).
+            app.logger.warning("Permanent SMTP failure, not retrying: %s (%s)", e, e.__cause__)
+            return False, str(e)
         except _TransientSMTPError as e:
-            last_error = str(e)[:500]
+            last_error = str(e)
             app.logger.warning(
-                "Transient SMTP failure (attempt %d/%d): %s", attempt, max_attempts, e
+                "Transient SMTP failure (attempt %d/%d): %s (%s)", attempt, max_attempts, e, e.__cause__
             )
             if attempt < max_attempts:
                 time.sleep(delay)
