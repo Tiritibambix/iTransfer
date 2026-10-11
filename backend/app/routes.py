@@ -549,8 +549,15 @@ def upload_file():
             final_path = safe_join(upload_root, final_filename)
             shutil.move(only['abs'], final_path)
 
+        # Stream the hash in fixed-size chunks. fh.read() with no argument
+        # pulls the entire file into memory at once -- on a multi-GB transfer
+        # that alone can exhaust the worker's RAM and get it OOM-killed
+        # mid-request, surfacing to the client as a dropped connection.
+        hasher = hashlib.sha256()
         with open(final_path, 'rb') as fh:
-            file_hash = hashlib.sha256(fh.read()).hexdigest()
+            for chunk in iter(lambda: fh.read(4 * 1024 * 1024), b''):
+                hasher.update(chunk)
+        file_hash = hasher.hexdigest()
 
         original_files = [{'name': f['name'], 'size': int(f['size'])} for f in files_list]
 
