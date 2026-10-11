@@ -82,6 +82,10 @@ CORS(
     methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization", "X-Requested-With"],
     supports_credentials=False,
+    # Let the browser cache the preflight so a chunked/multi-request upload
+    # doesn't fire an OPTIONS per request. 7200s is Chromium's hard cap; other
+    # browsers clamp to their own max, so this is a ceiling, not a guarantee.
+    max_age=7200,
 )
 
 
