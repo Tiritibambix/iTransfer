@@ -20,8 +20,9 @@ This application has been coded with the help of AI and is provided as-is. While
 
 - Upload files or folders via drag & drop
 - Automatic ZIP packaging for multiple files, direct download for single files
+- Streamed uploads and downloads with chunked hashing, suitable for multi-GB transfers
 - Configurable link expiration: 3, 5, 7 or 10 days
-- Email notifications: recipient on upload, sender on upload and on download — sent in the background with automatic retry on transient SMTP failures
+- Email notifications: recipient on upload, sender on upload and on download, sent in the background with automatic retry on transient SMTP failures
 - Admin panel: list and delete transfers (with per-notification delivery status), configure SMTP, DNS-based deliverability checker (SPF/DMARC/DKIM)
 - JWT authentication on protected routes
 - Rate limiting on login and upload endpoints
@@ -44,7 +45,7 @@ This application has been coded with the help of AI and is provided as-is. While
 ```
 ├── backend/
 │   ├── app/
-│   │   ├── __init__.py      # App factory, scheduler, CORS
+│   │   ├── __init__.py      # App init, schema migration, scheduler, CORS, email executor
 │   │   ├── auth.py          # JWT helpers
 │   │   ├── config.py        # Configuration
 │   │   ├── deliverability.py # SPF/DMARC/DKIM DNS checks
@@ -61,6 +62,8 @@ This application has been coded with the help of AI and is provided as-is. While
 │   │   ├── Download.jsx     # Download page
 │   │   ├── Login.jsx        # Authentication
 │   │   ├── PrivateRoute.jsx # Route guard
+│   │   ├── api.js           # authFetch wrapper (handles expired sessions)
+│   │   ├── storage.js       # Safe localStorage access
 │   │   ├── main.jsx         # Entry point
 │   │   └── index.css        # Design system
 │   ├── Dockerfile
@@ -179,6 +182,16 @@ server {
 server {
     listen 443 ssl;
     server_name api.itransfer.yourdomain.tld;
+
+    # Required for large uploads. Without these the proxy rejects or cuts
+    # multi-GB transfers before they reach the backend (nginx defaults to a
+    # 1 MB body limit), which shows up in the browser as "Network error".
+    client_max_body_size 0;          # 0 = unlimited, or set e.g. 5000m
+    proxy_request_buffering off;     # stream to the backend instead of buffering the whole body first
+    proxy_read_timeout 1800s;
+    proxy_send_timeout 1800s;
+    client_body_timeout 1800s;
+
     location / {
         proxy_pass http://localhost:5500;
         proxy_set_header Host $host;
@@ -189,6 +202,14 @@ server {
 }
 ```
 
+### Large file uploads
+
+iTransfer is built for big transfers, but two layers in front of the app impose their own limits you need to raise for multi-GB files.
+
+**Reverse proxy (required).** This is the most common reason a large upload fails with "Network error" while a small file works: nginx caps request bodies at 1 MB by default. Apply the directives shown in the backend server block above (`client_max_body_size`, the two `proxy_*_timeout` values, `client_body_timeout`, and `proxy_request_buffering off`). On Nginx Proxy Manager, paste them into the proxy host's *Advanced* tab. On Traefik there is no body-size limit by default, but raise the responding timeouts.
+
+**Backend (already tuned, optional).** Gunicorn runs threaded workers with a 30 minute request timeout by default, so slow multi-GB uploads and downloads are not cut off. Only if a single transfer can exceed 30 minutes on a slow link do you need to raise `GUNICORN_TIMEOUT` (see [Environment Variables](#environment-variables)).
+
 ## SMTP Configuration
 
 Configure SMTP from the admin panel (`/admin` → SMTP tab). The backend supports any SMTP server with SSL (port 465) or STARTTLS (port 587).
@@ -197,7 +218,7 @@ Tested with OVH, Gmail, Office 365 and generic SMTP.
 
 ### Domain authentication (SPF, DKIM, DMARC)
 
-Gmail and Yahoo reject or spam-folder unauthenticated mail since February 2024. iTransfer relays through *your own* SMTP account — it never sends mail directly — so the records below must exist on the domain of the **sender email** configured in the SMTP tab (the part after the `@`), not on iTransfer's own infrastructure.
+Gmail and Yahoo reject or spam-folder unauthenticated mail since February 2024. iTransfer relays through *your own* SMTP account and never sends mail directly, so the records below must exist on the domain of the **sender email** configured in the SMTP tab (the part after the `@`), not on iTransfer's own infrastructure.
 
 **SPF** authorizes your SMTP provider to send mail "as" your domain. Add one TXT record at your domain's apex (`@`):
 
@@ -211,7 +232,7 @@ v=spf1 include:<your-provider's-SPF-include> ~all
 | Gmail / Google Workspace | `include:_spf.google.com` |
 | Office 365 | `include:spf.protection.outlook.com` |
 
-If more than one service sends mail "as" your domain (iTransfer, your regular mailbox, a marketing tool, etc.), combine them into a **single** SPF record with multiple `include:` mechanisms — never publish two separate `v=spf1` TXT records, this silently breaks SPF entirely (RFC 7208 treats it as a hard PermError). The admin panel's deliverability checker (below) explicitly detects and flags this.
+If more than one service sends mail "as" your domain (iTransfer, your regular mailbox, a marketing tool, etc.), combine them into a **single** SPF record with multiple `include:` mechanisms. Never publish two separate `v=spf1` TXT records, this silently breaks SPF entirely (RFC 7208 treats it as a hard PermError). The admin panel's deliverability checker (below) explicitly detects and flags this.
 
 **DMARC** tells receivers what to do when SPF/DKIM fail. Add one TXT record at `_dmarc.yourdomain.tld`:
 
@@ -219,11 +240,11 @@ If more than one service sends mail "as" your domain (iTransfer, your regular ma
 v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@yourdomain.tld
 ```
 
-- `p=none` — monitoring only, offers no actual protection (a stale leftover from initial DMARC rollout is common — check this hasn't stayed at `none` for years).
-- `p=quarantine` — failing mail goes to spam. Recommended starting point.
-- `p=reject` — failing mail is rejected outright. Strongest, move here once `quarantine` hasn't caused issues with legitimate mail.
+- `p=none`: monitoring only, offers no actual protection (a stale leftover from initial DMARC rollout is common, so check this hasn't stayed at `none` for years).
+- `p=quarantine`: failing mail goes to spam. Recommended starting point.
+- `p=reject`: failing mail is rejected outright. Strongest, move here once `quarantine` hasn't caused issues with legitimate mail.
 
-**DKIM** cryptographically signs outgoing mail. DKIM is configured and signed by *your SMTP provider*, not by iTransfer — iTransfer only relays through your authenticated SMTP account, it does not sign messages itself. Enable it and find your selector in your provider's control panel:
+**DKIM** cryptographically signs outgoing mail. DKIM is configured and signed by *your SMTP provider*, not by iTransfer, which only relays through your authenticated SMTP account and does not sign messages itself. Enable it and find your selector in your provider's control panel:
 
 | Provider | Where to enable DKIM |
 |---|---|
@@ -233,7 +254,7 @@ v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@yourdomain.tld
 
 ### Re-verify, don't rely on memory
 
-DNS records drift: a registrar UI change can silently overwrite a TXT record, another service added later can introduce a second conflicting SPF record, or a DMARC policy set to `p=none` years ago may never have been tightened. "I checked this a while ago" is not the same as "this is correct right now." Use the **Check deliverability** button in the admin SMTP tab to re-run live SPF/DMARC/(optional DKIM) DNS lookups any time mail seems to be landing in spam — especially after any DNS or registrar change, and periodically even if nothing else changed.
+DNS records drift: a registrar UI change can silently overwrite a TXT record, another service added later can introduce a second conflicting SPF record, or a DMARC policy set to `p=none` years ago may never have been tightened. "I checked this a while ago" is not the same as "this is correct right now." Use the **Check deliverability** button in the admin SMTP tab to re-run live SPF/DMARC/(optional DKIM) DNS lookups any time mail seems to be landing in spam, especially after any DNS or registrar change, and periodically even if nothing else changed.
 
 ## Environment Variables
 
@@ -241,17 +262,20 @@ DNS records drift: a registrar UI change can silently overwrite a TXT record, an
 |---|---|---|---|
 | `FRONTEND_URL` | yes | `http://localhost:3500` | Public frontend URL |
 | `BACKEND_URL` | yes | `http://localhost:5500` | Public backend URL |
-| `ADMIN_USERNAME` | yes | — | Admin login |
-| `ADMIN_PASSWORD` | yes | — | Admin password |
+| `ADMIN_USERNAME` | yes | (none) | Admin login |
+| `ADMIN_PASSWORD` | yes | (none) | Admin password |
 | `DATABASE_URL` | yes | SQLite fallback | MariaDB connection string |
-| `JWT_SECRET_KEY` | yes | random | JWT signing key — set a stable value |
+| `JWT_SECRET_KEY` | yes | random | JWT signing key, set a stable value |
 | `TIMEZONE` | no | `Europe/Paris` | Timezone for expiry display |
 | `FORCE_HTTPS` | no | `true` | Enforce HTTPS in generated URLs |
 | `PROXY_COUNT` | no | `1` | Number of reverse proxies in front |
+| `GUNICORN_TIMEOUT` | no | `1800` | Worker heartbeat timeout (seconds); raise for very long transfers on slow links |
+| `GUNICORN_WORKERS` | no | `4` | Gunicorn worker processes |
+| `GUNICORN_THREADS` | no | `4` | Threads per worker (concurrent transfers per process) |
 
 ## Upgrading
 
-Newer versions may add columns to the database schema automatically on startup (additive only — existing data is never dropped or rewritten). As with any schema change, back up `./db_data` before pulling a new image version.
+Newer versions may add columns to the database schema automatically on startup (additive only, existing data is never dropped or rewritten). As with any schema change, back up `./db_data` before pulling a new image version.
 
 ## Troubleshooting
 
@@ -259,8 +283,12 @@ Newer versions may add columns to the database schema automatically on startup (
 
 1. Open the admin panel → SMTP tab → **Check deliverability**. This runs live DNS lookups against your sender domain for SPF and DMARC (and DKIM if you supply your provider's selector), and explicitly calls out a missing record, a misconfigured DMARC policy, or the "multiple SPF records" mistake.
 2. If the checker reports a problem, see [Domain authentication](#domain-authentication-spf-dkim-dmarc) above for exact record syntax per provider.
-3. Re-run the checker after any DNS/registrar change — don't assume a past check is still valid; records can be overwritten by a registrar UI change or by another service adding a conflicting record.
+3. Re-run the checker after any DNS/registrar change, don't assume a past check is still valid; records can be overwritten by a registrar UI change or by another service adding a conflicting record.
 4. Check the admin "Transfers" tab: each transfer shows per-notification send status (recipient / sender / download alert) with the last SMTP error on hover, so you can tell whether an email was actually attempted and what failed.
+
+**Upload fails with "Network error" on large files (small files work)**
+
+Almost always the reverse proxy rejecting the request body. Raise `client_max_body_size`, set `proxy_request_buffering off`, and raise the proxy timeouts as described in [Large file uploads](#large-file-uploads). If the proxy is already configured and only very long transfers still cut off, raise `GUNICORN_TIMEOUT` on the backend.
 
 **Database not initializing**
 Make sure `backend/init.sql` exists before the first `docker compose up`. If the DB volume already exists without the table, run:
@@ -284,4 +312,4 @@ docker compose logs -f frontend
 
 ## License
 
-GPL-3.0 — see [LICENSE](LICENSE).
+GPL-3.0. See [LICENSE](LICENSE).
