@@ -6,14 +6,16 @@ import Login from './Login'
 import Download from './Download'
 import Admin from './Admin'
 import PrivateRoute from './PrivateRoute'
+import { I18nProvider } from './i18n'
 import './index.css'
 
 const root = createRoot(document.getElementById('root'))
 
 root.render(
   <React.StrictMode>
-    <Router>
-      <Routes>
+    <I18nProvider>
+      <Router>
+        <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/download/:transferId" element={<Download />} />
         <Route
@@ -32,7 +34,8 @@ root.render(
             </PrivateRoute>
           }
         />
-      </Routes>
-    </Router>
+        </Routes>
+      </Router>
+    </I18nProvider>
   </React.StrictMode>
 )

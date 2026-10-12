@@ -27,12 +27,16 @@ from email.mime.text import MIMEText
 from email.utils import formataddr, formatdate, make_msgid
 import pytz
 from flask import Response, current_app, jsonify, request, send_from_directory, stream_with_context
+from markupsafe import escape
 
 from . import app, db, email_executor
 from .auth import issue_token, require_auth
 from .deliverability import check_dkim, check_dmarc, check_spf
+from .email_i18n import DEFAULT_LANGUAGE, normalize_language, t
 from .models import FileUpload
 from .paths import UnsafePathError, safe_join, safe_stored_filename
+
+_MAX_MESSAGE_LENGTH = 2000
 
 
 # -------------------------------------------------------------------------
@@ -251,8 +255,35 @@ def get_backend_url() -> str:
     return f"{proto}://{host}"
 
 
-def create_email_template(title, message, file_summary, total_size, download_link=None, sender_domain=None):
-    footer_domain_line = f'<p>Sent on behalf of {sender_domain}</p>' if sender_domain else ''
+def create_email_template(title, message, file_summary, total_size, download_link=None,
+                          sender_domain=None, lang=DEFAULT_LANGUAGE, user_message=None):
+    footer_domain_line = (
+        f'<p>{escape(t(lang, "footer_on_behalf", domain=sender_domain))}</p>' if sender_domain else ''
+    )
+
+    # Optional sender-supplied note. It is untrusted free text, so escape it
+    # before it enters the HTML body and only then turn newlines into <br>.
+    user_message_html = ''
+    user_message_text = ''
+    if user_message:
+        safe_msg = str(escape(user_message)).replace('\n', '<br>')
+        user_message_html = (
+            f'<div class="user-message"><span class="user-message__label">'
+            f'{escape(t(lang, "message_label"))}</span>{safe_msg}</div>'
+        )
+        user_message_text = f"{t(lang, 'message_label')}\n{user_message}\n\n"
+
+    # Precomputed so the big template below contains only bare {name} fields:
+    # on Python 3.10 an f-string replacement field cannot reuse the string's
+    # own quote character, and the template is triple-double-quoted.
+    footer_sent_via_html = escape(t(lang, 'footer_sent_via'))
+    download_btn_html = ''
+    if download_link:
+        download_btn_html = (
+            f'<a href="{download_link}" class="download-btn">'
+            f'{escape(t(lang, "btn_download"))}</a>'
+        )
+
     html = f"""
     <!DOCTYPE html>
     <html>
@@ -266,6 +297,8 @@ def create_email_template(title, message, file_summary, total_size, download_lin
             .header h1 {{ color: #ffffff; margin: 0; font-size: 28px; font-weight: 600; letter-spacing: 1px; }}
             .content {{ padding: 30px; }}
             .message h2 {{ color: #693a67; margin: 0 0 15px; font-size: 20px; font-weight: 500; }}
+            .user-message {{ background-color: #faf7fa; border-left: 3px solid #693a67; padding: 14px 18px; border-radius: 6px; margin: 20px 0; font-size: 14px; }}
+            .user-message__label {{ display: block; font-weight: 600; color: #693a67; margin-bottom: 6px; font-size: 13px; }}
             .files {{ background-color: #f8f9fa; padding: 20px; border-radius: 8px; white-space: pre-wrap; border: 1px solid rgba(0,0,0,0.05); margin: 20px 0; line-height: 1.8; font-size: 14px; }}
             .total {{ margin-top: 20px; padding: 12px 20px; background: linear-gradient(135deg, #400040, #693a67); color: #ffffff; border-radius: 8px; font-weight: 500; }}
             .footer {{ text-align: center; padding: 20px; color: #5a4e5a; font-size: 13px; border-top: 1px solid rgba(0,0,0,0.05); }}
@@ -277,46 +310,51 @@ def create_email_template(title, message, file_summary, total_size, download_lin
             <div class="header"><h1>iTransfer</h1></div>
             <div class="content">
                 <div class="message"><h2>{title}</h2><p>{message}</p></div>
-                {f'<a href="{download_link}" class="download-btn">Download files</a>' if download_link else ''}
+                {user_message_html}
+                {download_btn_html}
                 <div class="files">{file_summary}</div>
                 <div class="total">{total_size}</div>
             </div>
-            <div class="footer"><p>Sent via iTransfer</p>{footer_domain_line}</div>
+            <div class="footer"><p>{footer_sent_via_html}</p>{footer_domain_line}</div>
         </div>
     </body>
     </html>
     """
     text = (
         f"{title}\n\n{message}\n\n"
-        f"{'Download link: ' + download_link if download_link else ''}\n\n"
-        f"File summary:\n{file_summary}\n\nTotal size: {total_size}\n"
-        f"{'Sent on behalf of ' + sender_domain if sender_domain else ''}\n"
+        f"{user_message_text}"
+        f"{t(lang, 'download_link_label') + ' ' + download_link if download_link else ''}\n\n"
+        f"{t(lang, 'file_summary_label')}\n{file_summary}\n\n{t(lang, 'total_size_word')} {total_size}\n"
+        f"{t(lang, 'footer_on_behalf', domain=sender_domain) if sender_domain else ''}\n"
     )
     return html, text
 
 
-def _send_recipient_notification(recipient_email, file_id, files_summary, total_size, smtp_config, sender_email):
+def _send_recipient_notification(recipient_email, file_id, files_summary, total_size, smtp_config,
+                                 sender_email, lang=DEFAULT_LANGUAGE, user_message=None):
     """Build and send the recipient notification. Returns (success, error)."""
     try:
         file_info = FileUpload.query.get(file_id)
         if not file_info:
             return False, "transfer not found"
         tz = pytz.timezone(app.config.get('TIMEZONE', 'Europe/Paris'))
-        expiration_formatted = file_info.expires_at.astimezone(tz).strftime('%d/%m/%Y at %H:%M:%S')
+        expiration_formatted = file_info.expires_at.astimezone(tz).strftime(
+            f"%d/%m/%Y {t(lang, 'date_at')} %H:%M:%S"
+        )
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500').rstrip('/')
         download_page_link = f"{frontend_url}/download/{file_id}"
-        title = "You have received files"
+        title = t(lang, 'recipient_title')
         message = (
-            f"{sender_email} sent you files. Click the button below "
-            f"to access the download page.<br><br>"
-            f"This link will expire on {expiration_formatted}"
+            t(lang, 'recipient_body', sender=sender_email)
+            + "<br><br>"
+            + t(lang, 'expiry_line', date=expiration_formatted)
         )
         html, text = create_email_template(
             title, message, files_summary, total_size, download_page_link,
-            sender_domain=_sender_domain(smtp_config),
+            sender_domain=_sender_domain(smtp_config), lang=lang, user_message=user_message,
         )
         msg = _build_message(smtp_config, recipient_email,
-                             f"{sender_email} sent you files",
+                             t(lang, 'recipient_subject', sender=sender_email),
                              text, html, reply_to=sender_email)
         return send_email_with_retry(msg, smtp_config)
     except Exception:
@@ -324,23 +362,25 @@ def _send_recipient_notification(recipient_email, file_id, files_summary, total_
         return False, "internal error"
 
 
-def _send_sender_confirmation(sender_email, file_id, files_list, total_size, smtp_config, recipient_email):
+def _send_sender_confirmation(sender_email, file_id, files_list, total_size, smtp_config,
+                              recipient_email, lang=DEFAULT_LANGUAGE):
     """Build and send the sender confirmation. Returns (success, error)."""
     try:
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500').rstrip('/')
         download_page_link = f"{frontend_url}/download/{file_id}"
         files_summary = "".join(f"- {f['name']} ({format_size(f['size'])})\n" for f in files_list)
-        title = "Your files have been sent"
+        title = t(lang, 'sender_title')
         message = (
-            f"Your files have been sent to: {recipient_email}<br><br>"
-            f"Download page: {download_page_link}"
+            t(lang, 'sender_body', recipient=recipient_email)
+            + "<br><br>"
+            + t(lang, 'sender_download_page', link=download_page_link)
         )
         html, text = create_email_template(
             title, message, files_summary, total_size,
-            sender_domain=_sender_domain(smtp_config),
+            sender_domain=_sender_domain(smtp_config), lang=lang,
         )
         msg = _build_message(smtp_config, sender_email,
-                             f"Transfer confirmation to {recipient_email}",
+                             t(lang, 'sender_subject', recipient=recipient_email),
                              text, html)
         return send_email_with_retry(msg, smtp_config)
     except Exception:
@@ -348,11 +388,11 @@ def _send_sender_confirmation(sender_email, file_id, files_list, total_size, smt
         return False, "internal error"
 
 
-def _send_download_notification(sender_email, file_id, smtp_config):
+def _send_download_notification(sender_email, file_id, smtp_config, lang=DEFAULT_LANGUAGE):
     """Build and send the download notification. Returns (success, error)."""
     try:
         tz = pytz.timezone(app.config.get('TIMEZONE', 'Europe/Paris'))
-        download_time = datetime.now(tz).strftime('%d/%m/%Y at %H:%M:%S (%Z)')
+        download_time = datetime.now(tz).strftime(f"%d/%m/%Y {t(lang, 'date_at')} %H:%M:%S (%Z)")
         file_info = FileUpload.query.get(file_id)
         if not file_info:
             return False, "transfer not found"
@@ -367,14 +407,14 @@ def _send_download_notification(sender_email, file_id, smtp_config):
             size = os.path.getsize(stored_path)
             files_summary = f"- {stored_name} ({format_size(size)})"
             total_formatted = format_size(size)
-        title = "Your files have been downloaded"
-        message = f"Your files were downloaded on {download_time}."
+        title = t(lang, 'download_title')
+        message = t(lang, 'download_body', datetime=download_time)
         html, text = create_email_template(
             title, message, files_summary, total_formatted,
-            sender_domain=_sender_domain(smtp_config),
+            sender_domain=_sender_domain(smtp_config), lang=lang,
         )
         msg = _build_message(smtp_config, sender_email,
-                             "Your files have been downloaded", text, html)
+                             t(lang, 'download_subject'), text, html)
         return send_email_with_retry(msg, smtp_config)
     except Exception:
         app.logger.exception("Failed to prepare download notification")
@@ -392,11 +432,13 @@ def _send_download_notification(sender_email, file_id, smtp_config):
 # the executor's worker threads are reused across many tasks (Flask-
 # SQLAlchemy's scoped session is keyed by thread id).
 # -------------------------------------------------------------------------
-def _send_recipient_notification_task(file_id, recipient_email, files_summary, total_size, smtp_config, sender_email):
+def _send_recipient_notification_task(file_id, recipient_email, files_summary, total_size, smtp_config,
+                                      sender_email, lang=DEFAULT_LANGUAGE, user_message=None):
     with app.app_context():
         try:
             success, error = _send_recipient_notification(
-                recipient_email, file_id, files_summary, total_size, smtp_config, sender_email
+                recipient_email, file_id, files_summary, total_size, smtp_config,
+                sender_email, lang, user_message,
             )
             record = FileUpload.query.get(file_id)
             if record:
@@ -409,11 +451,12 @@ def _send_recipient_notification_task(file_id, recipient_email, files_summary, t
             db.session.remove()
 
 
-def _send_sender_confirmation_task(file_id, sender_email, files_list, total_size, smtp_config, recipient_email):
+def _send_sender_confirmation_task(file_id, sender_email, files_list, total_size, smtp_config,
+                                   recipient_email, lang=DEFAULT_LANGUAGE):
     with app.app_context():
         try:
             success, error = _send_sender_confirmation(
-                sender_email, file_id, files_list, total_size, smtp_config, recipient_email
+                sender_email, file_id, files_list, total_size, smtp_config, recipient_email, lang
             )
             record = FileUpload.query.get(file_id)
             if record:
@@ -426,10 +469,10 @@ def _send_sender_confirmation_task(file_id, sender_email, files_list, total_size
             db.session.remove()
 
 
-def _send_download_notification_task(file_id, sender_email, smtp_config):
+def _send_download_notification_task(file_id, sender_email, smtp_config, lang=DEFAULT_LANGUAGE):
     with app.app_context():
         try:
-            success, error = _send_download_notification(sender_email, file_id, smtp_config)
+            success, error = _send_download_notification(sender_email, file_id, smtp_config, lang)
             record = FileUpload.query.get(file_id)
             if record:
                 record.notification_status_download = 'sent' if success else 'failed'
@@ -487,6 +530,11 @@ def upload_file():
         paths = request.form.getlist('paths[]')
         email = (request.form.get('email') or '').strip()
         sender_email = (request.form.get('sender_email') or '').strip()
+        # Untrusted language codes: normalize against the whitelist before use.
+        recipient_language = normalize_language(request.form.get('language'))
+        sender_language = normalize_language(request.form.get('sender_language'))
+        # Optional free-text note; cap length server-side, not just in the UI.
+        user_message = (request.form.get('message') or '').strip()[:_MAX_MESSAGE_LENGTH] or None
 
         if not _valid_email(email):
             return jsonify({'error': 'Invalid recipient email address'}), 400
@@ -569,6 +617,9 @@ def upload_file():
             encrypted_data=file_hash,
             downloaded=False,
             expires_at=datetime.utcnow() + timedelta(days=expiration_days),
+            message=user_message,
+            language=recipient_language,
+            sender_language=sender_language,
         )
         record.set_files_list(original_files)
         db.session.add(record)
@@ -584,11 +635,11 @@ def upload_file():
             db.session.commit()
             email_executor.submit(
                 _send_recipient_notification_task, file_id, email, files_summary,
-                total_formatted, smtp_config, sender_email,
+                total_formatted, smtp_config, sender_email, recipient_language, user_message,
             )
             email_executor.submit(
                 _send_sender_confirmation_task, file_id, sender_email, original_files,
-                total_formatted, smtp_config, email,
+                total_formatted, smtp_config, email, sender_language,
             )
         except FileNotFoundError:
             app.logger.error("SMTP config missing; notifications not dispatched for %s", file_id)
@@ -640,6 +691,8 @@ def get_transfer_details(file_id):
             'files': files_list,
             'expires_at': record.expires_at.isoformat(),
             'sender_email': record.sender_email,
+            'message': record.message,
+            'language': record.language,
         }), 200
     except UnsafePathError:
         return jsonify({'error': 'Not found'}), 404
@@ -670,6 +723,7 @@ def download_file(file_id):
                 db.session.commit()
                 email_executor.submit(
                     _send_download_notification_task, file_id, record.sender_email, smtp_config,
+                    normalize_language(record.sender_language),
                 )
             except FileNotFoundError:
                 app.logger.error("SMTP config missing; download notification not dispatched for %s", file_id)
@@ -818,12 +872,15 @@ def test_smtp():
             smtp_config = _load_smtp_config()
         except FileNotFoundError:
             return jsonify({'error': 'SMTP config not found'}), 404
+        data = request.get_json(silent=True) or {}
+        lang = normalize_language(data.get('language'))
+        test_body = t(lang, 'smtp_test_body')
         msg = _build_message(
             smtp_config=smtp_config,
             to_addr=smtp_config['smtp_sender_email'],
-            subject="SMTP configuration test",
-            text_body="Test SMTP iTransfer.",
-            html_body="<p>Test SMTP iTransfer.</p>",
+            subject=t(lang, 'smtp_test_subject'),
+            text_body=test_body,
+            html_body=f"<p>{escape(test_body)}</p>",
         )
         success, error = send_email_with_retry(msg, smtp_config)
         if success:

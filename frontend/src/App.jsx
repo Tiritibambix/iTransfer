@@ -2,8 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import banner from './assets/banner.png'
 import { getToken, clearToken } from './storage'
+import { useT, LANGUAGES } from './i18n'
+import LanguageSelector from './LanguageSelector'
 
 const backendUrl = window.BACKEND_URL
+const MAX_MESSAGE_LENGTH = 2000
 
 function formatSize(bytes) {
   if (!bytes) return '0 B'
@@ -27,10 +30,13 @@ function Toast({ message, type = 'info', onClose }) {
 
 export default function App() {
   const navigate = useNavigate()
+  const { t, lang } = useT()
   const [items, setItems] = useState([])
   const [recipientEmail, setRecipientEmail] = useState('')
   const [senderEmail, setSenderEmail] = useState('')
   const [expirationDays, setExpirationDays] = useState(7)
+  const [recipientLanguage, setRecipientLanguage] = useState(lang)
+  const [message, setMessage] = useState('')
   const [dragActive, setDragActive] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadPct, setUploadPct] = useState(0)
@@ -110,14 +116,17 @@ export default function App() {
   const removeItem = (idx) => setItems(prev => prev.filter((_, i) => i !== idx))
 
   const handleUpload = async () => {
-    if (!items.length) return showToast('Please select at least one file.', 'warning')
-    if (!recipientEmail) return showToast('Recipient email is required.', 'warning')
-    if (!senderEmail) return showToast('Your email is required.', 'warning')
+    if (!items.length) return showToast(t('app.errNoFiles'), 'warning')
+    if (!recipientEmail) return showToast(t('app.errRecipient'), 'warning')
+    if (!senderEmail) return showToast(t('app.errSender'), 'warning')
 
     const fd = new FormData()
     fd.append('email', recipientEmail)
     fd.append('sender_email', senderEmail)
     fd.append('expiration_days', expirationDays)
+    fd.append('language', recipientLanguage)
+    fd.append('sender_language', lang)
+    if (message.trim()) fd.append('message', message.trim())
     fd.append('files_list', JSON.stringify(items.map(i => ({ name: i.path, size: i.size }))))
     items.forEach(i => { fd.append('files[]', i.file); fd.append('paths[]', i.path) })
 
@@ -133,18 +142,18 @@ export default function App() {
     xhr.onload = () => {
       setUploading(false)
       if (xhr.status === 200) {
-        showToast('Transfer complete!', 'success')
-        setItems([]); setRecipientEmail(''); setSenderEmail(''); setUploadPct(0)
+        showToast(t('app.success'), 'success')
+        setItems([]); setRecipientEmail(''); setSenderEmail(''); setMessage(''); setUploadPct(0)
       } else if (xhr.status === 401) {
         clearToken()
         window.location.assign('/login')
       } else {
-        let msg = 'Transfer failed.'
+        let msg = t('app.failed')
         try { msg = JSON.parse(xhr.responseText).error || msg } catch {}
         showToast(msg, 'error')
       }
     }
-    xhr.onerror = () => { setUploading(false); showToast('Network error. Check your connection.', 'error') }
+    xhr.onerror = () => { setUploading(false); showToast(t('app.networkError'), 'error') }
     xhr.send(fd)
   }
 
@@ -156,12 +165,15 @@ export default function App() {
       <div className="container">
         <header className="app-header">
           <img src={banner} alt="iTransfer" className="app-logo" />
-          <button className="btn btn--ghost btn--sm" onClick={() => navigate('/admin')}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/>
-            </svg>
-            Admin
-          </button>
+          <div className="flex items-center gap-2">
+            <LanguageSelector />
+            <button className="btn btn--ghost btn--sm" onClick={() => navigate('/admin')}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/>
+              </svg>
+              {t('nav.admin')}
+            </button>
+          </div>
         </header>
 
         {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
@@ -171,26 +183,47 @@ export default function App() {
 
             <div className="row-2col">
               <div className="field">
-                <label className="field__label">Recipient email</label>
-                <input className="input" type="email" placeholder="recipient@example.com"
+                <label className="field__label">{t('app.recipientEmail')}</label>
+                <input className="input" type="email" placeholder={t('app.recipientPlaceholder')}
                   value={recipientEmail} onChange={e => setRecipientEmail(e.target.value)} disabled={uploading} />
               </div>
               <div className="field">
-                <label className="field__label">Your email</label>
-                <input className="input" type="email" placeholder="you@example.com"
+                <label className="field__label">{t('app.yourEmail')}</label>
+                <input className="input" type="email" placeholder={t('app.yourEmailPlaceholder')}
                   value={senderEmail} onChange={e => setSenderEmail(e.target.value)} disabled={uploading} />
               </div>
             </div>
 
+            <div className="row-2col">
+              <div className="field">
+                <label className="field__label">{t('app.expiration')}</label>
+                <select className="input" value={expirationDays}
+                  onChange={e => setExpirationDays(parseInt(e.target.value))} disabled={uploading}>
+                  <option value="3">{t('app.daysOption', { n: 3 })}</option>
+                  <option value="5">{t('app.daysOption', { n: 5 })}</option>
+                  <option value="7">{t('app.daysOption', { n: 7 })}</option>
+                  <option value="10">{t('app.daysOption', { n: 10 })}</option>
+                </select>
+              </div>
+              <div className="field">
+                <label className="field__label">{t('app.recipientLanguage')}</label>
+                <select className="input" value={recipientLanguage}
+                  onChange={e => setRecipientLanguage(e.target.value)} disabled={uploading}>
+                  {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+                </select>
+                <span className="text-xs text-faint">{t('app.recipientLanguageHint')}</span>
+              </div>
+            </div>
+
             <div className="field">
-              <label className="field__label">Link expiration</label>
-              <select className="input" value={expirationDays}
-                onChange={e => setExpirationDays(parseInt(e.target.value))} disabled={uploading}>
-                <option value="3">3 days</option>
-                <option value="5">5 days</option>
-                <option value="7">7 days</option>
-                <option value="10">10 days</option>
-              </select>
+              <label className="field__label">{t('app.message')}</label>
+              <textarea className="input" rows={3} maxLength={MAX_MESSAGE_LENGTH}
+                placeholder={t('app.messagePlaceholder')}
+                value={message} onChange={e => setMessage(e.target.value)} disabled={uploading}
+                style={{ resize: 'vertical' }} />
+              <span className="text-xs text-faint" style={{ alignSelf: 'flex-end' }}>
+                {message.length}/{MAX_MESSAGE_LENGTH}
+              </span>
             </div>
 
             <div
@@ -208,18 +241,18 @@ export default function App() {
                 <path d="M24 8v24M14 18l10-10 10 10" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
                 <path d="M8 36h32" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
               </svg>
-              <p className="drop-zone__title">Drop your files here</p>
-              <p className="drop-zone__sub">or click to select</p>
+              <p className="drop-zone__title">{t('app.dropTitle')}</p>
+              <p className="drop-zone__sub">{t('app.dropSub')}</p>
             </div>
 
             {items.length > 0 && (
               <div>
                 <div className="flex items-center justify-between mb-3">
                   <p className="section-title" style={{ margin: 0 }}>
-                    {items.length} file{items.length > 1 ? 's' : ''} — {formatSize(totalSize)}
+                    {t(items.length === 1 ? 'files.one' : 'files.other', { count: items.length, size: formatSize(totalSize) })}
                   </p>
                   <button className="btn btn--ghost btn--sm" onClick={() => setItems([])} disabled={uploading}>
-                    Clear all
+                    {t('app.clearAll')}
                   </button>
                 </div>
                 <div className="file-list">
@@ -237,7 +270,7 @@ export default function App() {
             {uploading && (
               <div className="progress-wrap">
                 <div className="progress-label">
-                  <span className="progress-label__text">Uploading…</span>
+                  <span className="progress-label__text">{t('app.uploading')}</span>
                   <span className="progress-label__pct">{uploadPct}%</span>
                 </div>
                 <div className="progress-track">
@@ -247,8 +280,8 @@ export default function App() {
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
                     <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
                   </svg>
-                  <span style={{ flex: 1 }}>Do not close this window during the transfer.</span>
-                  <button className="btn btn--danger btn--sm" onClick={cancelUpload}>Cancel</button>
+                  <span style={{ flex: 1 }}>{t('app.doNotClose')}</span>
+                  <button className="btn btn--danger btn--sm" onClick={cancelUpload}>{t('app.cancel')}</button>
                 </div>
               </div>
             )}
@@ -256,17 +289,17 @@ export default function App() {
             <button className="btn btn--primary btn--full btn--lg" onClick={handleUpload}
               disabled={uploading || !items.length}>
               {uploading
-                ? <><span className="spinner" />Uploading…</>
+                ? <><span className="spinner" />{t('app.uploading')}</>
                 : <><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M22 2L11 13M22 2L15 22l-4-9-9-4 20-7z"/>
-                  </svg>Send</>
+                  </svg>{t('app.send')}</>
               }
             </button>
 
           </div>
         </div>
 
-        <p className="text-center text-xs text-faint">iTransfer · open-source · GPL-3.0</p>
+        <p className="text-center text-xs text-faint">{t('app.footer')}</p>
       </div>
     </div>
   )

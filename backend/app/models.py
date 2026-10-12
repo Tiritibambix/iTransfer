@@ -18,6 +18,16 @@ class FileUpload(db.Model):
     expires_at = db.Column(db.DateTime, nullable=False)
     files_list = db.Column(db.Text, nullable=True)
 
+    # Optional free-text message from the sender to the recipient, shown in the
+    # recipient email and on the download page. VARCHAR (not TEXT) so the
+    # startup migration can add it with DEFAULT NULL on MySQL/MariaDB.
+    message = db.Column(db.String(2000), nullable=True)
+    # Recipient email language (picked by the sender) and the sender's own UI
+    # language. The latter is stored because the download notification is sent
+    # later, at download time, when the request language is no longer known.
+    language = db.Column(db.String(8), nullable=True)
+    sender_language = db.Column(db.String(8), nullable=True)
+
     # Outcome of each background notification attempt: NULL (never attempted),
     # 'pending', 'sent', or 'failed'. Populated by the background email
     # executor in routes.py; see _ensure_notification_columns() in __init__.py

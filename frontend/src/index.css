@@ -1,5 +1,5 @@
 /* =========================================================
-   iTransfer — Design System 2026
+   iTransfer - Design System 2026
    Dark theme · Purple palette
    ========================================================= */
 
@@ -554,6 +554,7 @@ tbody tr:hover { background: rgba(105,58,103,0.05); }
 .items-center { align-items: center; }
 .justify-between { justify-content: space-between; }
 .justify-center { justify-content: center; }
+.justify-end { justify-content: flex-end; }
 .gap-2 { gap: var(--sp-2); }
 .gap-3 { gap: var(--sp-3); }
 .gap-4 { gap: var(--sp-4); }
@@ -572,6 +573,22 @@ tbody tr:hover { background: rgba(105,58,103,0.05); }
 .text-faint { color: var(--clr-text-faint); }
 .truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .w-full { width: 100%; }
+
+/* ---- Sender message block (download page) ---- */
+.user-message-box {
+  background-color: var(--clr-surface-alt, #faf7fa);
+  border-left: 3px solid var(--clr-accent, #693a67);
+  padding: var(--sp-3) var(--sp-4);
+  border-radius: var(--radius-sm, 6px);
+  font-size: var(--font-sm);
+}
+.user-message-box__label {
+  display: block;
+  font-weight: 600;
+  color: var(--clr-accent, #693a67);
+  margin-bottom: var(--sp-2);
+  font-size: var(--font-xs);
+}
 
 /* ---- Responsive ---- */
 @media (max-width: 600px) {
