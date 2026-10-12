@@ -1,10 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import banner from './assets/banner.png'
 import { getToken, clearToken } from './storage'
 import { authFetch } from './api'
 import { useT } from './i18n'
-import LanguageSelector from './LanguageSelector'
+import Header from './Header'
 
 const backendUrl = window.BACKEND_URL
 
@@ -370,20 +369,16 @@ export default function Admin() {
 
   return (
     <div className="page">
-      <div className="container--wide glow-accent">
+      <div className="container--wide">
 
-        <header className="app-header mb-8">
-          <img src={banner} alt="iTransfer" className="app-logo" />
-          <div className="flex items-center gap-2">
-            <LanguageSelector />
-            <button className="btn btn--ghost btn--sm" onClick={() => navigate('/')}>
-              ← {t('nav.back')}
-            </button>
-            <button className="btn btn--danger btn--sm" onClick={logout}>
-              {t('nav.signOut')}
-            </button>
-          </div>
-        </header>
+        <Header>
+          <button className="btn btn--ghost btn--sm" onClick={() => navigate('/')}>
+            {t('nav.back')}
+          </button>
+          <button className="btn btn--danger btn--sm" onClick={logout}>
+            {t('nav.signOut')}
+          </button>
+        </Header>
 
         <div className="card">
           <div className="card__body">

@@ -132,7 +132,6 @@ def _ensure_notification_columns() -> None:
         'notification_error_download': 'VARCHAR(500)',
         'message': 'VARCHAR(2000)',
         'language': 'VARCHAR(8)',
-        'sender_language': 'VARCHAR(8)',
     }
 
     is_mysql = db.engine.dialect.name in ('mysql', 'mariadb')

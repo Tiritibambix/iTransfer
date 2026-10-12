@@ -10,9 +10,8 @@
   "app.yourEmailPlaceholder": "sie@beispiel.com",
   "app.expiration": "Ablauf des Links",
   "app.daysOption": "{n} Tage",
-  "app.recipientLanguage": "Sprache des Empfängers",
-  "app.recipientLanguageHint": "Die Benachrichtigungs-E-Mail wird in dieser Sprache gesendet.",
-  "app.message": "Nachricht an den Empfänger (optional)",
+  "app.addMessage": "+ Nachricht hinzufügen",
+  "app.message": "Nachricht an den Empfänger",
   "app.messagePlaceholder": "Kurze Nachricht hinzufügen...",
   "app.dropTitle": "Dateien hier ablegen",
   "app.dropSub": "oder zum Auswählen klicken",
@@ -27,10 +26,13 @@
   "app.success": "Übertragung abgeschlossen!",
   "app.failed": "Übertragung fehlgeschlagen.",
   "app.networkError": "Netzwerkfehler. Überprüfen Sie Ihre Verbindung.",
-  "app.footer": "iTransfer · open-source · GPL-3.0",
+  "app.tagline": "Dateien senden. Ganz einfach.",
 
   "files.one": "{count} Datei · {size}",
   "files.other": "{count} Dateien · {size}",
+
+  "footer.text": "iTransfer ist freie Software unter der GPL-3.0-Lizenz.",
+  "footer.github": "Auf GitHub ansehen",
 
   "dl.sentBy": "Gesendet von",
   "dl.expiresOn": "Läuft ab am {date}",
@@ -42,8 +44,6 @@
   "dl.linkExpired": "Dieser Link ist abgelaufen.",
   "dl.invalidLink": "Ungültiger oder unbekannter Link.",
   "dl.downloadFailed": "Download fehlgeschlagen.",
-  "dl.footerText": "iTransfer ist freie Software unter der GPL-3.0-Lizenz.",
-  "dl.viewOnGithub": "Auf GitHub ansehen",
 
   "login.title": "Anmelden",
   "login.username": "Benutzername",

@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import banner from './assets/banner.png'
 import { setToken } from './storage'
 import { useT } from './i18n'
-import LanguageSelector from './LanguageSelector'
+import Header from './Header'
 
 const backendUrl = window.BACKEND_URL
 
@@ -48,13 +47,7 @@ export default function Login() {
     <div className="page page--centered">
       <div className="container--narrow">
 
-        <div className="flex justify-end mb-4">
-          <LanguageSelector />
-        </div>
-
-        <div className="text-center mb-8">
-          <img src={banner} alt="iTransfer" className="app-logo" style={{ margin: '0 auto' }} />
-        </div>
+        <Header />
 
         <div className="card">
           <div className="card__body flex-col gap-4">

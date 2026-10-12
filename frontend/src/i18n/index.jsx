@@ -44,13 +44,13 @@ const I18nContext = createContext(null)
 export function I18nProvider({ children }) {
   const [lang, setLangState] = useState(detectLanguage)
 
-  // persist defaults to true for an explicit user choice; pages that render in
-  // a language chosen for them (e.g. the download page using the transfer's
-  // language) pass persist:false so they don't overwrite the viewer's own pref.
-  const setLang = useCallback((next, { persist = true } = {}) => {
+  // Single language concept: the viewer's own UI language. It drives
+  // everything they see and, on the send form, the language their emails go
+  // out in. Always persisted -- there is no other language to protect it from.
+  const setLang = useCallback((next) => {
     if (!SUPPORTED.includes(next)) return
     setLangState(next)
-    if (persist) persistLang(next)
+    persistLang(next)
     try { document.documentElement.lang = next } catch { /* non-DOM env */ }
   }, [])
 

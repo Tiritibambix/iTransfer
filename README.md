@@ -23,7 +23,7 @@ This application has been coded with the help of AI and is provided as-is. While
 - Streamed uploads and downloads with chunked hashing, suitable for multi-GB transfers
 - Configurable link expiration: 3, 5, 7 or 10 days
 - Email notifications: recipient on upload, sender on upload and on download, sent in the background with automatic retry on transient SMTP failures
-- Multilingual interface and emails (English, Français, Español, Deutsch, Italiano): the UI auto-detects the browser language with a manual switcher, and the sender picks the language of the recipient's notification email
+- Multilingual interface and emails (English, Français, Español, Deutsch, Italiano): one language, auto-detected from the browser with a manual switcher, applies to the whole UI and to every email sent from that session
 - Optional personal message to the recipient, shown in the notification email and on the download page
 - Admin panel: list and delete transfers (with per-notification delivery status), configure SMTP, DNS-based deliverability checker (SPF/DMARC/DKIM)
 - JWT authentication on protected routes
@@ -265,10 +265,7 @@ DNS records drift: a registrar UI change can silently overwrite a TXT record, an
 
 The interface and the notification emails are available in English, Français, Español, Deutsch and Italiano.
 
-- Interface: the language is auto-detected from the browser on first visit and can be changed with the switcher in the header. The choice is remembered in the browser (per device).
-- Recipient email: the sender picks the recipient's language on the send form (defaulting to the current interface language), so the notification arrives in a language the recipient can read.
-- Download page: it opens in the language the sender chose for that transfer, and the recipient can still switch it.
-- Sender emails (upload confirmation and download alert) use the sender's interface language.
+There is a single language per visitor: it is auto-detected from the browser on first visit, can be changed with the switcher in the header, and is remembered in the browser (per device). On the send page, that same language is used for the recipient notification, the upload confirmation, and the later download alert email. The download page always renders in the visitor's own language, never in the sender's.
 
 No configuration is required. To add or adjust a language, edit the per-language JSON files in `frontend/src/i18n/` for the interface and the `TRANSLATIONS` dict in `backend/app/email_i18n.py` for the emails.
 

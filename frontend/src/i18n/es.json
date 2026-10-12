@@ -10,9 +10,8 @@
   "app.yourEmailPlaceholder": "tu@ejemplo.com",
   "app.expiration": "Caducidad del enlace",
   "app.daysOption": "{n} días",
-  "app.recipientLanguage": "Idioma del destinatario",
-  "app.recipientLanguageHint": "El email de notificación se enviará en este idioma.",
-  "app.message": "Mensaje para el destinatario (opcional)",
+  "app.addMessage": "+ Añadir un mensaje",
+  "app.message": "Mensaje para el destinatario",
   "app.messagePlaceholder": "Añade un breve mensaje...",
   "app.dropTitle": "Suelta tus archivos aquí",
   "app.dropSub": "o haz clic para seleccionar",
@@ -27,10 +26,13 @@
   "app.success": "¡Transferencia completada!",
   "app.failed": "La transferencia falló.",
   "app.networkError": "Error de red. Comprueba tu conexión.",
-  "app.footer": "iTransfer · open-source · GPL-3.0",
+  "app.tagline": "Envía archivos. Fácilmente.",
 
   "files.one": "{count} archivo · {size}",
   "files.other": "{count} archivos · {size}",
+
+  "footer.text": "iTransfer es software libre distribuido bajo la licencia GPL-3.0.",
+  "footer.github": "Ver en GitHub",
 
   "dl.sentBy": "Enviado por",
   "dl.expiresOn": "Caduca el {date}",
@@ -42,8 +44,6 @@
   "dl.linkExpired": "Este enlace ha caducado.",
   "dl.invalidLink": "Enlace no válido o desconocido.",
   "dl.downloadFailed": "La descarga falló.",
-  "dl.footerText": "iTransfer es software libre distribuido bajo la licencia GPL-3.0.",
-  "dl.viewOnGithub": "Ver en GitHub",
 
   "login.title": "Iniciar sesión",
   "login.username": "Usuario",

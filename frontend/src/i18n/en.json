@@ -10,9 +10,8 @@
   "app.yourEmailPlaceholder": "you@example.com",
   "app.expiration": "Link expiration",
   "app.daysOption": "{n} days",
-  "app.recipientLanguage": "Recipient's language",
-  "app.recipientLanguageHint": "The notification email will be sent in this language.",
-  "app.message": "Message to the recipient (optional)",
+  "app.addMessage": "+ Add a message",
+  "app.message": "Message to the recipient",
   "app.messagePlaceholder": "Add a short message...",
   "app.dropTitle": "Drop your files here",
   "app.dropSub": "or click to select",
@@ -27,10 +26,13 @@
   "app.success": "Transfer complete!",
   "app.failed": "Transfer failed.",
   "app.networkError": "Network error. Check your connection.",
-  "app.footer": "iTransfer · open-source · GPL-3.0",
+  "app.tagline": "Send files. Simply.",
 
   "files.one": "{count} file · {size}",
   "files.other": "{count} files · {size}",
+
+  "footer.text": "iTransfer is free software distributed under the GPL-3.0 license.",
+  "footer.github": "View on GitHub",
 
   "dl.sentBy": "Sent by",
   "dl.expiresOn": "Expires on {date}",
@@ -42,8 +44,6 @@
   "dl.linkExpired": "This link has expired.",
   "dl.invalidLink": "Invalid or unknown link.",
   "dl.downloadFailed": "Download failed.",
-  "dl.footerText": "iTransfer is free software distributed under the GPL-3.0 license.",
-  "dl.viewOnGithub": "View on GitHub",
 
   "login.title": "Sign in",
   "login.username": "Username",

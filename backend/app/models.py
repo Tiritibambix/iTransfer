@@ -22,11 +22,11 @@ class FileUpload(db.Model):
     # recipient email and on the download page. VARCHAR (not TEXT) so the
     # startup migration can add it with DEFAULT NULL on MySQL/MariaDB.
     message = db.Column(db.String(2000), nullable=True)
-    # Recipient email language (picked by the sender) and the sender's own UI
-    # language. The latter is stored because the download notification is sent
-    # later, at download time, when the request language is no longer known.
+    # The sender's UI language at the time of the transfer, used for every
+    # email tied to it (recipient notification, sender confirmation, and the
+    # later download alert). Stored because the download notification fires
+    # much later, at download time, when there is no request to read it from.
     language = db.Column(db.String(8), nullable=True)
-    sender_language = db.Column(db.String(8), nullable=True)
 
     # Outcome of each background notification attempt: NULL (never attempted),
     # 'pending', 'sent', or 'failed'. Populated by the background email

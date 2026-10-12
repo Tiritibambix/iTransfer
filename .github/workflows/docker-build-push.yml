@@ -9,10 +9,13 @@ name: Build and Push Multi-Arch Docker Images
 
 on:
   push:
-    # No branches filter: every branch gets built and pushed, each tagged
-    # with its own branch name (see the metadata steps below) so branch
-    # builds never collide with each other or overwrite :latest, which
-    # stays reserved for the default branch.
+    # Every branch gets built and pushed, tagged with its own branch name
+    # (see the metadata steps below), EXCEPT main: pushing to main must not
+    # auto-build/push, so testing never requires committing to main just to
+    # get an image. To actually build :latest from main, run this workflow
+    # manually (workflow_dispatch below) once you're ready.
+    branches-ignore:
+      - main
     paths-ignore:
       - 'LICENSE'
       - 'README.md'
@@ -50,9 +53,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      # :latest only on the default branch; every branch also gets a tag
-      # named after itself (slashes/uppercase normalized by the action) plus
-      # a short-SHA tag for traceability back to the exact commit.
+      # :latest only on the default branch; every other branch gets a tag
+      # named after itself, e.g. feat/rework -> feat-rework (the action
+      # replaces '/' and any other character a Docker tag disallows with
+      # '-'; this is the standard convention, the same idea as GitLab's
+      # CI_COMMIT_REF_SLUG), plus a short-SHA tag for traceability back to
+      # the exact commit.
       - name: Extract Docker metadata (backend)
         id: meta_backend
         uses: docker/metadata-action@v6

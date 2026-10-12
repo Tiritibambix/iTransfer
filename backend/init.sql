@@ -15,6 +15,5 @@ CREATE TABLE IF NOT EXISTS file_upload (
     notification_status_download VARCHAR(16) DEFAULT NULL,
     notification_error_download VARCHAR(500) DEFAULT NULL,
     message VARCHAR(2000) DEFAULT NULL, -- Optional sender message to the recipient
-    language VARCHAR(8) DEFAULT NULL, -- Recipient email language
-    sender_language VARCHAR(8) DEFAULT NULL -- Sender UI language (for the deferred download notification)
+    language VARCHAR(8) DEFAULT NULL -- Sender's UI language, used for every email on this transfer
 );

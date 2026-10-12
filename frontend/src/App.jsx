@@ -1,9 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import banner from './assets/banner.png'
 import { getToken, clearToken } from './storage'
-import { useT, LANGUAGES } from './i18n'
-import LanguageSelector from './LanguageSelector'
+import { useT } from './i18n'
+import Header from './Header'
+import Footer from './Footer'
 
 const backendUrl = window.BACKEND_URL
 const MAX_MESSAGE_LENGTH = 2000
@@ -35,7 +35,7 @@ export default function App() {
   const [recipientEmail, setRecipientEmail] = useState('')
   const [senderEmail, setSenderEmail] = useState('')
   const [expirationDays, setExpirationDays] = useState(7)
-  const [recipientLanguage, setRecipientLanguage] = useState(lang)
+  const [showMessage, setShowMessage] = useState(false)
   const [message, setMessage] = useState('')
   const [dragActive, setDragActive] = useState(false)
   const [uploading, setUploading] = useState(false)
@@ -124,8 +124,7 @@ export default function App() {
     fd.append('email', recipientEmail)
     fd.append('sender_email', senderEmail)
     fd.append('expiration_days', expirationDays)
-    fd.append('language', recipientLanguage)
-    fd.append('sender_language', lang)
+    fd.append('language', lang)
     if (message.trim()) fd.append('message', message.trim())
     fd.append('files_list', JSON.stringify(items.map(i => ({ name: i.path, size: i.size }))))
     items.forEach(i => { fd.append('files[]', i.file); fd.append('paths[]', i.path) })
@@ -143,7 +142,7 @@ export default function App() {
       setUploading(false)
       if (xhr.status === 200) {
         showToast(t('app.success'), 'success')
-        setItems([]); setRecipientEmail(''); setSenderEmail(''); setMessage(''); setUploadPct(0)
+        setItems([]); setRecipientEmail(''); setSenderEmail(''); setMessage(''); setShowMessage(false); setUploadPct(0)
       } else if (xhr.status === 401) {
         clearToken()
         window.location.assign('/login')
@@ -163,18 +162,16 @@ export default function App() {
   return (
     <div className="page">
       <div className="container">
-        <header className="app-header">
-          <img src={banner} alt="iTransfer" className="app-logo" />
-          <div className="flex items-center gap-2">
-            <LanguageSelector />
-            <button className="btn btn--ghost btn--sm" onClick={() => navigate('/admin')}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/>
-              </svg>
-              {t('nav.admin')}
-            </button>
-          </div>
-        </header>
+        <Header>
+          <button className="btn btn--ghost btn--sm" onClick={() => navigate('/admin')}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 10-16 0"/>
+            </svg>
+            {t('nav.admin')}
+          </button>
+        </Header>
+
+        <h1 className="hero-tagline">{t('app.tagline')}</h1>
 
         {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
@@ -194,37 +191,33 @@ export default function App() {
               </div>
             </div>
 
-            <div className="row-2col">
-              <div className="field">
-                <label className="field__label">{t('app.expiration')}</label>
-                <select className="input" value={expirationDays}
-                  onChange={e => setExpirationDays(parseInt(e.target.value))} disabled={uploading}>
-                  <option value="3">{t('app.daysOption', { n: 3 })}</option>
-                  <option value="5">{t('app.daysOption', { n: 5 })}</option>
-                  <option value="7">{t('app.daysOption', { n: 7 })}</option>
-                  <option value="10">{t('app.daysOption', { n: 10 })}</option>
-                </select>
-              </div>
-              <div className="field">
-                <label className="field__label">{t('app.recipientLanguage')}</label>
-                <select className="input" value={recipientLanguage}
-                  onChange={e => setRecipientLanguage(e.target.value)} disabled={uploading}>
-                  {LANGUAGES.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
-                </select>
-                <span className="text-xs text-faint">{t('app.recipientLanguageHint')}</span>
-              </div>
+            <div className="field">
+              <label className="field__label">{t('app.expiration')}</label>
+              <select className="input" value={expirationDays}
+                onChange={e => setExpirationDays(parseInt(e.target.value))} disabled={uploading}>
+                <option value="3">{t('app.daysOption', { n: 3 })}</option>
+                <option value="5">{t('app.daysOption', { n: 5 })}</option>
+                <option value="7">{t('app.daysOption', { n: 7 })}</option>
+                <option value="10">{t('app.daysOption', { n: 10 })}</option>
+              </select>
             </div>
 
-            <div className="field">
-              <label className="field__label">{t('app.message')}</label>
-              <textarea className="input" rows={3} maxLength={MAX_MESSAGE_LENGTH}
-                placeholder={t('app.messagePlaceholder')}
-                value={message} onChange={e => setMessage(e.target.value)} disabled={uploading}
-                style={{ resize: 'vertical' }} />
-              <span className="text-xs text-faint" style={{ alignSelf: 'flex-end' }}>
-                {message.length}/{MAX_MESSAGE_LENGTH}
-              </span>
-            </div>
+            {showMessage ? (
+              <div className="field">
+                <label className="field__label">{t('app.message')}</label>
+                <textarea className="input" rows={3} maxLength={MAX_MESSAGE_LENGTH} autoFocus
+                  placeholder={t('app.messagePlaceholder')}
+                  value={message} onChange={e => setMessage(e.target.value)} disabled={uploading}
+                  style={{ resize: 'vertical' }} />
+                <span className="text-xs text-faint" style={{ alignSelf: 'flex-end' }}>
+                  {message.length}/{MAX_MESSAGE_LENGTH}
+                </span>
+              </div>
+            ) : (
+              <button type="button" className="link-action" onClick={() => setShowMessage(true)} disabled={uploading}>
+                {t('app.addMessage')}
+              </button>
+            )}
 
             <div
               className={`drop-zone${dragActive ? ' drop-zone--active' : ''}`}
@@ -299,7 +292,7 @@ export default function App() {
           </div>
         </div>
 
-        <p className="text-center text-xs text-faint">{t('app.footer')}</p>
+        <Footer />
       </div>
     </div>
   )

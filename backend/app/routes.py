@@ -530,9 +530,10 @@ def upload_file():
         paths = request.form.getlist('paths[]')
         email = (request.form.get('email') or '').strip()
         sender_email = (request.form.get('sender_email') or '').strip()
-        # Untrusted language codes: normalize against the whitelist before use.
-        recipient_language = normalize_language(request.form.get('language'))
-        sender_language = normalize_language(request.form.get('sender_language'))
+        # Untrusted language code: normalize against the whitelist before use.
+        # A single language drives every email on this transfer (recipient
+        # notification, sender confirmation, and the later download alert).
+        language = normalize_language(request.form.get('language'))
         # Optional free-text note; cap length server-side, not just in the UI.
         user_message = (request.form.get('message') or '').strip()[:_MAX_MESSAGE_LENGTH] or None
 
@@ -618,8 +619,7 @@ def upload_file():
             downloaded=False,
             expires_at=datetime.utcnow() + timedelta(days=expiration_days),
             message=user_message,
-            language=recipient_language,
-            sender_language=sender_language,
+            language=language,
         )
         record.set_files_list(original_files)
         db.session.add(record)
@@ -635,11 +635,11 @@ def upload_file():
             db.session.commit()
             email_executor.submit(
                 _send_recipient_notification_task, file_id, email, files_summary,
-                total_formatted, smtp_config, sender_email, recipient_language, user_message,
+                total_formatted, smtp_config, sender_email, language, user_message,
             )
             email_executor.submit(
                 _send_sender_confirmation_task, file_id, sender_email, original_files,
-                total_formatted, smtp_config, email, sender_language,
+                total_formatted, smtp_config, email, language,
             )
         except FileNotFoundError:
             app.logger.error("SMTP config missing; notifications not dispatched for %s", file_id)
@@ -692,7 +692,6 @@ def get_transfer_details(file_id):
             'expires_at': record.expires_at.isoformat(),
             'sender_email': record.sender_email,
             'message': record.message,
-            'language': record.language,
         }), 200
     except UnsafePathError:
         return jsonify({'error': 'Not found'}), 404
@@ -723,7 +722,7 @@ def download_file(file_id):
                 db.session.commit()
                 email_executor.submit(
                     _send_download_notification_task, file_id, record.sender_email, smtp_config,
-                    normalize_language(record.sender_language),
+                    normalize_language(record.language),
                 )
             except FileNotFoundError:
                 app.logger.error("SMTP config missing; download notification not dispatched for %s", file_id)
