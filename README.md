@@ -12,6 +12,11 @@
 
 Self-hosted file transfer system. Upload files, share a download link, get notified by email when the recipient downloads. No cloud, no third party.
 
+<p align="center">
+  <img src="docs/screenshots/send.jpg" width="48%" alt="Send page" />
+  <img src="docs/screenshots/download.jpg" width="48%" alt="Download page" />
+</p>
+
 ## ⚠️ Security Notice
 
 This application has been coded with the help of AI and is provided as-is. While reasonable security measures have been implemented, no independent audit has been performed. You are responsible for reviewing the code, assessing the risks for your use case, and validating that the deployment meets your security requirements before exposing this to the internet. The repository owner accepts no liability for any damages or data loss resulting from the use of this software.
