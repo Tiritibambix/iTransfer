@@ -27,7 +27,6 @@
   "app.success": "Transfer complete!",
   "app.failed": "Transfer failed.",
   "app.networkError": "Network error. Check your connection.",
-  "app.tagline": "Send files. Simply.",
 
   "files.one": "{count} file · {size}",
   "files.other": "{count} files · {size}",

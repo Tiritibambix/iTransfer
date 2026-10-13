@@ -183,8 +183,6 @@ export default function App() {
           </button>
         </Header>
 
-        <h1 className="hero-tagline">{t('app.tagline')}</h1>
-
         {toast && <Toast key={toast.id} message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
 
         <div className="card mb-6">

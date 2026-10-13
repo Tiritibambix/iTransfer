@@ -171,25 +171,8 @@ body {
   gap: var(--sp-2);
 }
 
-/* Hero tagline above the send-page card */
-.hero-tagline {
-  font-family: var(--font-display);
-  font-size: var(--font-2xl);
-  font-weight: 600;
-  letter-spacing: -0.01em;
-  line-height: 1.15;
-  text-align: center;
-  color: var(--clr-text);
-  margin-bottom: var(--sp-6);
-}
-
-@media (max-width: 480px) {
-  .hero-tagline { font-size: var(--font-xl); margin-bottom: var(--sp-4); }
-}
-
-/* Shared large page title (login, etc.) -- same display face as the hero
-   tagline so the two or three big headline moments in the app feel like
-   one deliberate typographic choice, not Inter used at a bigger size. */
+/* Shared large page title (login, etc.) -- the one deliberate display-face
+   headline moment in the app, kept quiet rather than a marketing tagline. */
 .page-title {
   font-family: var(--font-display);
   font-size: var(--font-lg);

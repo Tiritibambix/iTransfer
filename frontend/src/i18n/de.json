@@ -27,7 +27,6 @@
   "app.success": "Übertragung abgeschlossen!",
   "app.failed": "Übertragung fehlgeschlagen.",
   "app.networkError": "Netzwerkfehler. Überprüfen Sie Ihre Verbindung.",
-  "app.tagline": "Dateien senden. Ganz einfach.",
 
   "files.one": "{count} Datei · {size}",
   "files.other": "{count} Dateien · {size}",
