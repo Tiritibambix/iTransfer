@@ -80,7 +80,7 @@ export default function Download() {
   )
 
   return (
-    <div className="page">
+    <div className="page page--centered">
       <div className="container--narrow">
 
         <Header />
