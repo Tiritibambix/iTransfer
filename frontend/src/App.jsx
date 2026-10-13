@@ -113,6 +113,18 @@ export default function App() {
     input.click()
   }
 
+  // Separate from handleClick: the native file picker has no mode that lets
+  // the user choose freely between files and a folder, so folder selection
+  // needs its own input with webkitdirectory. Each resulting File already
+  // carries webkitRelativePath, which ingestFiles already prefers over the
+  // plain name -- same path-preserving behavior as a drag-and-drop folder.
+  const handleSelectFolder = () => {
+    const input = document.createElement('input')
+    input.type = 'file'; input.webkitdirectory = true; input.multiple = true
+    input.onchange = e => ingestFiles(Array.from(e.target.files))
+    input.click()
+  }
+
   const removeItem = (idx) => setItems(prev => prev.filter((_, i) => i !== idx))
 
   const handleUpload = async () => {
@@ -235,7 +247,17 @@ export default function App() {
                 <path d="M8 36h32" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
               </svg>
               <p className="drop-zone__title">{t('app.dropTitle')}</p>
-              <p className="drop-zone__sub">{t('app.dropSub')}</p>
+              <p className="drop-zone__sub">
+                <button type="button" className="drop-zone__link" disabled={uploading}
+                  onClick={e => { e.stopPropagation(); handleClick() }}>
+                  {t('app.selectFiles')}
+                </button>
+                {' · '}
+                <button type="button" className="drop-zone__link" disabled={uploading}
+                  onClick={e => { e.stopPropagation(); handleSelectFolder() }}>
+                  {t('app.selectFolder')}
+                </button>
+              </p>
             </div>
 
             {items.length > 0 && (

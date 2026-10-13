@@ -3,7 +3,7 @@
    Light theme · Bold single accent · WeTransfer-inspired
    ========================================================= */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap');
 
 :root {
   /* Brand accent (single, used flat -- no gradients/glow) */
@@ -38,11 +38,14 @@
   --shadow-md:         0 4px 16px rgba(20,10,30,0.08);
   --shadow-lg:         0 16px 40px rgba(20,10,30,0.12);
 
-  /* Radii */
-  --radius-sm:   8px;
-  --radius-md:   12px;
-  --radius-lg:   18px;
-  --radius-xl:   24px;
+  /* Radii: modest and consistent rather than heavily rounded -- a crisp,
+     typed corner reads as more deliberate/premium than an exaggerated one.
+     --radius-pill stays reserved for small chip-like controls (badges, the
+     language switcher), not for primary actions. */
+  --radius-sm:   6px;
+  --radius-md:   10px;
+  --radius-lg:   14px;
+  --radius-xl:   18px;
   --radius-pill: 999px;
 
   /* Spacing */
@@ -56,8 +59,12 @@
   --sp-10: 2.5rem;
   --sp-12: 3rem;
 
-  /* Typography */
+  /* Typography: Inter for UI chrome/body text; Fraunces (a soft display
+     serif) only for the few large headline moments -- pairing a quiet
+     sans with a characterful display face on headlines is what reads as
+     deliberate/premium rather than a single uniform grotesque everywhere. */
   --font: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Fraunces', Georgia, serif;
   --font-xs:   0.75rem;
   --font-sm:   0.875rem;
   --font-base: 1rem;
@@ -166,8 +173,9 @@ body {
 
 /* Hero tagline above the send-page card */
 .hero-tagline {
+  font-family: var(--font-display);
   font-size: var(--font-2xl);
-  font-weight: 800;
+  font-weight: 600;
   letter-spacing: -0.01em;
   line-height: 1.15;
   text-align: center;
@@ -177,6 +185,18 @@ body {
 
 @media (max-width: 480px) {
   .hero-tagline { font-size: var(--font-xl); margin-bottom: var(--sp-4); }
+}
+
+/* Shared large page title (login, etc.) -- same display face as the hero
+   tagline so the two or three big headline moments in the app feel like
+   one deliberate typographic choice, not Inter used at a bigger size. */
+.page-title {
+  font-family: var(--font-display);
+  font-size: var(--font-lg);
+  font-weight: 600;
+  text-align: center;
+  color: var(--clr-text);
+  margin-bottom: var(--sp-2);
 }
 
 /* Plain text-button used for secondary/optional actions (e.g. "+ Add a message") */
@@ -207,7 +227,7 @@ body {
   font-size: var(--font-sm);
   font-weight: 600;
   border: none;
-  border-radius: var(--radius-pill);
+  border-radius: var(--radius-md);
   cursor: pointer;
   transition: all var(--t-base);
   white-space: nowrap;
@@ -383,6 +403,25 @@ select.input {
   font-size: var(--font-sm);
   color: var(--clr-text-muted);
 }
+
+/* The two explicit pick actions ("select files" / "select a folder") inside
+   the sub line. They stopPropagation in JS so clicking them doesn't also
+   fire the drop-zone's own click-to-pick-files handler. */
+.drop-zone__link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-family: var(--font);
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--clr-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  transition: text-decoration-color var(--t-fast);
+}
+.drop-zone__link:hover:not(:disabled) { text-decoration-color: currentColor; }
+.drop-zone__link:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ---- File list ---- */
 .file-list {

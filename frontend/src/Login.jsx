@@ -51,9 +51,7 @@ export default function Login() {
 
         <div className="card">
           <div className="card__body flex-col gap-4">
-            <h1 className="text-center" style={{ fontSize: 'var(--font-lg)', fontWeight: 600, marginBottom: 'var(--sp-2)' }}>
-              {t('login.title')}
-            </h1>
+            <h1 className="page-title">{t('login.title')}</h1>
 
             <form onSubmit={handleSubmit} className="flex-col gap-4">
               <div className="field">
