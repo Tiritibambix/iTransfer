@@ -287,16 +287,65 @@ select.input {
   cursor: pointer;
 }
 
-/* Compact language switcher, lives in the Header */
-.lang-select {
-  width: auto;
-  min-width: 0;
-  padding: var(--sp-2) var(--sp-6) var(--sp-2) var(--sp-3);
-  border-radius: var(--radius-pill);
-  font-size: var(--font-xs);
-  font-weight: 600;
-  background-color: var(--clr-surface-2);
+/* Language switcher: a compact trigger (matches the other .btn--sm pill
+   buttons in the Header exactly in height/padding/font) that opens a small
+   custom dropdown panel -- not a native <select>, so it never looks like a
+   stray form control sitting in the nav. */
+.lang-switcher {
+  position: relative;
 }
+
+.lang-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-4);
+  background: var(--clr-accent-faint);
+  color: var(--clr-accent);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-pill);
+  font-family: var(--font);
+  font-size: var(--font-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: background var(--t-base), border-color var(--t-base);
+}
+.lang-trigger:hover { background: var(--clr-accent-soft); border-color: var(--clr-accent-soft); }
+
+.lang-menu {
+  position: absolute;
+  top: calc(100% + var(--sp-2));
+  right: 0;
+  z-index: 20;
+  min-width: 150px;
+  max-width: calc(100vw - 2rem);
+  background: var(--clr-surface-1);
+  border: 1px solid var(--clr-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: var(--sp-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lang-menu__item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: var(--sp-2) var(--sp-3);
+  background: none;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font);
+  font-size: var(--font-sm);
+  color: var(--clr-text);
+  cursor: pointer;
+  transition: background var(--t-fast);
+}
+.lang-menu__item:hover { background: var(--clr-surface-2); }
+.lang-menu__item--active { color: var(--clr-accent); font-weight: 700; background: var(--clr-accent-faint); }
 
 /* ---- Drop zone ---- */
 .drop-zone {
