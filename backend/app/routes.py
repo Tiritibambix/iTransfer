@@ -573,11 +573,15 @@ def _tus_hook_post_finish(event: dict) -> None:
 
     # Defense in depth: the hook secret already authenticates the caller as
     # tusd, but a filesystem path from a webhook payload is still never
-    # trusted blindly -- confirm it actually lives inside tusd's own storage
-    # before moving anything.
+    # trusted blindly -- run it through safe_join (root=tusd's own storage
+    # dir, relative=the lexical relpath into it) exactly like every other
+    # untrusted path in this file, rather than a one-off manual check, so it
+    # stays inside tusd's own storage both before and after symlink
+    # resolution.
     tusd_root = os.path.realpath(app.config['TUSD_DATA_DIR'])
-    source = os.path.realpath(storage_path)
-    if source != tusd_root and not source.startswith(tusd_root + os.sep):
+    try:
+        source = safe_join(tusd_root, os.path.relpath(storage_path, tusd_root))
+    except (UnsafePathError, ValueError):
         app.logger.warning("post-finish hook reported a path outside tusd storage")
         return
     if not os.path.isfile(source):
@@ -585,7 +589,8 @@ def _tus_hook_post_finish(event: dict) -> None:
         return
 
     try:
-        target_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'temp', transfer_id)
+        temp_root = os.path.join(app.config['UPLOAD_FOLDER'], 'temp')
+        target_dir = safe_join(temp_root, transfer_id)
         target_path = safe_join(target_dir, relative_path)
     except UnsafePathError:
         app.logger.warning("post-finish hook reported an unsafe relative path")
@@ -643,7 +648,10 @@ def finalize_transfer():
         return jsonify({'error': 'Invalid transfer id'}), 400
 
     upload_root = app.config['UPLOAD_FOLDER']
-    temp_dir = os.path.join(upload_root, 'temp', transfer_id)
+    try:
+        temp_dir = safe_join(os.path.join(upload_root, 'temp'), transfer_id)
+    except UnsafePathError:
+        return jsonify({'error': 'Invalid transfer id'}), 400
     zip_path = None
     try:
         email = (data.get('email') or '').strip()
