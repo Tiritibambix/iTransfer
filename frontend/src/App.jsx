@@ -172,7 +172,7 @@ export default function App() {
   const totalSize = items.reduce((acc, i) => acc + i.size, 0)
 
   return (
-    <div className="page">
+    <div className="page page--centered">
       <div className="container">
         <Header>
           <button className="btn btn--ghost btn--sm" onClick={() => navigate('/admin')}>

@@ -368,7 +368,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="page">
+    <div className="page page--centered">
       <div className="container--wide">
 
         <Header>
