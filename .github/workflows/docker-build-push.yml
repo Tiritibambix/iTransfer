@@ -10,12 +10,11 @@ name: Build and Push Multi-Arch Docker Images
 on:
   push:
     # Every branch gets built and pushed, tagged with its own branch name
-    # (see the metadata steps below), EXCEPT main: pushing to main must not
-    # auto-build/push, so testing never requires committing to main just to
-    # get an image. To actually build :latest from main, run this workflow
-    # manually (workflow_dispatch below) once you're ready.
-    branches-ignore:
-      - main
+    # (see the metadata steps below) -- main included, so it gets :latest
+    # (enabled only on the default branch in the metadata steps) the moment
+    # something lands there, with no separate manual trigger required.
+    branches:
+      - '**'
     paths-ignore:
       - 'LICENSE'
       - 'README.md'
@@ -40,8 +39,62 @@ env:
   IMAGE_FRONTEND: tiritibambix/itransfer-frontend
 
 jobs:
+  # Guards against building the same commit twice for the same ref (e.g. a
+  # re-run with no new push, or workflow_dispatch right after a push that
+  # already built it) -- multi-arch builds aren't free, and main now builds
+  # on every push, so this keeps that from wasting CI minutes and Docker Hub
+  # pushes on a no-op. workflow_dispatch always bypasses the skip, so a
+  # manual rebuild of an unchanged commit still works if you ask for it.
+  check:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      skip: ${{ steps.compare.outputs.skip }}
+    steps:
+      - name: Restore last built commit for this ref
+        uses: actions/cache/restore@v5
+        with:
+          path: last_commit.txt
+          key: last-commit-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: last-commit-${{ github.ref_name }}-
+
+      - name: Read last built commit
+        id: read
+        run: |
+          if [ -f last_commit.txt ]; then
+            echo "last_commit=$(cat last_commit.txt)" >> "$GITHUB_OUTPUT"
+          else
+            echo "last_commit=none" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Compare commits
+        id: compare
+        run: |
+          if [ "${{ github.sha }}" = "${{ steps.read.outputs.last_commit }}" ] && [ "${{ github.event_name }}" != "workflow_dispatch" ]; then
+            echo "No new commit for this ref. Skipping build."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "New commit detected or manual trigger."
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Save new commit hash to cache
+        if: steps.compare.outputs.skip == 'false'
+        run: echo "${{ github.sha }}" > last_commit.txt
+
+      - name: Update cache
+        if: steps.compare.outputs.skip == 'false'
+        uses: actions/cache/save@v5
+        with:
+          path: last_commit.txt
+          key: last-commit-${{ github.ref_name }}-${{ github.run_id }}
+
   setup:
     runs-on: ubuntu-24.04
+    needs: check
+    if: needs.check.outputs.skip == 'false'
     permissions:
       contents: read
     outputs:
@@ -81,7 +134,8 @@ jobs:
 
   audit:
     runs-on: ubuntu-24.04
-    needs: setup
+    needs: [check, setup]
+    if: needs.check.outputs.skip == 'false'
     permissions:
       contents: read
     steps:
@@ -99,7 +153,8 @@ jobs:
 
   build-push-backend:
     runs-on: ubuntu-24.04
-    needs: [setup, audit]
+    needs: [check, setup, audit]
+    if: needs.check.outputs.skip == 'false'
     permissions:
       contents: read
     steps:
@@ -130,7 +185,8 @@ jobs:
 
   build-push-frontend:
     runs-on: ubuntu-24.04
-    needs: [setup, audit]
+    needs: [check, setup, audit]
+    if: needs.check.outputs.skip == 'false'
     permissions:
       contents: read
     steps:
@@ -161,10 +217,12 @@ jobs:
 
   update-dockerhub-description:
     runs-on: ubuntu-24.04
-    needs: [build-push-backend, build-push-frontend]
+    needs: [check, build-push-backend, build-push-frontend]
     # Only the default branch should own the public Docker Hub description --
     # branch builds push their own image tags but must not overwrite it.
-    if: github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+    if: |
+      needs.check.outputs.skip == 'false' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
     permissions:
       contents: read
     steps:
