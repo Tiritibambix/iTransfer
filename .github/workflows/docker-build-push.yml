@@ -54,7 +54,7 @@ jobs:
       skip: ${{ steps.compare.outputs.skip }}
     steps:
       - name: Restore last built commit for this ref
-        uses: actions/cache/restore@v5
+        uses: actions/cache/restore@v6
         with:
           path: last_commit.txt
           key: last-commit-${{ github.ref_name }}-${{ github.run_id }}
@@ -86,7 +86,7 @@ jobs:
 
       - name: Update cache
         if: steps.compare.outputs.skip == 'false'
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: last_commit.txt
           key: last-commit-${{ github.ref_name }}-${{ github.run_id }}
