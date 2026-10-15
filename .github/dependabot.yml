@@ -17,3 +17,12 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    ignore:
+      # dnspython 2.9.0 requires Python >=3.11, but backend/Dockerfile builds
+      # on python:3.10-slim -- pip install fails on this version. Dependabot
+      # kept proposing it and that PR got merged despite its own CI failing
+      # (CODEOWNERS/branch protection doesn't block on it), silently
+      # reverting the pin back to a broken state. Remove this once the
+      # backend base image moves to Python 3.11+.
+      - dependency-name: "dnspython"
+        versions: [">=2.9.0"]
