@@ -4,6 +4,7 @@ import { getToken, clearToken } from './storage'
 import { authFetch } from './api'
 import { useT } from './i18n'
 import Header from './Header'
+import PageBackground from './PageBackground'
 
 const backendUrl = window.BACKEND_URL
 
@@ -369,6 +370,7 @@ export default function Admin() {
 
   return (
     <div className="page page--centered">
+      <PageBackground />
       <div className="container--wide">
 
         <Header>

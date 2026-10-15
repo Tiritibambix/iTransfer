@@ -11,6 +11,7 @@ Security posture:
 * Recipient/sender emails are validated before any processing.
 """
 import hashlib
+import hmac
 import json
 import os
 import re
@@ -18,7 +19,6 @@ import shutil
 import smtplib
 import threading
 import time
-import uuid
 import zipfile
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -28,13 +28,15 @@ from email.utils import formataddr, formatdate, make_msgid
 import pytz
 from flask import Response, current_app, jsonify, request, send_from_directory, stream_with_context
 from markupsafe import escape
+from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import app, db, email_executor
-from .auth import issue_token, require_auth
+from .auth import issue_token, require_auth, verify_bearer_header
 from .deliverability import check_dkim, check_dmarc, check_spf
 from .email_i18n import DEFAULT_LANGUAGE, normalize_language, t
 from .models import FileUpload
 from .paths import UnsafePathError, safe_join, safe_stored_filename
+from .slug import generate_slug
 
 _MAX_MESSAGE_LENGTH = 2000
 
@@ -84,6 +86,9 @@ _EMAIL_LOCAL  = re.compile(r'^[A-Za-z0-9._%+\-]{1,64}$')
 _EMAIL_DOMAIN = re.compile(r'^[A-Za-z0-9.\-]{1,253}$')
 _EMAIL_TLD    = re.compile(r'^[A-Za-z]{2,}$')
 _DKIM_SELECTOR = re.compile(r'^[A-Za-z0-9_\-]{1,63}$')
+_TRANSFER_ID_RE = re.compile(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', re.IGNORECASE
+)
 
 
 def _valid_email(addr: str) -> bool:
@@ -342,7 +347,7 @@ def _send_recipient_notification(recipient_email, file_id, files_summary, total_
             f"%d/%m/%Y {t(lang, 'date_at')} %H:%M:%S"
         )
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500').rstrip('/')
-        download_page_link = f"{frontend_url}/download/{file_id}"
+        download_page_link = f"{frontend_url}/download/{file_info.slug or file_id}"
         title = t(lang, 'recipient_title')
         message = (
             t(lang, 'recipient_body', sender=sender_email)
@@ -366,8 +371,10 @@ def _send_sender_confirmation(sender_email, file_id, files_list, total_size, smt
                               recipient_email, lang=DEFAULT_LANGUAGE):
     """Build and send the sender confirmation. Returns (success, error)."""
     try:
+        file_info = FileUpload.query.get(file_id)
+        link_id = (file_info.slug if file_info else None) or file_id
         frontend_url = os.environ.get('FRONTEND_URL', 'http://localhost:3500').rstrip('/')
-        download_page_link = f"{frontend_url}/download/{file_id}"
+        download_page_link = f"{frontend_url}/download/{link_id}"
         files_summary = "".join(f"- {f['name']} ({format_size(f['size'])})\n" for f in files_list)
         title = t(lang, 'sender_title')
         message = (
@@ -510,32 +517,141 @@ def login():
     return jsonify({'error': 'Invalid credentials'}), 401
 
 
-@app.route('/upload', methods=['POST', 'OPTIONS'])
+def _tus_hook_json(body: dict):
+    """Hook responses must always be HTTP 200 with a JSON body -- tusd treats
+    any non-2XX from this endpoint as an internal failure (retried, then a
+    500 to the uploading client) rather than as a deliberate rejection.
+    Rejection is instead signalled inside the body via RejectUpload /
+    HTTPResponse, per tusd's hook contract."""
+    return jsonify(body), 200
+
+
+def _tus_reject(status: int, message: str):
+    return _tus_hook_json({
+        'RejectUpload': True,
+        'HTTPResponse': {
+            'StatusCode': status,
+            'Body': json.dumps({'error': message}),
+            'Header': {'Content-Type': 'application/json'},
+        },
+    })
+
+
+def _tus_hook_pre_create(event: dict):
+    headers = (event.get('HTTPRequest') or {}).get('Header') or {}
+    auth_values = headers.get('Authorization') or []
+    if not verify_bearer_header(auth_values[0] if auth_values else ''):
+        return _tus_reject(401, 'Authentication required')
+
+    upload = event.get('Upload') or {}
+    size = upload.get('Size')
+    if size is not None and size > app.config['MAX_CONTENT_LENGTH']:
+        return _tus_reject(413, 'File too large')
+
+    metadata = upload.get('MetaData') or {}
+    if not metadata.get('transfer_id') or not metadata.get('relative_path'):
+        return _tus_reject(400, 'Missing transfer metadata')
+
+    return _tus_hook_json({})
+
+
+def _tus_hook_post_finish(event: dict) -> None:
+    """Move the file tusd just finished receiving out of its own transit
+    storage and into this transfer's temp directory, using the metadata the
+    frontend attached at creation time to know where it belongs. Runs after
+    tusd has already answered the client, so nothing here can affect the
+    response -- failures are only logged."""
+    upload = event.get('Upload') or {}
+    metadata = upload.get('MetaData') or {}
+    transfer_id = metadata.get('transfer_id') or ''
+    relative_path = metadata.get('relative_path') or ''
+    storage_path = (upload.get('Storage') or {}).get('Path')
+
+    if not _TRANSFER_ID_RE.match(transfer_id) or not relative_path or not storage_path:
+        app.logger.warning("post-finish hook missing or invalid metadata")
+        return
+
+    # Defense in depth: the hook secret already authenticates the caller as
+    # tusd, but a filesystem path from a webhook payload is still never
+    # trusted blindly -- confirm it actually lives inside tusd's own storage
+    # before moving anything.
+    tusd_root = os.path.realpath(app.config['TUSD_DATA_DIR'])
+    source = os.path.realpath(storage_path)
+    if source != tusd_root and not source.startswith(tusd_root + os.sep):
+        app.logger.warning("post-finish hook reported a path outside tusd storage")
+        return
+    if not os.path.isfile(source):
+        app.logger.warning("post-finish hook reported a missing file: %s", source)
+        return
+
+    try:
+        target_dir = os.path.join(app.config['UPLOAD_FOLDER'], 'temp', transfer_id)
+        target_path = safe_join(target_dir, relative_path)
+    except UnsafePathError:
+        app.logger.warning("post-finish hook reported an unsafe relative path")
+        return
+
+    os.makedirs(os.path.dirname(target_path), exist_ok=True)
+    shutil.move(source, target_path)
+    info_path = source + '.info'
+    if os.path.exists(info_path):
+        try:
+            os.remove(info_path)
+        except OSError:
+            pass
+
+
+@app.route('/api/tus-hooks', methods=['POST'])
+def tus_hooks():
+    """Webhook endpoint tusd calls for pre-create/post-finish/post-terminate
+    (see -hooks-http / -hooks-enabled-events in docker-compose.yml). Guarded
+    by a shared secret, not JWT, since this is tusd calling us, not the
+    browser -- the pre-create hook below validates the *uploading user's*
+    JWT separately, forwarded inside the hook payload itself."""
+    secret = request.args.get('secret', '')
+    if not hmac.compare_digest(secret, app.config['TUS_HOOK_SECRET']):
+        app.logger.warning("Rejected /api/tus-hooks call with invalid secret")
+        return jsonify({'error': 'Forbidden'}), 403
+
+    payload = request.get_json(silent=True) or {}
+    hook_type = payload.get('Type', '')
+    event = payload.get('Event') or {}
+
+    if hook_type == 'pre-create':
+        return _tus_hook_pre_create(event)
+    if hook_type == 'post-finish':
+        _tus_hook_post_finish(event)
+    # post-terminate: tusd's own filestore already deletes the partial
+    # upload's data when the client aborts/terminates it -- nothing of ours
+    # exists yet at that point (post-finish is what creates it), so there is
+    # nothing to clean up here.
+    return _tus_hook_json({})
+
+
+@app.route('/api/transfers/finalize', methods=['POST', 'OPTIONS'])
 @require_auth
-def upload_file():
+def finalize_transfer():
     if request.method == 'OPTIONS':
         return jsonify({'message': 'ok'}), 200
 
     if not _rate_limit(_client_key()):
         return jsonify({'error': 'Too many requests'}), 429
 
+    data = request.get_json(silent=True) or {}
+    transfer_id = (data.get('transfer_id') or '').strip()
+    if not _TRANSFER_ID_RE.match(transfer_id):
+        return jsonify({'error': 'Invalid transfer id'}), 400
+
     upload_root = app.config['UPLOAD_FOLDER']
-    temp_dir = None
+    temp_dir = os.path.join(upload_root, 'temp', transfer_id)
     zip_path = None
     try:
-        if 'files[]' not in request.files:
-            return jsonify({'error': 'No files provided'}), 400
-
-        files = request.files.getlist('files[]')
-        paths = request.form.getlist('paths[]')
-        email = (request.form.get('email') or '').strip()
-        sender_email = (request.form.get('sender_email') or '').strip()
-        # Untrusted language code: normalize against the whitelist before use.
-        # A single language drives every email on this transfer (recipient
-        # notification, sender confirmation, and the later download alert).
-        language = normalize_language(request.form.get('language'))
-        # Optional free-text note; cap length server-side, not just in the UI.
-        user_message = (request.form.get('message') or '').strip()[:_MAX_MESSAGE_LENGTH] or None
+        email = (data.get('email') or '').strip()
+        sender_email = (data.get('sender_email') or '').strip()
+        language = normalize_language(data.get('language'))
+        user_message = (data.get('message') or '').strip()[:_MAX_MESSAGE_LENGTH] or None
+        transfer_password = (data.get('password') or '').strip() or None
+        password_hash = generate_password_hash(transfer_password) if transfer_password else None
 
         if not _valid_email(email):
             return jsonify({'error': 'Invalid recipient email address'}), 400
@@ -543,57 +659,62 @@ def upload_file():
             return jsonify({'error': 'Invalid sender email address'}), 400
 
         try:
-            expiration_days = int(request.form.get('expiration_days', '7'))
-        except ValueError:
+            expiration_days = int(data.get('expiration_days', 7))
+        except (TypeError, ValueError):
             expiration_days = 7
         if expiration_days not in (3, 5, 7, 10):
             expiration_days = 7
 
+        download_limit = None
         try:
-            files_list = json.loads(request.form.get('files_list', '[]'))
-        except json.JSONDecodeError:
-            return jsonify({'error': 'Invalid files_list payload'}), 400
+            parsed_limit = int(data.get('download_limit') or 0)
+            if parsed_limit > 0:
+                download_limit = parsed_limit
+        except (TypeError, ValueError):
+            pass
+
+        files_list = data.get('files_list') or []
         if not files_list:
             return jsonify({'error': 'Empty files_list'}), 400
 
-        total_size = sum(int(f.get('size', 0)) for f in files_list)
-
-        file_id = str(uuid.uuid4())
-        temp_dir = os.path.join(upload_root, 'temp', file_id)
-        os.makedirs(temp_dir, exist_ok=True)
-
-        file_list = []
-        for uploaded_file, raw_path in zip(files, paths):
-            if not uploaded_file.filename:
-                continue
+        # Each file's post-finish hook runs independently, so by the time the
+        # client calls this endpoint one of them may not have landed in
+        # temp_dir yet -- retry briefly instead of failing the whole transfer
+        # on that race.
+        file_entries = None
+        for attempt in range(5):
             try:
-                target_path = safe_join(temp_dir, raw_path)
-            except UnsafePathError:
-                app.logger.warning("Rejected unsafe upload path")
-                return jsonify({'error': 'Invalid file path'}), 400
-            os.makedirs(os.path.dirname(target_path), exist_ok=True)
-            uploaded_file.save(target_path)
-            file_list.append({
-                'relative': os.path.relpath(target_path, temp_dir).replace(os.sep, '/'),
-                'size': os.path.getsize(target_path),
-                'abs': target_path,
-            })
+                entries = []
+                for f in files_list:
+                    relative = f.get('name')
+                    stored_path = safe_join(temp_dir, relative)
+                    entries.append({
+                        'relative': relative,
+                        'size': os.path.getsize(stored_path),
+                        'abs': stored_path,
+                    })
+                file_entries = entries
+                break
+            except OSError:
+                if attempt < 4:
+                    time.sleep(0.5 * (attempt + 1))
 
-        if not file_list:
-            return jsonify({'error': 'No valid files uploaded'}), 400
+        if file_entries is None:
+            return jsonify({'error': 'Uploaded files not found yet, please retry'}), 409
 
-        needs_zip = len(file_list) > 1 or any('/' in f['relative'] for f in file_list)
+        file_id = transfer_id
+        needs_zip = len(file_entries) > 1 or any('/' in f['relative'] for f in file_entries)
 
         if needs_zip:
             date_str = datetime.utcnow().strftime("%y%m%d%H%M%S")
             final_filename = f"iTransfer_{date_str}_{file_id[:8]}.zip"
             zip_path = safe_join(upload_root, final_filename)
             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-                for entry in file_list:
+                for entry in file_entries:
                     zf.write(entry['abs'], entry['relative'])
             final_path = zip_path
         else:
-            only = file_list[0]
+            only = file_entries[0]
             final_filename = safe_stored_filename(only['relative'])
             final_path = safe_join(upload_root, final_filename)
             shutil.move(only['abs'], final_path)
@@ -608,7 +729,15 @@ def upload_file():
                 hasher.update(chunk)
         file_hash = hasher.hexdigest()
 
-        original_files = [{'name': f['name'], 'size': int(f['size'])} for f in files_list]
+        original_files = [{'name': f.get('name'), 'size': int(f.get('size', 0))} for f in files_list]
+        total_size = sum(f['size'] for f in original_files)
+
+        # Human-readable public link. Collisions are astronomically unlikely
+        # (4 words drawn from two ~90-word lists) but checked anyway since
+        # the cost of checking is trivial next to the cost of a collision.
+        slug = generate_slug()
+        while FileUpload.query.filter_by(slug=slug).first() is not None:
+            slug = generate_slug()
 
         record = FileUpload(
             id=file_id,
@@ -620,6 +749,10 @@ def upload_file():
             expires_at=datetime.utcnow() + timedelta(days=expiration_days),
             message=user_message,
             language=language,
+            slug=slug,
+            password_hash=password_hash,
+            download_limit=download_limit,
+            download_count=0,
         )
         record.set_files_list(original_files)
         db.session.add(record)
@@ -651,48 +784,79 @@ def upload_file():
         except Exception:
             app.logger.exception("Notification dispatch failed for %s", file_id)
 
-        return jsonify({'success': True, 'file_id': file_id, 'message': 'Upload OK'}), 200
+        return jsonify({'success': True, 'file_id': file_id, 'slug': slug}), 200
 
     except UnsafePathError:
-        app.logger.warning("Unsafe path in upload request")
+        app.logger.warning("Unsafe path in finalize request")
         return jsonify({'error': 'Invalid file path'}), 400
     except Exception:
-        app.logger.exception("Upload failed")
+        app.logger.exception("Transfer finalize failed")
         if zip_path and os.path.exists(zip_path):
             try:
                 os.remove(zip_path)
             except OSError:
                 pass
-        return jsonify({'error': 'Upload failed'}), 500
+        return jsonify({'error': 'Finalize failed'}), 500
     finally:
-        if temp_dir and os.path.exists(temp_dir):
+        if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir, ignore_errors=True)
 
 
-@app.route('/transfer/<file_id>', methods=['GET'])
-def get_transfer_details(file_id):
+def _find_transfer(identifier):
+    """Look up a transfer by its public slug first, falling back to the raw
+    internal id -- covers links sent before the slug column existed."""
+    record = FileUpload.query.filter_by(slug=identifier).first()
+    if record:
+        return record
+    return FileUpload.query.get(identifier)
+
+
+def _transfer_expired(record) -> bool:
+    if datetime.utcnow() > record.expires_at:
+        return True
+    if record.download_limit is not None and (record.download_count or 0) >= record.download_limit:
+        return True
+    return False
+
+
+def _transfer_payload(record) -> dict:
+    """Shared response body for the detail and unlock endpoints. Raises
+    FileNotFoundError if the stored file is missing so callers can turn that
+    into the existing 404 message without duplicating the check."""
+    stored_name = safe_stored_filename(record.filename)
+    file_path = safe_join(app.config['UPLOAD_FOLDER'], stored_name)
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(file_path)
+
+    files_list = record.get_files_list()
+    if not files_list:
+        files_list = [{'name': stored_name, 'size': os.path.getsize(file_path)}]
+
+    return {
+        'files': files_list,
+        'expires_at': record.expires_at.isoformat(),
+        'sender_email': record.sender_email,
+        'message': record.message,
+    }
+
+
+@app.route('/transfer/<identifier>', methods=['GET'])
+def get_transfer_details(identifier):
     try:
-        record = FileUpload.query.get(file_id)
+        record = _find_transfer(identifier)
         if not record:
             return jsonify({'error': 'Not found'}), 404
-        if datetime.utcnow() > record.expires_at:
+        if _transfer_expired(record):
             return jsonify({'error': 'Link expired'}), 410
 
-        stored_name = safe_stored_filename(record.filename)
-        file_path = safe_join(app.config['UPLOAD_FOLDER'], stored_name)
-        if not os.path.exists(file_path):
-            return jsonify({'error': 'File missing on server'}), 404
+        # Never expose the file list or message before the password check --
+        # the frontend shows a password prompt and calls /unlock instead.
+        if record.password_hash:
+            return jsonify({'password_required': True}), 200
 
-        files_list = record.get_files_list()
-        if not files_list:
-            files_list = [{'name': stored_name, 'size': os.path.getsize(file_path)}]
-
-        return jsonify({
-            'files': files_list,
-            'expires_at': record.expires_at.isoformat(),
-            'sender_email': record.sender_email,
-            'message': record.message,
-        }), 200
+        return jsonify(_transfer_payload(record)), 200
+    except FileNotFoundError:
+        return jsonify({'error': 'File missing on server'}), 404
     except UnsafePathError:
         return jsonify({'error': 'Not found'}), 404
     except Exception:
@@ -700,19 +864,54 @@ def get_transfer_details(file_id):
         return jsonify({'error': 'Internal error'}), 500
 
 
-@app.route('/download/<file_id>', methods=['GET'])
-def download_file(file_id):
+@app.route('/transfer/<identifier>/unlock', methods=['POST', 'OPTIONS'])
+def unlock_transfer(identifier):
+    if request.method == 'OPTIONS':
+        return jsonify({'message': 'ok'}), 200
+    if not _rate_limit(_client_key()):
+        return jsonify({'error': 'Too many requests'}), 429
     try:
-        record = FileUpload.query.get(file_id)
+        record = _find_transfer(identifier)
         if not record:
             return jsonify({'error': 'Not found'}), 404
-        if datetime.utcnow() > record.expires_at:
+        if _transfer_expired(record):
             return jsonify({'error': 'Link expired'}), 410
+
+        if record.password_hash:
+            password = (request.get_json(silent=True) or {}).get('password') or ''
+            if not check_password_hash(record.password_hash, password):
+                return jsonify({'error': 'Incorrect password'}), 403
+
+        return jsonify(_transfer_payload(record)), 200
+    except FileNotFoundError:
+        return jsonify({'error': 'File missing on server'}), 404
+    except UnsafePathError:
+        return jsonify({'error': 'Not found'}), 404
+    except Exception:
+        app.logger.exception("transfer unlock failed")
+        return jsonify({'error': 'Internal error'}), 500
+
+
+@app.route('/download/<identifier>', methods=['GET'])
+def download_file(identifier):
+    try:
+        record = _find_transfer(identifier)
+        if not record:
+            return jsonify({'error': 'Not found'}), 404
+        if _transfer_expired(record):
+            return jsonify({'error': 'Link expired'}), 410
+
+        if record.password_hash:
+            password = request.headers.get('X-Transfer-Password', '')
+            if not check_password_hash(record.password_hash, password):
+                return jsonify({'error': 'Incorrect password'}), 403
 
         stored_name = safe_stored_filename(record.filename)
         file_path = safe_join(app.config['UPLOAD_FOLDER'], stored_name)
         if not os.path.exists(file_path):
             return jsonify({'error': 'File missing on server'}), 404
+
+        record.download_count = (record.download_count or 0) + 1
 
         if not record.downloaded:
             record.downloaded = True
@@ -721,17 +920,19 @@ def download_file(file_id):
                 record.notification_status_download = 'pending'
                 db.session.commit()
                 email_executor.submit(
-                    _send_download_notification_task, file_id, record.sender_email, smtp_config,
+                    _send_download_notification_task, record.id, record.sender_email, smtp_config,
                     normalize_language(record.language),
                 )
             except FileNotFoundError:
-                app.logger.error("SMTP config missing; download notification not dispatched for %s", file_id)
+                app.logger.error("SMTP config missing; download notification not dispatched for %s", record.id)
                 record.notification_status_download = 'failed'
                 record.notification_error_download = 'SMTP not configured'
                 db.session.commit()
             except Exception:
-                app.logger.exception("Failed to dispatch download notification for %s", file_id)
+                app.logger.exception("Failed to dispatch download notification for %s", record.id)
                 db.session.commit()
+        else:
+            db.session.commit()
 
         return send_from_directory(
             app.config['UPLOAD_FOLDER'],

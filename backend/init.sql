@@ -15,5 +15,9 @@ CREATE TABLE IF NOT EXISTS file_upload (
     notification_status_download VARCHAR(16) DEFAULT NULL,
     notification_error_download VARCHAR(500) DEFAULT NULL,
     message VARCHAR(2000) DEFAULT NULL, -- Optional sender message to the recipient
-    language VARCHAR(8) DEFAULT NULL -- Sender's UI language, used for every email on this transfer
+    language VARCHAR(8) DEFAULT NULL, -- Sender's UI language, used for every email on this transfer
+    slug VARCHAR(64) DEFAULT NULL, -- Human-readable public link
+    password_hash VARCHAR(255) DEFAULT NULL, -- Optional password gate (hashed)
+    download_limit INT DEFAULT NULL, -- Optional cap on successful downloads
+    download_count INT DEFAULT NULL -- Successful downloads so far
 );

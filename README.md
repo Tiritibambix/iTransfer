@@ -24,9 +24,13 @@ This application has been coded with the help of AI and is provided as-is. While
 ## Features
 
 - Upload files or folders via drag & drop
+- Resumable uploads (tus protocol): a dropped connection or closed laptop lid resumes from where it left off instead of restarting multi-GB transfers from zero
 - Automatic ZIP packaging for multiple files, direct download for single files
 - Streamed uploads and downloads with chunked hashing, suitable for multi-GB transfers
+- Human-readable transfer links (e.g. `quiet-river-still-dawn`) instead of a raw ID
+- Optional password protection and optional download-count limit per transfer
 - Configurable link expiration: 3, 5, 7 or 10 days
+- Full-bleed rotating background with a frosted-glass card, photos bundled locally (no third-party image service)
 - Email notifications: recipient on upload, sender on upload and on download, sent in the background with automatic retry on transient SMTP failures
 - Multilingual interface and emails (English, Français, Español, Deutsch, Italiano): one language, auto-detected from the browser with a manual switcher, applies to the whole UI and to every email sent from that session
 - Optional personal message to the recipient, shown in the notification email and on the download page
@@ -59,7 +63,8 @@ This application has been coded with the help of AI and is provided as-is. While
 │   │   ├── email_i18n.py    # Email translations (EN/FR/ES/DE/IT)
 │   │   ├── models.py        # Database models
 │   │   ├── paths.py         # Path sanitization (CodeQL sanitizer)
-│   │   └── routes.py        # API endpoints
+│   │   ├── routes.py        # API endpoints (incl. tus hooks + finalize)
+│   │   └── slug.py          # Human-readable transfer link generation
 │   ├── Dockerfile
 │   ├── init.sql
 │   └── run.py
@@ -71,6 +76,7 @@ This application has been coded with the help of AI and is provided as-is. While
 │   │   ├── Download.jsx     # Download page
 │   │   ├── Login.jsx        # Authentication
 │   │   ├── LanguageSelector.jsx # Language switcher
+│   │   ├── PageBackground.jsx # Rotating full-bleed background + photo credit
 │   │   ├── PrivateRoute.jsx # Route guard
 │   │   ├── api.js           # authFetch wrapper (handles expired sessions)
 │   │   ├── storage.js       # Safe localStorage access
@@ -113,6 +119,25 @@ services:
     networks:
       - itransfer-network
 
+  # Receives resumable (tus protocol) uploads and notifies the backend once
+  # each file is fully received. Not published on the host: the frontend's
+  # nginx proxies /files/ to it, and the backend calls it as a webhook, both
+  # over itransfer-network.
+  tusd:
+    image: tusproject/tusd:v2.10.1
+    command: >-
+      -behind-proxy
+      -hooks-http=http://backend:5000/api/tus-hooks?secret=changeme-tus-hook-secret
+      -hooks-enabled-events=pre-create,post-finish,post-terminate
+      -upload-dir=/data
+      -base-path=/files/
+    volumes:
+      - tusd-uploads:/data
+    networks:
+      - itransfer-network
+    depends_on:
+      - backend
+
   backend:
     image: tiritibambix/itransfer-backend
     ports:
@@ -124,9 +149,11 @@ services:
       - DATABASE_URL=mysql+mysqldb://mariadb_user:mariadb_pass@db/mariadb_db
       - TIMEZONE=Europe/Paris
       - JWT_SECRET_KEY=changeme       # Change this
+      - TUS_HOOK_SECRET=changeme-tus-hook-secret  # Change this; must match the tusd service above
     volumes:
       - ./backend/data:/app/data
       - ./backend/uploads:/app/uploads
+      - tusd-uploads:/data           # Same volume as tusd, so finished files can be moved out of it
     depends_on:
       db:
         condition: service_healthy
@@ -155,6 +182,9 @@ services:
 networks:
   itransfer-network:
     driver: bridge
+
+volumes:
+  tusd-uploads:
 ```
 
 ```bash
@@ -181,10 +211,21 @@ Nginx example:
 server {
     listen 443 ssl;
     server_name itransfer.yourdomain.tld;
+
+    # Resumable uploads (tus protocol) now flow through this server block too
+    # (proxied internally from here to tusd), so it needs the same large-body
+    # treatment as the backend block below.
+    client_max_body_size 0;
+    proxy_request_buffering off;
+    proxy_read_timeout 1800s;
+    proxy_send_timeout 1800s;
+    client_body_timeout 1800s;
+
     location / {
         proxy_pass http://localhost:3500;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
     }
 }
 
@@ -214,11 +255,11 @@ server {
 
 ### Large file uploads
 
-iTransfer is built for big transfers, but two layers in front of the app impose their own limits you need to raise for multi-GB files.
+iTransfer is built for big transfers, and uploads use the resumable (tus) protocol: a dropped connection or a closed laptop lid resumes from the last byte the server actually received instead of restarting the file from zero. Two layers in front of the app still impose their own limits you need to raise for multi-GB files.
 
-**Reverse proxy (required).** This is the most common reason a large upload fails with "Network error" while a small file works: nginx caps request bodies at 1 MB by default. Apply the directives shown in the backend server block above (`client_max_body_size`, the two `proxy_*_timeout` values, `client_body_timeout`, and `proxy_request_buffering off`). On Nginx Proxy Manager, paste them into the proxy host's *Advanced* tab. On Traefik there is no body-size limit by default, but raise the responding timeouts.
+**Reverse proxy (required).** This is the most common reason a large upload fails with "Network error" while a small file works: nginx caps request bodies at 1 MB by default. Uploads now reach the app through the **frontend** hostname (`/files/`, proxied internally to the `tusd` service), so apply the directives shown in *both* the frontend and backend server blocks above (`client_max_body_size`, the two `proxy_*_timeout` values, `client_body_timeout`, and `proxy_request_buffering off`). On Nginx Proxy Manager, paste them into both proxy hosts' *Advanced* tab. On Traefik there is no body-size limit by default, but raise the responding timeouts.
 
-**Backend (already tuned, optional).** Gunicorn runs threaded workers with a 30 minute request timeout by default, so slow multi-GB uploads and downloads are not cut off. Only if a single transfer can exceed 30 minutes on a slow link do you need to raise `GUNICORN_TIMEOUT` (see [Environment Variables](#environment-variables)).
+**Backend (already tuned, optional).** Gunicorn runs threaded workers with a 30 minute request timeout by default, so slow multi-GB downloads are not cut off (uploads no longer pass through Gunicorn at all -- `tusd` receives them directly). Only if a single download can exceed 30 minutes on a slow link do you need to raise `GUNICORN_TIMEOUT` (see [Environment Variables](#environment-variables)).
 
 ## SMTP Configuration
 
@@ -284,6 +325,7 @@ No configuration is required. To add or adjust a language, edit the per-language
 | `ADMIN_PASSWORD` | yes | (none) | Admin password |
 | `DATABASE_URL` | yes | SQLite fallback | MariaDB connection string |
 | `JWT_SECRET_KEY` | yes | random | JWT signing key, set a stable value |
+| `TUS_HOOK_SECRET` | yes | `changeme-tus-hook-secret` | Shared secret the `tusd` service must present on every call to `/api/tus-hooks`; must match the value baked into `tusd`'s `-hooks-http` URL |
 | `TIMEZONE` | no | `Europe/Paris` | Timezone for expiry display |
 | `FORCE_HTTPS` | no | `true` | Enforce HTTPS in generated URLs |
 | `PROXY_COUNT` | no | `1` | Number of reverse proxies in front |
@@ -306,7 +348,7 @@ Newer versions may add columns to the database schema automatically on startup (
 
 **Upload fails with "Network error" on large files (small files work)**
 
-Almost always the reverse proxy rejecting the request body. Raise `client_max_body_size`, set `proxy_request_buffering off`, and raise the proxy timeouts as described in [Large file uploads](#large-file-uploads). If the proxy is already configured and only very long transfers still cut off, raise `GUNICORN_TIMEOUT` on the backend.
+Almost always a reverse proxy rejecting the request body -- and since uploads go through the **frontend** hostname (`/files/`), check that proxy's config, not just the backend's. Raise `client_max_body_size`, set `proxy_request_buffering off`, and raise the proxy timeouts on both server blocks as described in [Large file uploads](#large-file-uploads). A dropped connection mid-upload should resume on its own (retries automatically for a short while); if it instead restarts from zero, confirm the outer proxy isn't buffering or rewriting the `/files/` requests.
 
 **Database not initializing**
 Make sure `backend/init.sql` exists before the first `docker compose up`. If the DB volume already exists without the table, run:

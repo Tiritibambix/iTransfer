@@ -39,6 +39,24 @@ class FileUpload(db.Model):
     notification_status_download = db.Column(db.String(16), nullable=True)
     notification_error_download = db.Column(db.String(500), nullable=True)
 
+    # Human-readable public link (e.g. "quiet-river-still-dawn"), generated at
+    # upload time. The id (uuid) above stays the real primary key and the temp
+    # directory name; slug only ever appears in URLs. Nullable so rows created
+    # before this column existed keep resolving by id (see the fallback
+    # lookup in routes.py).
+    slug = db.Column(db.String(64), nullable=True)
+
+    # Optional password gate on the transfer. Holds a werkzeug password hash,
+    # never the plaintext value.
+    password_hash = db.Column(db.String(255), nullable=True)
+
+    # Optional cap on successful downloads, on top of the existing time-based
+    # expiry. NULL means unlimited (the historical default). download_count
+    # is nullable rather than NOT NULL DEFAULT 0 so it fits the same additive
+    # migration path as every other column here; treat a NULL as 0 when read.
+    download_limit = db.Column(db.Integer, nullable=True)
+    download_count = db.Column(db.Integer, nullable=True)
+
     def set_files_list(self, files):
         self.files_list = json.dumps(files) if files else None
 

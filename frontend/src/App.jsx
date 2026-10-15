@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
+import * as tus from 'tus-js-client'
 import { getToken, clearToken } from './storage'
 import { useT } from './i18n'
 import Header from './Header'
 import Footer from './Footer'
+import PageBackground from './PageBackground'
 
 const backendUrl = window.BACKEND_URL
 const MAX_MESSAGE_LENGTH = 2000
@@ -37,11 +39,18 @@ export default function App() {
   const [expirationDays, setExpirationDays] = useState(7)
   const [showMessage, setShowMessage] = useState(false)
   const [message, setMessage] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [password, setPassword] = useState('')
+  const [showDownloadLimit, setShowDownloadLimit] = useState(false)
+  const [downloadLimit, setDownloadLimit] = useState('')
   const [dragActive, setDragActive] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [uploadPct, setUploadPct] = useState(0)
   const [toast, setToast] = useState(null)
-  const xhrRef = useRef(null)
+  const uploadsRef = useRef([])
+  const rejectorsRef = useRef([])
+  const progressRef = useRef({})
+  const cancelledRef = useRef(false)
 
   useEffect(() => {
     if ('Notification' in window && Notification.permission === 'default')
@@ -127,52 +136,107 @@ export default function App() {
 
   const removeItem = (idx) => setItems(prev => prev.filter((_, i) => i !== idx))
 
+  // One tus.Upload per file, sent through this origin's own /files/ proxy
+  // (see nginx.conf) straight to the tusd service. tus-js-client's built-in
+  // retryDelays resumes a PATCH from the last byte the server actually
+  // persisted after a dropped connection, instead of restarting the file
+  // from zero -- the whole point of using tus for large transfers.
+  const uploadOne = (item, idx, transferId, token) => new Promise((resolve, reject) => {
+    rejectorsRef.current[idx] = reject
+    progressRef.current[idx] = { loaded: 0, total: item.size }
+    const upload = new tus.Upload(item.file, {
+      endpoint: `${window.location.origin}/files/`,
+      retryDelays: [0, 1000, 3000, 5000, 10000],
+      headers: { Authorization: `Bearer ${token}` },
+      metadata: { transfer_id: transferId, relative_path: item.path, filename: item.name },
+      onProgress: (bytesSent, bytesTotal) => {
+        progressRef.current[idx] = { loaded: bytesSent, total: bytesTotal }
+        const entries = Object.values(progressRef.current)
+        const loaded = entries.reduce((a, e) => a + e.loaded, 0)
+        const total = entries.reduce((a, e) => a + e.total, 0)
+        setUploadPct(total ? Math.round(loaded * 100 / total) : 0)
+      },
+      onSuccess: () => resolve(),
+      onError: (err) => reject(err),
+    })
+    uploadsRef.current[idx] = upload
+    upload.start()
+  })
+
   const handleUpload = async () => {
     if (!items.length) return showToast(t('app.errNoFiles'), 'warning')
     if (!recipientEmail) return showToast(t('app.errRecipient'), 'warning')
     if (!senderEmail) return showToast(t('app.errSender'), 'warning')
 
-    const fd = new FormData()
-    fd.append('email', recipientEmail)
-    fd.append('sender_email', senderEmail)
-    fd.append('expiration_days', expirationDays)
-    fd.append('language', lang)
-    if (message.trim()) fd.append('message', message.trim())
-    fd.append('files_list', JSON.stringify(items.map(i => ({ name: i.path, size: i.size }))))
-    items.forEach(i => { fd.append('files[]', i.file); fd.append('paths[]', i.path) })
-
+    const transferId = crypto.randomUUID()
+    const token = getToken() || ''
+    progressRef.current = {}
+    uploadsRef.current = []
+    rejectorsRef.current = []
+    cancelledRef.current = false
     setUploading(true); setUploadPct(0)
 
-    const xhr = new XMLHttpRequest()
-    xhrRef.current = xhr
-    xhr.open('POST', `${backendUrl}/upload`, true)
-    xhr.setRequestHeader('Authorization', `Bearer ${getToken() || ''}`)
-    xhr.upload.onprogress = (e) => {
-      if (e.lengthComputable) setUploadPct(Math.round(e.loaded * 100 / e.total))
-    }
-    xhr.onload = () => {
-      setUploading(false)
-      if (xhr.status === 200) {
-        showToast(t('app.success'), 'success')
-        setItems([]); setRecipientEmail(''); setSenderEmail(''); setMessage(''); setShowMessage(false); setUploadPct(0)
-      } else if (xhr.status === 401) {
+    try {
+      const CONCURRENCY = 3
+      let next = 0
+      const runWorker = async () => {
+        while (next < items.length && !cancelledRef.current) {
+          const i = next++
+          await uploadOne(items[i], i, transferId, token)
+        }
+      }
+      await Promise.all(Array.from({ length: Math.min(CONCURRENCY, items.length) }, runWorker))
+
+      const res = await fetch(`${backendUrl}/api/transfers/finalize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          transfer_id: transferId,
+          email: recipientEmail,
+          sender_email: senderEmail,
+          expiration_days: expirationDays,
+          language: lang,
+          message: message.trim() || undefined,
+          password: password || undefined,
+          download_limit: downloadLimit || undefined,
+          files_list: items.map(i => ({ name: i.path, size: i.size })),
+        }),
+      })
+      if (res.status === 401) {
         clearToken()
         window.location.assign('/login')
-      } else {
-        let msg = t('app.failed')
-        try { msg = JSON.parse(xhr.responseText).error || msg } catch {}
-        showToast(msg, 'error')
+        return
       }
+      if (!res.ok) {
+        let msg = t('app.failed')
+        try { msg = (await res.json()).error || msg } catch { /* non-JSON error body */ }
+        throw new Error(msg)
+      }
+
+      showToast(t('app.success'), 'success')
+      setItems([]); setRecipientEmail(''); setSenderEmail(''); setMessage(''); setShowMessage(false)
+      setPassword(''); setShowPassword(false); setDownloadLimit(''); setShowDownloadLimit(false); setUploadPct(0)
+    } catch (err) {
+      if (!cancelledRef.current) {
+        uploadsRef.current.forEach(u => u?.abort(true).catch(() => {}))
+        showToast(err?.message || t('app.networkError'), 'error')
+      }
+    } finally {
+      setUploading(false)
     }
-    xhr.onerror = () => { setUploading(false); showToast(t('app.networkError'), 'error') }
-    xhr.send(fd)
   }
 
-  const cancelUpload = () => { xhrRef.current?.abort(); setUploading(false); setUploadPct(0) }
+  const cancelUpload = () => {
+    cancelledRef.current = true
+    uploadsRef.current.forEach(u => u?.abort(true).catch(() => {}))
+    rejectorsRef.current.forEach(r => r?.(new Error('cancelled')))
+    setUploading(false); setUploadPct(0)
+  }
   const totalSize = items.reduce((acc, i) => acc + i.size, 0)
 
   return (
     <div className="page page--centered">
+      <PageBackground />
       <div className="container">
         <Header>
           <button className="btn btn--ghost btn--sm" onClick={() => navigate('/admin')}>
@@ -226,6 +290,32 @@ export default function App() {
             ) : (
               <button type="button" className="link-action" onClick={() => setShowMessage(true)} disabled={uploading}>
                 {t('app.addMessage')}
+              </button>
+            )}
+
+            {showPassword ? (
+              <div className="field">
+                <label className="field__label">{t('app.password')}</label>
+                <input className="input" type="password" autoFocus
+                  placeholder={t('app.passwordPlaceholder')}
+                  value={password} onChange={e => setPassword(e.target.value)} disabled={uploading} />
+              </div>
+            ) : (
+              <button type="button" className="link-action" onClick={() => setShowPassword(true)} disabled={uploading}>
+                {t('app.addPassword')}
+              </button>
+            )}
+
+            {showDownloadLimit ? (
+              <div className="field">
+                <label className="field__label">{t('app.downloadLimit')}</label>
+                <input className="input" type="number" min="1" step="1" autoFocus
+                  placeholder={t('app.downloadLimitPlaceholder')}
+                  value={downloadLimit} onChange={e => setDownloadLimit(e.target.value)} disabled={uploading} />
+              </div>
+            ) : (
+              <button type="button" className="link-action" onClick={() => setShowDownloadLimit(true)} disabled={uploading}>
+                {t('app.addDownloadLimit')}
               </button>
             )}
 

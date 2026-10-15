@@ -19,6 +19,20 @@ def _decode_token(token: str) -> dict:
     return jwt.decode(token, current_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
 
 
+def verify_bearer_header(header: str) -> bool:
+    """Validate a raw "Authorization: Bearer <token>" header value outside of
+    a normal Flask request/view -- e.g. from a webhook payload that merely
+    forwards the original request's headers. Returns True iff valid."""
+    if not header or not header.startswith('Bearer '):
+        return False
+    token = header[len('Bearer '):].strip()
+    try:
+        _decode_token(token)
+        return True
+    except jwt.InvalidTokenError:
+        return False
+
+
 def require_auth(view):
     """Decorator that rejects requests without a valid bearer token."""
     @wraps(view)

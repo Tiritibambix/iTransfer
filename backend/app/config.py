@@ -50,6 +50,19 @@ class Config:
 
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024 * 1024  # 50 GB
 
+    # Shared secret the tusd service must present (as a query string on the
+    # -hooks-http URL) on every call to /api/tus-hooks, so that endpoint
+    # can't be driven by an arbitrary caller on the docker network or the
+    # backend's published host port. Not a per-session credential, just
+    # proof the caller is the configured tusd instance.
+    TUS_HOOK_SECRET = os.environ.get('TUS_HOOK_SECRET', 'changeme-tus-hook-secret')
+
+    # Root of tusd's own filestore (the `-upload-dir` tusd is started with).
+    # Must match the path inside *this* container where the same named
+    # volume is mounted -- see docker-compose.yml. Used only to sanity-check
+    # paths reported by the post-finish hook before touching them.
+    TUSD_DATA_DIR = os.environ.get('TUSD_DATA_DIR', '/data')
+
     # Admin credentials (no defaults: failing closed is safer than shipping
     # known credentials).
     ADMIN_USERNAME = os.environ.get('ADMIN_USERNAME')

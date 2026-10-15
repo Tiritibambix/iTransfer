@@ -102,6 +102,47 @@ body {
   width: 100%;
 }
 
+/* ---- Full-bleed rotating background (behind every page) ----
+   Fixed + negative z-index so it never needs the page content to set up
+   its own stacking context; <PageBackground> just renders this once per
+   page, crossfading between a few bundled photos. */
+.page-backgrounds {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  background: var(--clr-bg);
+}
+
+.page-backgrounds__item {
+  position: absolute;
+  inset: 0;
+  background-size: cover;
+  background-position: center;
+  opacity: 0;
+  transition: opacity 1.6s ease-in-out;
+}
+
+.page-backgrounds__item--active {
+  opacity: 1;
+}
+
+.page-backgrounds__credit {
+  position: fixed;
+  right: 14px;
+  bottom: 14px;
+  z-index: 1;
+  margin: 0;
+  padding: 4px 10px;
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.9);
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 999px;
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  pointer-events: none;
+}
+
 /* ---- Layout ---- */
 .page {
   flex: 1;
@@ -139,13 +180,28 @@ body {
   }
 }
 
-/* ---- Card ---- */
+/* ---- Card ----
+   Frosted glass over the rotating background: translucent white + blur
+   rather than a flat opaque fill. The blur itself does most of the work
+   for text contrast (it flattens whatever photo detail sits behind it),
+   the opacity is just a bit of extra insurance against a very bright sky. */
 .card {
-  background: var(--clr-surface-1);
-  border: 1px solid var(--clr-border);
+  background: rgba(255, 255, 255, 0.78);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: var(--radius-lg);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-lg);
   overflow: hidden;
+}
+
+/* Browsers without backdrop-filter support (rare in 2026) get a fully
+   opaque card instead of a half-transparent one with no blur to hide
+   what's behind it, which would hurt legibility rather than look glassy. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .card {
+    background: var(--clr-surface-1);
+  }
 }
 
 .card__body { padding: var(--sp-6); }

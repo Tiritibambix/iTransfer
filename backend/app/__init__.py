@@ -132,6 +132,10 @@ def _ensure_notification_columns() -> None:
         'notification_error_download': 'VARCHAR(500)',
         'message': 'VARCHAR(2000)',
         'language': 'VARCHAR(8)',
+        'slug': 'VARCHAR(64)',
+        'password_hash': 'VARCHAR(255)',
+        'download_limit': 'INT',
+        'download_count': 'INT',
     }
 
     is_mysql = db.engine.dialect.name in ('mysql', 'mariadb')
@@ -244,11 +248,47 @@ def _cleanup_expired_files() -> None:
         app.logger.exception("Cleanup task failed")
 
 
+def _cleanup_orphaned_temp_dirs() -> None:
+    """Remove temp/<transfer_id> directories left behind by a tus upload
+    that finished receiving some files (via the post-finish hook) but whose
+    transfer was then abandoned -- the browser tab closed, the user hit
+    cancel, or finalize never got called. Age-gated so a transfer still in
+    progress is never touched.
+    """
+    import shutil
+    from datetime import timedelta
+    from .models import FileUpload
+    temp_root = os.path.join(app.config['UPLOAD_FOLDER'], 'temp')
+    if not os.path.isdir(temp_root):
+        return
+    max_age = timedelta(hours=48)
+    now = time.time()
+    try:
+        for name in os.listdir(temp_root):
+            path = os.path.join(temp_root, name)
+            if not os.path.isdir(path):
+                continue
+            try:
+                age = now - os.path.getmtime(path)
+                if age < max_age.total_seconds():
+                    continue
+                if FileUpload.query.get(name) is not None:
+                    continue  # a finalize is mid-flight or raced with this sweep
+                shutil.rmtree(path, ignore_errors=True)
+                app.logger.info("Removed orphaned upload temp directory %s", name)
+            except Exception:
+                app.logger.exception("Failed to inspect/remove temp directory %s", name)
+    except Exception:
+        app.logger.exception("Orphaned temp directory cleanup failed")
+
+
 def _run_scheduler() -> None:
     with app.app_context():
         # Run once at startup to catch files that expired while the container was down.
         _cleanup_expired_files()
+        _cleanup_orphaned_temp_dirs()
         schedule.every(12).hours.do(_cleanup_expired_files)
+        schedule.every(12).hours.do(_cleanup_orphaned_temp_dirs)
         while True:
             schedule.run_pending()
             time.sleep(60)  # Check every minute so scheduled jobs fire on time

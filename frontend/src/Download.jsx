@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useT } from './i18n'
 import Header from './Header'
 import Footer from './Footer'
+import PageBackground from './PageBackground'
 
 const backendUrl = window.BACKEND_URL
 
@@ -31,6 +32,18 @@ export default function Download() {
   const [error, setError] = useState(null)
   const [downloading, setDownloading] = useState(false)
   const [done, setDone] = useState(false)
+  const [passwordRequired, setPasswordRequired] = useState(false)
+  const [passwordInput, setPasswordInput] = useState('')
+  const [unlockPassword, setUnlockPassword] = useState(null)
+  const [passwordError, setPasswordError] = useState(false)
+  const [unlocking, setUnlocking] = useState(false)
+
+  const applyTransferData = (data) => {
+    setFiles(data.files || [])
+    setExpiresAt(data.expires_at)
+    setSenderEmail(data.sender_email)
+    setMessage(data.message || null)
+  }
 
   useEffect(() => {
     fetch(`${backendUrl}/transfer/${transferId}`)
@@ -39,19 +52,48 @@ export default function Download() {
         return r.json()
       })
       .then(data => {
-        setFiles(data.files || [])
-        setExpiresAt(data.expires_at)
-        setSenderEmail(data.sender_email)
-        setMessage(data.message || null)
+        if (data.password_required) {
+          setPasswordRequired(true)
+        } else {
+          applyTransferData(data)
+        }
         setLoading(false)
       })
       .catch(e => { setError(e.message); setLoading(false) })
   }, [transferId])
 
+  const handleUnlock = async (e) => {
+    e.preventDefault()
+    setUnlocking(true)
+    setPasswordError(false)
+    try {
+      const r = await fetch(`${backendUrl}/transfer/${transferId}/unlock`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: passwordInput }),
+      })
+      if (r.status === 403) {
+        setPasswordError(true)
+        return
+      }
+      if (!r.ok) throw new Error(r.status === 410 ? 'expired' : 'invalid')
+      const data = await r.json()
+      applyTransferData(data)
+      setUnlockPassword(passwordInput)
+      setPasswordRequired(false)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setUnlocking(false)
+    }
+  }
+
   const handleDownload = async () => {
     setDownloading(true)
     try {
-      const r = await fetch(`${backendUrl}/download/${transferId}`)
+      const r = await fetch(`${backendUrl}/download/${transferId}`, {
+        headers: unlockPassword ? { 'X-Transfer-Password': unlockPassword } : {},
+      })
       if (!r.ok) throw new Error('downloadFailed')
       const blob = await r.blob()
       const cd = r.headers.get('Content-Disposition') || ''
@@ -75,18 +117,36 @@ export default function Download() {
 
   if (loading) return (
     <div className="page page--centered">
+      <PageBackground />
       <span className="spinner spinner--lg" />
     </div>
   )
 
   return (
     <div className="page page--centered">
+      <PageBackground />
       <div className="container--narrow">
 
         <Header />
 
         {error ? (
           <div className="toast toast--error">{errorText}</div>
+        ) : passwordRequired ? (
+          <div className="card">
+            <form className="card__body flex-col gap-4" onSubmit={handleUnlock}>
+              <p className="section-title" style={{ margin: 0 }}>{t('dl.passwordTitle')}</p>
+              <div className="field">
+                <input className="input" type="password" autoFocus
+                  placeholder={t('dl.passwordPlaceholder')}
+                  value={passwordInput} onChange={e => { setPasswordInput(e.target.value); setPasswordError(false) }}
+                  disabled={unlocking} />
+              </div>
+              {passwordError && <div className="toast toast--error">{t('dl.incorrectPassword')}</div>}
+              <button type="submit" className="btn btn--primary btn--full btn--lg" disabled={unlocking || !passwordInput}>
+                {unlocking ? <><span className="spinner" />{t('dl.preparing')}</> : t('dl.unlock')}
+              </button>
+            </form>
+          </div>
         ) : (
           <div className="card">
             <div className="card__body flex-col gap-5">

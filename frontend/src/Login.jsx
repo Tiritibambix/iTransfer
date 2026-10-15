@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { setToken } from './storage'
 import { useT } from './i18n'
 import Header from './Header'
+import PageBackground from './PageBackground'
 
 const backendUrl = window.BACKEND_URL
 
@@ -45,6 +46,7 @@ export default function Login() {
 
   return (
     <div className="page page--centered">
+      <PageBackground />
       <div className="container--narrow">
 
         <Header />

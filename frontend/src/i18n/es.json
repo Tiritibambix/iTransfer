@@ -13,6 +13,12 @@
   "app.addMessage": "+ Añadir un mensaje",
   "app.message": "Mensaje para el destinatario",
   "app.messagePlaceholder": "Añade un breve mensaje...",
+  "app.addPassword": "+ Añadir una contraseña",
+  "app.password": "Contraseña",
+  "app.passwordPlaceholder": "Introduce una contraseña",
+  "app.addDownloadLimit": "+ Limitar descargas",
+  "app.downloadLimit": "Límite de descargas",
+  "app.downloadLimitPlaceholder": "ej. 1",
   "app.dropTitle": "Suelta archivos o carpetas aquí",
   "app.selectFiles": "seleccionar archivos",
   "app.selectFolder": "seleccionar una carpeta",
@@ -33,6 +39,7 @@
 
   "footer.text": "iTransfer es software libre distribuido bajo la licencia GPL-3.0.",
   "footer.github": "Ver en GitHub",
+  "footer.photoCredit": "Crédito de la foto: {name}",
 
   "dl.sentBy": "Enviado por",
   "dl.expiresOn": "Caduca el {date}",
@@ -44,6 +51,10 @@
   "dl.linkExpired": "Este enlace ha caducado.",
   "dl.invalidLink": "Enlace no válido o desconocido.",
   "dl.downloadFailed": "La descarga falló.",
+  "dl.passwordTitle": "Esta transferencia está protegida con contraseña",
+  "dl.passwordPlaceholder": "Introduce la contraseña",
+  "dl.unlock": "Desbloquear",
+  "dl.incorrectPassword": "Contraseña incorrecta.",
 
   "login.title": "Iniciar sesión",
   "login.username": "Usuario",
