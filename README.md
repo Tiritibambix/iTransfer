@@ -303,7 +303,7 @@ v=DMARC1; p=quarantine; rua=mailto:dmarc-reports@yourdomain.tld
 | Gmail / Google Workspace | Admin console → Apps → Google Workspace → Gmail → Authenticate email |
 | Office 365 | Microsoft 365 Defender → Policies & rules → Email authentication settings → DKIM |
 
-### Re-verify, don't rely on memory
+### Re-check periodically
 
 DNS records drift: a registrar UI change can silently overwrite a TXT record, another service added later can introduce a second conflicting SPF record, or a DMARC policy set to `p=none` years ago may never have been tightened. "I checked this a while ago" is not the same as "this is correct right now." Use the **Check deliverability** button in the admin SMTP tab to re-run live SPF/DMARC/(optional DKIM) DNS lookups any time mail seems to be landing in spam, especially after any DNS or registrar change, and periodically even if nothing else changed.
 
