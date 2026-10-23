@@ -48,6 +48,7 @@ This application has been coded with the help of AI and is provided as-is. While
 |---|---|
 | Frontend | React 18 + Vite |
 | Backend | Python / Flask + Gunicorn |
+| Resumable uploads | [tusd](https://github.com/tus/tusd) (tus protocol), hook-driven handoff to the backend |
 | Database | MariaDB |
 | Containerization | Docker + Docker Compose |
 
@@ -351,6 +352,8 @@ No configuration is required. To add or adjust a language, edit the per-language
 ## Upgrading
 
 Newer versions may add columns to the database schema automatically on startup (additive only, existing data is never dropped or rewritten). As with any schema change, back up `./db_data` before pulling a new image version.
+
+**Breaking change if you're upgrading from before resumable uploads:** the old synchronous `/upload` endpoint is gone, replaced entirely by the `tusd`-based flow described in [Quick Start](#quick-start-local). If your `docker-compose.yml` predates this, uploads will fail outright until you add the `tusd-init` and `tusd` services, the `tusd-uploads` volume, mount that same volume into `backend` at `/data`, and set `TUS_HOOK_SECRET` (same value on both `backend` and in `tusd`'s `-hooks-http` URL) -- copy the full example from Quick Start rather than patching your existing file piecemeal, it's easy to miss one of the pieces.
 
 ## Troubleshooting
 

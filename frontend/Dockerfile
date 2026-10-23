@@ -2,6 +2,12 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
+# node:20-alpine ships npm 10.8.2, which has a known arborist bug
+# ("Cannot read properties of null (reading 'edgesOut')") that can crash
+# `npm install` while resolving the dependency tree from package.json alone
+# (no lockfile in this repo). Upgrading npm first avoids it.
+RUN npm install -g npm@latest
+
 COPY frontend/package.json ./
 RUN npm install
 
