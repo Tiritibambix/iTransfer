@@ -27,6 +27,19 @@ services:
       - ./frontend:/app
       - /app/node_modules
 
+  # One-shot init container: the official tusd image runs as a non-root
+  # user (uid 1000), but a freshly created bind mount or named volume is
+  # owned by root, so tusd fails every upload with "permission denied"
+  # until something chowns it. Runs once, exits, then tusd is allowed to
+  # start -- cheap enough to leave in on every `docker compose up`.
+  tusd-init:
+    image: busybox:latest
+    command: ["sh", "-c", "chown -R 1000:1000 /data"]
+    volumes:
+      - tusd-uploads:/data
+    networks:
+      - itransfer-network
+
   # tusd service: receives resumable (tus protocol) uploads directly and
   # notifies the backend by webhook once each file is fully received. Not
   # published on the host: only the frontend's nginx (via /files/) and the
@@ -44,7 +57,10 @@ services:
     networks:
       - itransfer-network
     depends_on:
-      - backend
+      tusd-init:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
     restart: always
 
   # Backend service: Flask application
