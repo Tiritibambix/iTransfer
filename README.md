@@ -123,7 +123,10 @@ services:
   # One-shot init container: the official tusd image runs as a non-root
   # user (uid 1000), but a freshly created volume is owned by root, so tusd
   # fails every upload with "permission denied" until something chowns it.
-  # Runs once, exits, then tusd is allowed to start.
+  # This runs the chown, exits (status 0), and tusd only starts once it has
+  # -- `docker compose ps` / `docker ps` will show tusd-init as "Exited (0)"
+  # once the stack is up, which is expected, not a crash. It isn't a
+  # long-running service, so there's nothing to restart or remove.
   tusd-init:
     image: busybox:latest
     command: ["sh", "-c", "chown -R 1000:1000 /data"]
@@ -379,6 +382,10 @@ or, for a named volume, via a disposable container that mounts it:
 docker run --rm -v <volume-name>:/data busybox chown -R 1000:1000 /data
 ```
 then `docker compose restart tusd`.
+
+**`tusd-init` shows as "Exited" in `docker ps` / `docker compose ps`**
+
+Expected, not a problem. `tusd-init` only runs the one chown above and exits immediately (status 0); it isn't a long-running service. `tusd` itself waits on that exit (`depends_on: tusd-init: condition: service_completed_successfully`) before it starts. Leave it in the compose file as-is, including on every future `docker compose up` -- it's cheap and keeps the fix working automatically if the volume is ever recreated.
 
 **Database not initializing**
 Make sure `backend/init.sql` exists before the first `docker compose up`. If the DB volume already exists without the table, run:
