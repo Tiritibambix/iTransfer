@@ -2,17 +2,15 @@ FROM node:20-alpine AS builder
 
 WORKDIR /app
 
-# node:20-alpine ships npm 10.8.2, which has a known arborist bug
-# ("Cannot read properties of null (reading 'edgesOut')") that can crash
-# `npm install` while resolving the dependency tree from package.json alone
-# (no lockfile in this repo). Pinned to the latest 10.x patch rather than
-# `@latest`: npm 12 requires Node >=22, which node:20-alpine doesn't have,
-# and `@latest` is a moving target that will break this build again the
-# next time npm cuts a major that drops Node 20 support.
-RUN npm install -g npm@10.9.9
-
+# --legacy-peer-deps works around a live npm/arborist bug (confirmed open
+# upstream: npm/cli#9787) that crashes `npm install` with "Cannot read
+# properties of null (reading 'edgesOut')" while auto-resolving an optional,
+# self-referential peer-dependency set -- the shape vite's own tooling
+# declares. Not an npm-version issue (reproduces on 10.8.2 through 10.9.9,
+# and differently even on 11.x); this flag skips that resolution path
+# entirely instead of auto-installing those peers.
 COPY frontend/package.json ./
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 COPY frontend/ .
 RUN npm run build
