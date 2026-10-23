@@ -119,6 +119,18 @@ services:
     networks:
       - itransfer-network
 
+  # One-shot init container: the official tusd image runs as a non-root
+  # user (uid 1000), but a freshly created volume is owned by root, so tusd
+  # fails every upload with "permission denied" until something chowns it.
+  # Runs once, exits, then tusd is allowed to start.
+  tusd-init:
+    image: busybox:latest
+    command: ["sh", "-c", "chown -R 1000:1000 /data"]
+    volumes:
+      - tusd-uploads:/data
+    networks:
+      - itransfer-network
+
   # Receives resumable (tus protocol) uploads and notifies the backend once
   # each file is fully received. Not published on the host: the frontend's
   # nginx proxies /files/ to it, and the backend calls it as a webhook, both
@@ -136,7 +148,10 @@ services:
     networks:
       - itransfer-network
     depends_on:
-      - backend
+      tusd-init:
+        condition: service_completed_successfully
+      backend:
+        condition: service_started
 
   backend:
     image: tiritibambix/itransfer-backend
@@ -349,6 +364,18 @@ Newer versions may add columns to the database schema automatically on startup (
 **Upload fails with "Network error" on large files (small files work)**
 
 Almost always a reverse proxy rejecting the request body -- and since uploads go through the **frontend** hostname (`/files/`), check that proxy's config, not just the backend's. Raise `client_max_body_size`, set `proxy_request_buffering off`, and raise the proxy timeouts on both server blocks as described in [Large file uploads](#large-file-uploads). A dropped connection mid-upload should resume on its own (retries automatically for a short while); if it instead restarts from zero, confirm the outer proxy isn't buffering or rewriting the `/files/` requests.
+
+**Upload fails with `500` / "permission denied" on `tusd`'s logs**
+
+The official `tusd` image runs as a non-root user (uid 1000), but a freshly created volume or bind mount is owned by root, so `tusd` can't write to it. The `tusd-init` container in the example `docker-compose.yml` fixes this automatically on every `docker compose up`. If you're on an older compose file without it, fix it by hand once -- either directly on the host if you're using a bind mount:
+```bash
+sudo chown -R 1000:1000 <your bind-mounted path>
+```
+or, for a named volume, via a disposable container that mounts it:
+```bash
+docker run --rm -v <volume-name>:/data busybox chown -R 1000:1000 /data
+```
+then `docker compose restart tusd`.
 
 **Database not initializing**
 Make sure `backend/init.sql` exists before the first `docker compose up`. If the DB volume already exists without the table, run:
