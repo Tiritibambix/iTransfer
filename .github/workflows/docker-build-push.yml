@@ -159,6 +159,14 @@ jobs:
       # mysqlclient has no prebuilt wheel. backend/Dockerfile installs
       # exactly these system packages before its own `pip install`; mirror
       # that here instead of fighting pip-audit's flags.
+      # CVE-2026-114605 (dnspython): the only fixed releases, 2.9.0 and
+      # 2.9.1, require Python >=3.11. This project's backend runs on
+      # python:3.10-slim (see backend/Dockerfile), and so does this audit
+      # container -- there is no installable fix for this codebase's actual
+      # Python version. Ignored explicitly rather than left to fail the
+      # build on a vulnerability with no available remediation here;
+      # revisit (drop --ignore-vuln, bump dnspython) if the project's
+      # Python base image is ever raised to 3.11+.
       - name: Check dependencies with pip-audit
         run: |
           docker run --rm -v $(pwd):/app -w /app python:3.10-slim sh -c " \
@@ -168,7 +176,7 @@ jobs:
           . venv/bin/activate && \
           pip install --upgrade pip setuptools && \
           pip install pip-audit && \
-          pip-audit -r requirements.txt"
+          pip-audit -r requirements.txt --ignore-vuln CVE-2026-114605"
 
   build-push-backend:
     runs-on: ubuntu-24.04
