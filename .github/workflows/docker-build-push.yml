@@ -152,24 +152,23 @@ jobs:
       # resolves and audits requirements.txt specifically, so the report is
       # scoped to what iTransfer actually ships.
       #
-      # `--no-deps` on top of that: without it, `-r` resolution still runs
-      # a real `pip install --dry-run` under the hood, which invokes each
-      # package's PEP 517 build backend to get metadata. mysqlclient has no
-      # prebuilt wheel and its backend shells out to `pkg-config` to find
-      # the MySQL/MariaDB client headers -- absent from the bare
-      # python:3.10-slim image here (the actual backend Dockerfile installs
-      # them, this throwaway audit container never needs to). `--no-deps`
-      # skips resolution entirely and audits the pinned package==version
-      # pairs directly, which requirements.txt already supports since every
-      # line is pinned with `==`.
+      # Even with `--no-deps`, pip-audit's `-r` mode still shells out to a
+      # real `pip install --dry-run` to resolve/report on each entry, which
+      # invokes mysqlclient's PEP 517 build backend for metadata -- it needs
+      # `pkg-config` and the MySQL/MariaDB client headers to do that at all,
+      # mysqlclient has no prebuilt wheel. backend/Dockerfile installs
+      # exactly these system packages before its own `pip install`; mirror
+      # that here instead of fighting pip-audit's flags.
       - name: Check dependencies with pip-audit
         run: |
           docker run --rm -v $(pwd):/app -w /app python:3.10-slim sh -c " \
+          apt-get update && \
+          apt-get install -y --no-install-recommends build-essential default-libmysqlclient-dev pkg-config && \
           python -m venv venv && \
           . venv/bin/activate && \
           pip install --upgrade pip setuptools && \
           pip install pip-audit && \
-          pip-audit --no-deps -r requirements.txt"
+          pip-audit -r requirements.txt"
 
   build-push-backend:
     runs-on: ubuntu-24.04
