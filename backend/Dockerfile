@@ -1,5 +1,5 @@
 # Utiliser une image Python légère
-FROM python:3.10-slim
+FROM python:3.11-slim
 
 # Installer les bibliothèques nécessaires pour mysqlclient et autres dépendances
 RUN apt-get update && apt-get install -y \
