@@ -50,6 +50,7 @@ services:
       -behind-proxy
       -hooks-http=http://backend:5000/api/tus-hooks?secret=${TUS_HOOK_SECRET:-changeme-tus-hook-secret}
       -hooks-enabled-events=pre-create,post-finish,post-terminate
+      -hooks-http-forward-headers=Authorization
       -upload-dir=/data
       -base-path=/files/
     volumes:
