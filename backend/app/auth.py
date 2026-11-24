@@ -22,14 +22,29 @@ def _decode_token(token: str) -> dict:
 def verify_bearer_header(header: str) -> bool:
     """Validate a raw "Authorization: Bearer <token>" header value outside of
     a normal Flask request/view -- e.g. from a webhook payload that merely
-    forwards the original request's headers. Returns True iff valid."""
-    if not header or not header.startswith('Bearer '):
+    forwards the original request's headers. Returns True iff valid.
+
+    Logs the specific rejection reason (never the token itself) so a 401
+    here can be diagnosed from the logs instead of guessed at -- this
+    endpoint has no browser-visible response body to inspect."""
+    if not header:
+        current_app.logger.warning("Bearer token rejected: no Authorization header present")
+        return False
+    if not header.startswith('Bearer '):
+        current_app.logger.warning(
+            "Bearer token rejected: Authorization header present but not a Bearer token (starts with: %r)",
+            header[:15],
+        )
         return False
     token = header[len('Bearer '):].strip()
     try:
         _decode_token(token)
         return True
-    except jwt.InvalidTokenError:
+    except jwt.ExpiredSignatureError:
+        current_app.logger.warning("Bearer token rejected: expired")
+        return False
+    except jwt.InvalidTokenError as exc:
+        current_app.logger.warning("Bearer token rejected: invalid (%s: %s)", type(exc).__name__, exc)
         return False
 
 

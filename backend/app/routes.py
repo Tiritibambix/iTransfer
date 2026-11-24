@@ -540,6 +540,11 @@ def _tus_reject(status: int, message: str):
 def _tus_hook_pre_create(event: dict):
     headers = (event.get('HTTPRequest') or {}).get('Header') or {}
     auth_values = headers.get('Authorization') or []
+    if not auth_values:
+        app.logger.warning(
+            "pre-create hook: no Authorization key in tusd's forwarded headers (keys present: %s)",
+            sorted(headers.keys()),
+        )
     if not verify_bearer_header(auth_values[0] if auth_values else ''):
         return _tus_reject(401, 'Authentication required')
 
