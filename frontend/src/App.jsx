@@ -219,6 +219,16 @@ export default function App() {
     } catch (err) {
       if (!cancelledRef.current) {
         uploadsRef.current.forEach(u => u?.abort(true).catch(() => {}))
+        // tus-js-client surfaces the pre-create hook's 401 (expired/invalid
+        // token) as a generic onError, not as a response status this code
+        // already checks -- without this, an expired session shows up as
+        // a cryptic "unexpected response" toast instead of the same
+        // clean login redirect the finalize call below already gets.
+        if (err?.originalResponse?.getStatus?.() === 401) {
+          clearToken()
+          window.location.assign('/login')
+          return
+        }
         showToast(err?.message || t('app.networkError'), 'error')
       }
     } finally {
